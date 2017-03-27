@@ -50,7 +50,7 @@ elseif (-NOT (Get-ChildItem -Path $Path -Filter *.iclz)) {
 # Create new login Token and add it to Script variable
 Write-Host "Connecting $HuntServer using account $($HuntCredential.username)"
 $NewToken = New-ICToken $HuntCredential $HuntServer
-if ($NewToken) {
+if ($NewToken.id) {
 	Write-Host "Login successful to $HuntServer"
 	Write-Host "Login Token id: $($NewToken.id)"
 } else {
@@ -90,8 +90,16 @@ else {
 	while ($active) { 
 		$status = Get-ICActiveTasks | where { $_.type -eq "Enumerate" -AND $_.status -eq "Active"}
 		if ($status -match "Error") {
-			Write-Warning $status
-			return
+			Write-Host "$Status"
+			Write-Host "Attempting to re-connecting to $HuntServer"
+			$NewToken = New-ICToken $HuntCredential $HuntServer
+			if ($NewToken.id) {
+				Write-Host "Login successful to $HuntServer"
+				Write-Host "Login Token id: $($NewToken.id)"
+			} else {
+				Write-Warning "ERROR: Could not get a token from $HuntServer using credentials $($HuntCredential.username)"
+				return
+			}
 		} elseif ($status) {
 			$lastStatus = $status
 			$elapsedtime = "$($($status.elapsed)/1000)"
@@ -126,7 +134,15 @@ $LastFolder = (gci 'C:\Program Files\Infocyte\Hunt\uploads\' | Sort-Object LastW
 $ScanJobs = Get-ICActiveJobs | Sort-Object timestamp -Descending | where { $_.status -eq "Scanning" }
 if ($ScanJobs -match "Error") {
 	Write-Warning $ScanJobs
-	return
+	Write-Host "Attempting to re-connecting to $HuntServer"
+	$NewToken = New-ICToken $HuntCredential $HuntServer
+	if ($NewToken.id) {
+		Write-Host "Login successful to $HuntServer"
+		Write-Host "Login Token id: $($NewToken.id)"
+	} else {
+		Write-Warning "ERROR: Could not get a token from $HuntServer using credentials $($HuntCredential.username)"
+		return
+	}
 } elseif ($ScanJobs) {
 	$baseScanId = $ScanJobs[0].ScanId
 } else {
@@ -145,7 +161,15 @@ while ($scanId -eq $baseScanId) {
 	$ScanJobs = Get-ICActiveJobs | Sort-Object timestamp -Descending | where { $_.status -eq "Scanning" }
 	if ($ScanJobs -match "Error") {
 		Write-Warning $ScanJobs
-		return
+		Write-Host "Attempting to re-connecting to $HuntServer"
+		$NewToken = New-ICToken $HuntCredential $HuntServer
+		if ($NewToken.id) {
+			Write-Host "Login successful to $HuntServer"
+			Write-Host "Login Token id: $($NewToken.id)"
+		} else {
+			Write-Warning "ERROR: Could not get a token from $HuntServer using credentials $($HuntCredential.username)"
+			return
+		}
 	} elseif ($ScanJobs) {
 		$scanId = $ScanJobs[0].ScanId
 		Write-Host "Waiting for new ScanId to be created... ScanID is currently $scanID $(Get-Date)"
@@ -169,7 +193,18 @@ Write-Host "Your HostSurvey results will be processed as the current scan of Tar
 $active = $true
 while ($active) { 
 	$status = Get-ICActiveTasks | where { $_.type -eq "Scan" -AND $_.status -eq "Active"}
-	if ($status.status -eq "Active") {
+	if ($status -match "Error") {
+		Write-Host "$Status"
+		Write-Host "Attempting to re-connecting to $HuntServer"
+		$NewToken = New-ICToken $HuntCredential $HuntServer
+		if ($NewToken.id) {
+			Write-Host "Login successful to $HuntServer"
+			Write-Host "Login Token id: $($NewToken.id)"
+		} else {
+			Write-Warning "ERROR: Could not get a token from $HuntServer using credentials $($HuntCredential.username)"
+			return
+		}
+	} elseif ($status.status -eq "Active") {
 		$elapsedtime = "$($($status.elapsed)/1000)"
 		Write-Progress -Activity "Waiting for scan to process" -status "[Elapsed (seconds): $elapsedtime] $($status.message)" -percentComplete ($status.progress)	
 	} else {
