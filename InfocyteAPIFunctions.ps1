@@ -26,11 +26,11 @@ function New-ICToken ([PSCredential]$Credential, [String]$HuntServer = "https://
 		$response = Invoke-RestMethod "$HuntServerAddress/api/users/login" -Method POST -Body $i -ContentType 'application/json'
 	} catch {
 		Write-Warning "Error: $_"
-		break
+		return "ERROR: $($_.Exception.Message)"
 	}
 	if ($response -match "Error") {
 		Write-Warning "Error: Unauthorized"
-		break
+		return "ERROR: $($_.Exception.Message)"
 	} else {
 		# Set Token to global variable
 		$Global:ICToken = $response.id
@@ -48,7 +48,7 @@ function Get-ICScans {
 		$TargetLists = Invoke-RestMethod "$HuntServerAddress/api/Targets" -Headers $headers -Method GET -ContentType 'application/json'
 	} catch {
 		Write-Warning "Error: $_"
-		break
+		return "ERROR: $($_.Exception.Message)"
 	}
 	$more = $true
 	While ($more) {
@@ -74,7 +74,7 @@ function Get-ICScans {
 		$Scans = Invoke-RestMethod ("$HuntServerAddress/api/Scans") -Headers $headers -Method GET -ContentType 'application/json'
 	} catch {
 		Write-Warning "Error: $_"
-		break
+		return "ERROR: $($_.Exception.Message)"
 	}
 	$more = $true
 	While ($more) {
@@ -110,7 +110,7 @@ function Get-ICFileReport ($sha1){
 		$objects = Invoke-RestMethod "$HuntServerAddress/api/FileReps/$sha1" -Headers $headers -Method GET -ContentType 'application/json'
 	} catch {
 		Write-Warning "Error: $_"
-		break
+		return "ERROR: $($_.Exception.Message)"
 	}
 	
 	$objects | % {
@@ -128,7 +128,7 @@ function Get-ICFileReports ($scanId) {
 		$scan = Invoke-RestMethod ("$HuntServerAddress/api/scans/$scanId") -Headers $headers -Method GET -ContentType 'application/json'
 	} catch {
 		Write-Warning "Error: $_"
-		break	
+		return "ERROR: $($_.Exception.Message)"	
 	}
 	
 	$skip = 0
@@ -184,7 +184,7 @@ function Get-ICProcessInstances ($scanId){
 		$objects = Invoke-RestMethod ("$HuntServerAddress/api/scanProcessInstances") -Headers $headers -Method GET -ContentType 'application/json'
 	} catch {
 		Write-Warning "Error: $_"
-		break	
+		return "ERROR: $($_.Exception.Message)"	
 	}
 	$more = $true
 	While ($more) {
@@ -224,7 +224,7 @@ function Get-ICModuleInstances ($scanId){
 		$objects = Invoke-RestMethod ("$HuntServerAddress/api/scanModuleInstances") -Headers $headers -Method GET -ContentType 'application/json'
 	} catch {
 		Write-Warning "Error: $_"
-		break	
+		return "ERROR: $($_.Exception.Message)"	
 	}
 	$more = $true
 	While ($more) {
@@ -262,7 +262,7 @@ function Get-ICDriverInstances ($scanId){
 		$objects = Invoke-RestMethod ("$HuntServerAddress/api/scanDriverInstances") -Headers $headers -Method GET -ContentType 'application/json'
 	} catch {
 		Write-Warning "Error: $_"
-		break	
+		return "ERROR: $($_.Exception.Message)"	
 	}
 	$more = $true
 	While ($more) {
@@ -301,7 +301,7 @@ function Get-ICAutostartInstances ($scanId){
 		$objects = Invoke-RestMethod ("$HuntServerAddress/api/scanAutostartInstances") -Headers $headers -Method GET -ContentType 'application/json'
 	} catch {
 		Write-Warning "Error: $_"
-		break	
+		return "ERROR: $($_.Exception.Message)"	
 	}
 	$more = $true
 	While ($more) {
@@ -340,7 +340,7 @@ function Get-ICMemscanInstances ($scanId){
 		$objects = Invoke-RestMethod "$HuntServerAddress/api/scanMemscanInstances" -Headers $headers -Method GET -ContentType 'application/json'
 	} catch {
 		Write-Warning "Error: $_"
-		break	
+		return "ERROR: $($_.Exception.Message)"	
 	}
 	$more = $true
 	While ($more) {
@@ -381,7 +381,7 @@ function Get-ICConnectionInstances ([String]$scanId, [Switch]$All) {
 		$objects = (Invoke-RestMethod ("$HuntServerAddress/api/scanConnectionInstances") -Headers $headers -Method GET -ContentType 'application/json') | where { $_.localaddr -ne $_.remoteaddr }
 	} catch {
 		Write-Warning "Error: $_"
-		break
+		return "ERROR: $($_.Exception.Message)"
 	}
 	$more = $true
 	While ($more) {
@@ -421,7 +421,7 @@ function Get-ICAccountInstances ($scanId) {
 		$objects = Invoke-RestMethod "$HuntServerAddress/api/ScanAccountInstances" -Headers $headers -Method GET -ContentType 'application/json'
 	} catch {
 		Write-Warning "Error: $_"
-		break	
+		return "ERROR: $($_.Exception.Message)"	
 	}
 	$more = $true
 	While ($more) {
@@ -491,7 +491,7 @@ function Get-ICHosts ($scanId) {
 		$objects = Invoke-RestMethod ("$HuntServerAddress/api/ScanHosts") -Headers $headers -Method GET -ContentType 'application/json'
 	} catch {
 		Write-Warning "Error: $_"
-		break
+		return "ERROR: $($_.Exception.Message)"
 	}
 	$more = $true
 	While ($more) {
@@ -521,7 +521,7 @@ function Get-ICAddresses ($TargetId) {
 		$objects += Invoke-RestMethod ("$HuntServerAddress/api/Addresses") -Headers $headers -Method GET -ContentType 'application/json'		
 	} catch {
 		Write-Warning "Error: $_"
-		break
+		return "ERROR: $($_.Exception.Message)"
 	}
 	$more = $true
 	While ($more) {
@@ -551,7 +551,7 @@ function Get-ICTargetList {
 		$objects += Invoke-RestMethod ("$HuntServerAddress/api/targets") -Headers $headers -Method GET -ContentType 'application/json'		
 	} catch {
 		Write-Warning "Error: $_"
-		break
+		return "ERROR: $($_.Exception.Message)"
 	}	
 	$objects
 }
@@ -564,7 +564,7 @@ function New-ICTargetList ([String]$Name) {
 		$objects += Invoke-RestMethod ("$HuntServerAddress/api/targets") -Headers $headers -Body $body -Method POST -ContentType 'application/json'		
 	} catch {
 		Write-Warning "Error: $_"
-		break
+		return "ERROR: $($_.Exception.Message)"
 	}
 	$objects
 }
@@ -579,7 +579,7 @@ function New-ICQuery ([String]$TargetListId, [String]$query, [PSCredential]$Cred
 		$objects += Invoke-RestMethod ("$HuntServerAddress/api/queries") -Headers $headers -Body $body -Method POST -ContentType 'application/json'		
 	} catch {
 		Write-Warning "Error: $_"
-		break
+		return "ERROR: $($_.Exception.Message)"
 	}	
 	$objects
 }
@@ -592,7 +592,7 @@ function Remove-ICAddresses ($TargetListId) {
 		$objects += Invoke-RestMethod ("$HuntServerAddress/api/Addresses?$data") -Headers $headers -Method DELETE -ContentType 'application/json'		
 	} catch {
 		Write-Warning "Error: $_"
-		break
+		return "ERROR: $($_.Exception.Message)"
 	}	
 	$objects
 }
@@ -605,7 +605,7 @@ function Invoke-ICEnumeration ($TargetListId, $QueryId) {
 		$objects += Invoke-RestMethod ("$HuntServerAddress/api/targets/$TargetListId/Enumerate") -Headers $headers -Body $body -Method POST -ContentType 'application/json'		
 	} catch {
 		Write-Warning "Error: $_"
-		break
+		return "ERROR: $($_.Exception.Message)"
 	}	
 	$objects
 }
@@ -618,7 +618,7 @@ function Invoke-ICScan ($TargetListId) {
 		$objects += Invoke-RestMethod ("$HuntServerAddress/api/targets/$TargetListId/scan") -Headers $headers -Body $body -Method POST -ContentType 'application/json'		
 	} catch {
 		Write-Warning "Error: $_"
-		break
+		return "ERROR: $($_.Exception.Message)"
 	}	
 	$objects
 }
@@ -630,7 +630,7 @@ function Get-ICActiveTasks {
 		$objects += Invoke-RestMethod ("$HuntServerAddress/api/usertasks/active") -Headers $headers -Method GET -ContentType 'application/json'		
 	} catch {
 		Write-Warning "Error: $_"
-		break
+		return "ERROR: $($_.Exception.Message)"
 	}	
 	$objects | where { $_.status -eq "Active" }
 }
@@ -642,7 +642,7 @@ function Get-ICLastScanId {
 		$Scans = Invoke-RestMethod ("$HuntServerAddress/api/Scans") -Headers $headers -Method GET -ContentType 'application/json'
 	} catch {
 		Write-Warning "Error: $_"
-		break
+		return "ERROR: $($_.Exception.Message)"
 	}
 	if ($Scans) {
 		($Scans | sort-object completedOn -descending)[0].id
@@ -661,7 +661,7 @@ function Get-ICActiveJobs {
 		$Scans = Invoke-RestMethod ("$HuntServerAddress/api/CoreJobs") -Headers $headers -Method GET -ContentType 'application/json'
 	} catch {
 		Write-Warning "Error: $_"
-		break
+		return "ERROR: $($_.Exception.Message)"
 	}
 	if ($Scans) {
 		$Scans | where { $_.status -ne "Complete" }

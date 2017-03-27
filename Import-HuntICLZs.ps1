@@ -53,6 +53,9 @@ $NewToken = New-ICToken $HuntCredential $HuntServer
 if ($NewToken) {
 	Write-Host "Login successful to $HuntServer"
 	Write-Host "Login Token id: $($NewToken.id)"
+} else {
+	Write-Warning "ERROR: Could not get a token from $HuntServer using credentials $($HuntCredential.username)"
+	return
 }
 Start-Sleep 1
 # Error if token no longer valid is:
@@ -60,9 +63,14 @@ Start-Sleep 1
 
 # Get Target Lists.  If our specified list isn't there, create it.
 $TargetList = Get-ICTargetList | where { $_.name -eq $TargetListName -AND $_.deleted -eq $False}
-if ($TargetList) {
+if ($TargetList -match "Error") {
+	Write-Warning $TargetList
+	return
+}
+elseif ($TargetList) {
 	$TargetListId = $TargetList.id
-} else {
+} 
+else {
 	Write-Host "Creating TargetList named $TargetListName"
 	$TargetListId = (New-ICTargetList $TargetListName).id
 	
@@ -113,7 +121,10 @@ Get-ChildItem $Path -filter *.iclz | Foreach-Object {
 Write-Host "Retrieving Last Job and ScanId"
 $LastFolder = (gci 'C:\Program Files\Infocyte\Hunt\uploads\' | Sort-Object LastWriteTime -Descending)[0].Name
 $ScanJobs = Get-ICActiveJobs | Sort-Object timestamp -Descending | where { $_.status -eq "Scanning" }
-if ($ScanJobs) {
+if ($ScanJobs -match "Error") {
+	Write-Warning $ScanJobs
+	return
+} elseif ($ScanJobs) {
 	$baseScanId = $ScanJobs[0].ScanId
 } else {
 	$baseScanId = "NO_SCAN"
@@ -129,7 +140,10 @@ Invoke-ICScan $TargetListId
 $scanId = $baseScanId
 while ($scanId -eq $baseScanId) {
 	$ScanJobs = Get-ICActiveJobs | Sort-Object timestamp -Descending | where { $_.status -eq "Scanning" }
-	if ($ScanJobs) {
+	if ($ScanJobs -match "Error") {
+		Write-Warning $ScanJobs
+		return
+	} elseif ($ScanJobs) {
 		$scanId = $ScanJobs[0].ScanId
 		Write-Host "Waiting for new ScanId to be created... ScanID is currently $scanID $(Get-Date)"
 	} else {
