@@ -116,7 +116,7 @@ $ScanJobs = Get-ICActiveJobs | Sort-Object timestamp -Descending | where { $_.st
 if ($ScanJobs) {
 	$baseScanId = $ScanJobs[0].ScanId
 } else {
-	$baseScanId = "N/A"
+	$baseScanId = "NO_SCAN"
 }
 Write-Host "Last Folder name: $LastFolder"
 Write-Host "Last Active ScanId: $baseScanId"
@@ -134,7 +134,7 @@ while ($scanId -eq $baseScanId) {
 		Write-Host "Waiting for new ScanId to be created... ScanID is currently $scanID $(Get-Date)"
 	} else {
 		Write-Warning "No Active Scan! Waiting for scan to be initiated..."
-		$ScanId = "N/A"
+		$ScanId = "NO_SCAN"
 	}
 	Start-Sleep 2
 }
