@@ -66,10 +66,6 @@ if ($TargetList) {
 	Write-Host "Creating TargetList named $TargetListName"
 	$TargetListId = (New-ICTargetList $TargetListName).id
 	
-	# If we don't clear the target list, we would enumerate and scan all the other addresses already in there again
-	Write-Host "Clearing Target List targets from $TargetListId"
-	Remove-ICAddresses $TargetListId
-
 	#Create new Query for target
 	Write-Host "Creating new Query for: $Target"
 	$QueryId = (New-ICQuery $TargetListId $Target $ScanCredential).id
@@ -77,27 +73,30 @@ if ($TargetList) {
 	# Initiate Enumeration
 	Write-Host "Enumerating $Target"
 	Invoke-ICEnumeration $TargetListId $QueryId
+	Start-Sleep 1
 	
 	# Track Status of Enumeration
 	$active = $true
 	Write-Host "Waiting for enumeration to complete"
-	Write-Progress -Activity "Enumerating Target" -status "Waiting for enumeration to complete"
+	Write-Progress -Activity "Enumerating Target" -status "Initiating Enumeration"
 	while ($active) { 
-		$status = Get-ICActiveTasks | where { $_.type -eq "Enumerate" }
-		Write-Progress -Activity "Enumerating Target" -status "[$elapsed/1000] $($status.message)" -percentComplete $status.progress
-		if ($status.status -eq "Active") {
-			
-		} else {
+		$status = Get-ICActiveTasks | where { $_.type -eq "Enumerate" -AND $_.status -eq "Active"}
+		if ($status) {
+			$lastStatus = $status
+			$elapsedtime = "$($($status.elapsed)/1000)"
+			Write-Progress -Activity "Enumerating Target" -status "[Elapsed (seconds): $elapsedtime] $($status.message)" -percentComplete ($status.progress)	
+			Start-Sleep 0.5
+		} elseif ($Status.message -like "error") {
 			$active = $false
-			if ($status.message -like "error") {
-				Write-Host "ERROR: Could not enumerate Target"
-				return "ERROR: Could not enumerate Target"
-			} else {
-				Write-Host "Enumeration Complete!"
-			}
+			Write-Warning "ERROR: Could not enumerate Target: $($Status.message)"
+			return "ERROR: Could not enumerate Target: $($Status.message)"
+		}else {
+			$active = $false
+			Write-Warning "Enumeration Complete: $($lastStatus.message)"
 		}
 	}
 }
+Start-Sleep 1
 
 #Copy .iclz files into upload folder (temp dir)
 $TempFolderName = "temp$([guid]::NewGuid())"
