@@ -89,7 +89,10 @@ else {
 	Write-Progress -Activity "Enumerating Target" -status "Initiating Enumeration"
 	while ($active) { 
 		$status = Get-ICActiveTasks | where { $_.type -eq "Enumerate" -AND $_.status -eq "Active"}
-		if ($status) {
+		if ($status -match "Error") {
+			Write-Warning $status
+			return
+		} elseif ($status) {
 			$lastStatus = $status
 			$elapsedtime = "$($($status.elapsed)/1000)"
 			Write-Progress -Activity "Enumerating Target" -status "[Elapsed (seconds): $elapsedtime] $($status.message)" -percentComplete ($status.progress)	
