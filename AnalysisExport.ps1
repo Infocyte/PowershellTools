@@ -3,16 +3,18 @@
 #>
 Param(
 	[Parameter()]
-	[Int]$Days = 7, # Age of new data to pull from HUNT (in days)
+	[Int]$Days = 0, # Age of new data to pull from HUNT (in days)
 	
 	[Parameter()]
-	[String]$HuntServer = "https://localhost:4443"
+	[String]$HuntServer = "https://localhost:4443",
 	
 	[Parameter()]
-	[String]$OutPath = "C:\Program Files\Infocyte\SplunkData\" # Output Path of SplunkData json files
+	[String]$OutPath = "C:\Program Files\Infocyte\SplunkData\", # Output Path of SplunkData json files
 	
 	[Parameter()]
-	[ValidateNotNull()]
+	[Switch]$Replace,
+	
+	[Parameter()]
 	[PSCredential]$HuntCredential
 )
 
@@ -34,367 +36,95 @@ New-ICToken $Credential $HuntServer
 
 # splunkscan
 $AllScans = Get-ICScans
-$LastScan = $Scans[-1]
 
 # Create Time Box
-$CurrentDT = Get-Date
-$FirstDT = $CurrentDT.AddDays(-$Days)
-$Scans = $AllScans | where { $_.completedOn } | where { [datetime]$_.completedOn -gt $FirstDT -AND $_.hostCount -gt 0 }
-
-
-# splunkprocesses
-Write-Host "[] Exporting Processes"
-$Scans | % {
-	$n = 0
-	Write-Progress -Activity "[1/7] Exporting Processes" -status "Requesting Process Instances from Hunt Server"
-	$scan = $_
-	$time = Measure-Command { $obj = Get-ICProcessInstances $_.id }
-	$nt = $obj.count
-	Write-Host "[$n] Received ProcessInstances from Hunt server in $($time.TotalSeconds)"
-	Write-Progress -Activity "[1/7] Exporting Processes" -status "Getting FileReps on $nt objects" -percentComplete ($n * 100 / $nt)
-	$time = @()
-	$obj | % {
-		$n += 1
-		if ($n%10 -eq 0) {
-			Write-Progress -Activity "[1/7] Exporting Processes" -status "Getting FileReps on $nt objects" -percentComplete ($n * 100 / $nt)
-		}
-		$time += (Measure-Command { $filerep = Get-ICFileReport $_.fileRepId }).TotalSeconds
-		$_ | Add-Member -Type NoteProperty -Name 'type' -Value "Process" 
-		$_ | Add-Member -Type NoteProperty -Name 'scancompletedon' -Value $scan.scancompletedon
-		$_ | Add-Member -Type NoteProperty -Name 'targetListName' -Value $scan.targetListName
-		$_ | Add-Member -Type NoteProperty -Name 'avpositives' -Value $filerep.avpositives
-		$_ | Add-Member -Type NoteProperty -Name 'avtotal' -Value $filerep.avtotal
-		$_ | Add-Member -Type NoteProperty -Name 'synapse' -Value $filerep.synapse
-		$_ | Add-Member -Type NoteProperty -Name 'md5' -Value $filerep.md5
-		$_ | Add-Member -Type NoteProperty -Name 'sha1' -Value $filerep.sha1
-		$_ | Add-Member -Type NoteProperty -Name 'sha256' -Value $filerep.sha256
-		$_ | Add-Member -Type NoteProperty -Name 'ssdeep' -Value $filerep.ssdeep
-	}
-	$Processes += $obj
-	Write-Host "[$n] Received FileReps for $nt objects in average time of $($a = 0; $time | % { $a += $_ }; $a/$nt) seconds each"
+if ($Days -ne 0 -AND $AllScans) {
+	$CurrentDT = Get-Date
+	$FirstDT = $CurrentDT.AddDays(-$Days)
+	$Scans = $AllScans | where { $_.scancompletedon } | where { [datetime]$_.scancompletedon -gt $FirstDT -AND $_.hostCount -gt 0 }
+} else {
+	$Scans = $AllScans
 }
-$obj = $null
-$exportparams = @(
-  "scancompletedon",
-  "hostname",
-  "ip",
-  "targetlist",
-  "scanId",
-  "type",
-  "name",
-  "path",
-  "md5",
-  "sha1",
-  "sha256",
-  "ssdeep",
-  "pid",
-  "ppid",
-  "commandLine",
-  "hostCount",
-  "failed",
-  "managed",
-  "signed",
-  "threatName",
-  "threatScore",
-  "synapse",
-  "avpostives",
-  "avtotal",
-  "flagName"
-)
-$Processes | Select $exportparams | ConvertTo-JSON | Out-File Processes.json
 
-
-# splunkmodules
-Write-Host "[] Exporting Modules"
-$Scans | % {
-	$n = 0
-	Write-Progress -Activity "[1/7] Exporting Modules" -status "Requesting Instances from Hunt Server"
-	$scan = $_
-	$time = Measure-Command { $obj = Get-ICModuleInstances $_.id }
-	$nt = $obj.count
-	Write-Host "[$n] Received ModuleInstances from Hunt server in $($time.TotalSeconds)"
-	Write-Progress -Activity "[1/7] Exporting Modules" -status "Getting FileReps on $nt objects" -percentComplete ($n * 100 / $nt)
-	$obj | % {
-		$n += 1
-		if ($n%10 -eq 0) {
-			Write-Progress -Activity "[1/7] Exporting Modules" -status "Getting FileReps on $nt objects" -percentComplete ($n * 100 / $nt)
-		}
-		$filerep = Get-ICFileReport $_.fileRepId
-		$_ | Add-Member -Type NoteProperty -Name 'type' -Value "Module" 
-		$_ | Add-Member -Type NoteProperty -Name 'scancompletedon' -Value $scan.scancompletedon
-		$_ | Add-Member -Type NoteProperty -Name 'targetListName' -Value $scan.targetListName
-		$_ | Add-Member -Type NoteProperty -Name 'avpositives' -Value $filerep.avpositives
-		$_ | Add-Member -Type NoteProperty -Name 'avtotal' -Value $filerep.avtotal
-		$_ | Add-Member -Type NoteProperty -Name 'synapse' -Value $filerep.synapse
-		$_ | Add-Member -Type NoteProperty -Name 'md5' -Value $filerep.md5
-		$_ | Add-Member -Type NoteProperty -Name 'sha1' -Value $filerep.sha1
-		$_ | Add-Member -Type NoteProperty -Name 'sha256' -Value $filerep.sha256
-		$_ | Add-Member -Type NoteProperty -Name 'ssdeep' -Value $filerep.ssdeep
-	}
-	$Modules += $obj
+if (-NOT $Scans) {
+	Write-Warning "No Scans were found for the given date range"
+	exit
 }
-$obj = $null
-$exportparams = @(
-  "scancompletedon",
-  "hostname",
-  "ip",
-  "targetlist",
-  "scanId",
-  "type",
-  "name",
-  "path",
-  "md5",
-  "sha1",
-  "sha256",
-  "ssdeep",
-  "hostCount",
-  "failed",
-  "managed",
-  "signed",
-  "threatName",
-  "threatScore",
-  "synapse",
-  "avpostives",
-  "avtotal",
-  "flagName"
-)
-$Modules | ConvertTo-JSON | Out-File Modules.json
 
-# splunkdrivers
-Write-Host "[] Exporting Drivers"
-$Scans | % {
-	$n = 0
-	Write-Progress -Activity "[1/7] Exporting Drivers" -status "Requesting Instances from Hunt Server"
-	$scan = $_
-	$time = Measure-Command { $obj = Get-ICDriverInstances $_.id }
-	$nt = $obj.count
-	Write-Host "[$n] Received DriverInstances from Hunt server in $($time.TotalSeconds)"
-	Write-Progress -Activity "[1/7] Exporting Drivers" -status "Getting FileReps on $nt objects" -percentComplete ($n * 100 / $nt)
-	$obj | % {
-		$n += 1
-		if ($n%10 -eq 0) {
-			Write-Progress -Activity "[1/7] Exporting Drivers" -status "Getting FileReps on $nt objects" -percentComplete ($n * 100 / $nt)
-		}
-		$filerep = Get-ICFileReport $_.fileRepId
-		$_ | Add-Member -Type NoteProperty -Name 'type' -Value "Driver" 
-		$_ | Add-Member -Type NoteProperty -Name 'scancompletedon' -Value $scan.scancompletedon
-		$_ | Add-Member -Type NoteProperty -Name 'targetListName' -Value $scan.targetListName
-		$_ | Add-Member -Type NoteProperty -Name 'avpositives' -Value $filerep.avpositives
-		$_ | Add-Member -Type NoteProperty -Name 'avtotal' -Value $filerep.avtotal
-		$_ | Add-Member -Type NoteProperty -Name 'synapse' -Value $filerep.synapse
-		$_ | Add-Member -Type NoteProperty -Name 'md5' -Value $filerep.md5
-		$_ | Add-Member -Type NoteProperty -Name 'sha1' -Value $filerep.sha1
-		$_ | Add-Member -Type NoteProperty -Name 'sha256' -Value $filerep.sha256
-		$_ | Add-Member -Type NoteProperty -Name 'ssdeep' -Value $filerep.ssdeep
+# splunkscans
+$itemtype = "Scans"
+if (Test-Path $OutPath\$itemtype.json) {
+	if ($Replace) {
+		Remove-Item $OutPath\$itemtype.json
+		Write-Host "Requesting data from $($Scans.count) Scans."
+	} else {
+		#Check latest, only append new scanids
+		$old = gc $OutPath\$itemtype.json | convertfrom-JSON
+		$scanIds = $old.scanid
+		Write-Host "$($Scans.count) Scans found. $($scanIds.count) scans have already been exported"
+		$Scans = $Scans | where { $scanIds -notcontains $_.scanid }
+		Write-Host "Requesting $($Scans.count) new Scans."
+		
 	}
-	$Driver += $obj
 }
-$obj = $null
-$exportparams = @(
-  "scancompletedon",
-  "hostname",
-  "ip",
-  "targetlist",
-  "scanId",
-  "type",
-  "name",
-  "path",
-  "md5",
-  "sha1",
-  "sha256",
-  "ssdeep",
-  "hostCount",
-  "failed",
-  "managed",
-  "signed",
-  "threatName",
-  "threatScore",
-  "synapse",
-  "avpostives",
-  "avtotal",
-  "flagName"
-)
-$Driver | Select $exportparams | ConvertTo-JSON | Out-File Modules.json
+$Scans | % { $_ | ConvertTo-Json -compress | Out-File $OutPath\$itemtype.json -Append }
+
+
+if ((Test-Path $OutPath\$scanname.json) -AND $Replace) {
+	Remove-Item $OutPath\$scanname.json
+}
+$Scans | % {
+	$scanname = "$($_.targetlist)-$($_.scanname)"
+	
+	# splunkprocesses
+	$itemtype = "Processes"
+	Write-Host "[] Exporting $itemtype from $scanname"
+	$time = Measure-Command { $obj = Get-ICProcesses $_.id }
+	Write-Host "Received $($obj.count) $itemtype from Hunt server in $($time.TotalSeconds) seconds"
+	$obj | % { $_ | ConvertTo-Json -compress | Out-File $OutPath\$scanname.json -Append }
+
+	# splunkmodules
+	$itemtype = "Modules"
+	Write-Host "[] Exporting $itemtype from $scanname"
+	$time = Measure-Command { $obj = Get-ICModules $_.id }
+	Write-Host "Received $($obj.count) $itemtype from Hunt server in $($time.TotalSeconds) seconds"	
+	$obj | % { $_ | ConvertTo-Json -compress | Out-File $OutPath\$scanname.json -Append }
 
 	
-# splunkautostarts
-Write-Host "[] Exporting Autostarts"
-$Scans | % {
-	$n = 0
-	Write-Progress -Activity "[1/7] Exporting Autostarts" -status "Requesting Instances from Hunt Server"
-	$scan = $_
-	$time = Measure-Command { $obj = Get-ICAutostartInstances $_.id }
-	$nt = $obj.count
-	Write-Host "[$n] Received AutostartInstances from Hunt server in $($time.TotalSeconds)"
-	Write-Progress -Activity "[1/7] Exporting Autostarts" -status "Getting FileReps on $nt objects" -percentComplete ($n * 100 / $nt)
-	$obj | % {
-		$n += 1
-		if ($n%10 -eq 0) {
-			Write-Progress -Activity "[1/7] Exporting Autostarts" -status "Getting FileReps on $nt objects" -percentComplete ($n * 100 / $nt)
-		}
-		$filerep = Get-ICFileReport $_.fileRepId
-		$_ | Add-Member -Type NoteProperty -Name 'type' -Value "Autostart" 
-		$_ | Add-Member -Type NoteProperty -Name 'scancompletedon' -Value $scan.scancompletedon
-		$_ | Add-Member -Type NoteProperty -Name 'targetListName' -Value $scan.targetListName
-		$_ | Add-Member -Type NoteProperty -Name 'avpositives' -Value $filerep.avpositives
-		$_ | Add-Member -Type NoteProperty -Name 'avtotal' -Value $filerep.avtotal
-		$_ | Add-Member -Type NoteProperty -Name 'synapse' -Value $filerep.synapse
-		$_ | Add-Member -Type NoteProperty -Name 'md5' -Value $filerep.md5
-		$_ | Add-Member -Type NoteProperty -Name 'sha1' -Value $filerep.sha1
-		$_ | Add-Member -Type NoteProperty -Name 'sha256' -Value $filerep.sha256
-		$_ | Add-Member -Type NoteProperty -Name 'ssdeep' -Value $filerep.ssdeep
-	}
-	$Autostarts += $obj
-}
-$obj = $null
-$exportparams = @(
-  "scancompletedon",
-  "hostname",
-  "ip",
-  "targetlist",
-  "scanId",
-  "type",
-  "autostarttype",
-  "regpath",
-  "value",
-  "name",
-  "path",
-  "md5",
-  "sha1",
-  "sha256",
-  "ssdeep",
-  "hostCount",
-  "failed",
-  "managed",
-  "signed",
-  "threatName",
-  "threatScore",
-  "synapse",
-  "avpostives",
-  "avtotal",
-  "flagName"
-)
-$Autostarts | Select $exportparams | ConvertTo-JSON | Out-File Autostarts.json
+	# splunkdrivers
+	$itemtype = "Drivers"
+	Write-Host "[] Exporting $itemtype from $scanname"
+	$time = Measure-Command { $obj = Get-ICDrivers $_.id }
+	Write-Host "Received $($obj.count) $itemtype from Hunt server in $($time.TotalSeconds) seconds"
+	$obj | % { $_ | ConvertTo-Json -compress | Out-File $OutPath\$scanname.json -Append }
 
-# splunkmemscans
-Write-Host "[] Exporting MemoryObjects"
-$Scans | % {
-	$n = 0
-	Write-Progress -Activity "[1/7] Exporting MemoryObjects" -status "Requesting Instances from Hunt Server"
-	$scan = $_
-	$time = Measure-Command { $obj = Get-ICMemscanInstances $_.id }
-	$nt = $obj.count
-	Write-Host "[$n] Received MemoryInstances from Hunt server in $($time.TotalSeconds)"
-	Write-Progress -Activity "[1/7] Exporting MemoryObjects" -status "Getting FileReps on $nt objects" -percentComplete ($n * 100 / $nt)
-	$obj | % {
-		$n += 1
-		if ($n%1 -eq 0) {
-			Write-Progress -Activity "[1/7] Exporting MemoryObjects" -status "Getting FileReps on $nt objects" -percentComplete ($n * 100 / $nt)
-		}
+	# splunkautostarts
+	$itemtype = "Autostarts"
+	Write-Host "[] Exporting $itemtype from $scanname"
+	$time = Measure-Command { $obj = Get-ICAutostarts $_.id }
+	Write-Host "Received $($obj.count) $itemtype from Hunt server in $($time.TotalSeconds) seconds"
+	$obj | % { $_ | ConvertTo-Json -compress | Out-File $OutPath\$scanname.json -Append }
 
-		$_ | Add-Member -Type NoteProperty -Name 'processname' -Value $_.name
-		$_ | Add-Member -Type NoteProperty -Name 'processpath' -Value $_.path
+	# splunkmemscans
+	$itemtype = "Memscans"
+	Write-Host "[] Exporting $itemtype from $scanname"
+	$time = Measure-Command { $obj = Get-ICMemscans $_.id }
+	Write-Host "Received $($obj.count) $itemtype from Hunt server in $($time.TotalSeconds) seconds"
+	$obj | % { $_ | ConvertTo-Json -compress | Out-File $OutPath\$scanname.json -Append }
 
-		$filerep = Get-ICFileReport $_.fileRepId
-		$_ | Add-Member -Type NoteProperty -Name 'type' -Value "MemoryObject" 
-		$_ | Add-Member -Type NoteProperty -Name 'scancompletedon' -Value $scan.scancompletedon
-		$_ | Add-Member -Type NoteProperty -Name 'targetListName' -Value $scan.targetListName
-		$_ | Add-Member -Type NoteProperty -Name 'avpositives' -Value $filerep.avpositives
-		$_ | Add-Member -Type NoteProperty -Name 'avtotal' -Value $filerep.avtotal
-		$_ | Add-Member -Type NoteProperty -Name 'synapse' -Value $filerep.synapse
-		$_ | Add-Member -Type NoteProperty -Name 'ssdeep' -Value $filerep.ssdeep
-	}
-	$Memscans += $obj
-}
-$obj = $null
-$exportparams = @(
-  "scancompletedon",
-  "hostname",
-  "ip",
-  "targetlist",
-  "scanId",
-  "type",
-  "memscanid",
-  "filerepid",
-  "processname",
-  "processpath",
-  "address",
-  "size",
-  "protection",
-  "threatName",
-  "threatScore",
-  "synapse",
-  "avpostives",
-  "avtotal",
-  "flagName"
-)
-$Memscans | Select $exportparams | ConvertTo-JSON | Out-File Memscans.json
+	# splunkconnections
+	$itemtype = "Connections"
+	Write-Host "[] Exporting $itemtype from $scanname"
+	$time = Measure-Command { $obj = Get-ICConnections $_.id }
+	Write-Host "Received $($obj.count) $itemtype from Hunt server in $($time.TotalSeconds) seconds"
+	$obj | % { $_ | ConvertTo-Json -compress | Out-File $OutPath\$scanname.json -Append }
 
-# splunkconnections
-Write-Host "[] Exporting Connections"
-$Scans | % {
-	$n = 0
-	Write-Progress -Activity "[1/7] Exporting Connections" -status "Requesting Instances from Hunt Server"
-	$scan = $_
-	$time = Measure-Command { $obj = Get-ICConnectionInstances $_.id }
-	$nt = $obj.count
-	Write-Host "[$n] Received ConnectionInstances from Hunt server in $($time.TotalSeconds)"
-	$obj | % {
-		$_ | Add-Member -Type NoteProperty -Name 'type' -Value "Connection" 
-		$_ | Add-Member -Type NoteProperty -Name 'scancompletedon' -Value $scan.scancompletedon
-		$_ | Add-Member -Type NoteProperty -Name 'targetListName' -Value $scan.targetListName
-	}
-	$Connections += $obj
-}
-$obj = $null
-$exportparams = @(
-  "scancompletedon",
-  "hostname",
-  "ip",
-  "targetListName",
-  "scanId",
-  "type",
-  "pid",
-  "processPath",
-  "localAddr",
-  "localPort",
-  "remoteAddr",
-  "remotePort",
-  "proto",
-  "state",
-  "threatscore"
-)
-$Connections | Select $exportparams | ConvertTo-JSON | Out-File Connections.json
-
-
-# splunkhosts
-Write-Host "[] Exporting Hosts"
-$Scans | % {
-	$n = 0
-	Write-Progress -Activity "[1/7] Exporting Hosts" -status "Requesting Instances from Hunt Server"
-	$scan = $_
+	# splunkhosts
+	$itemtype = "Hosts"
+	Write-Host "[] Exporting $itemtype from $scanname"
 	$time = Measure-Command { $obj = Get-ICHosts $_.id }
-	$nt = $obj.count
-	Write-Host "[$n] Received Hosts from Hunt server in $($time.TotalSeconds)"
-	$obj | % {
-		$_ | Add-Member -Type NoteProperty -Name 'type' -Value "Host" 
-		$_ | Add-Member -Type NoteProperty -Name 'scancompletedon' -Value $scan.scancompletedon
-		$_ | Add-Member -Type NoteProperty -Name 'targetListName' -Value $scan.targetListName
-	}
-	$Hosts += $obj
+	Write-Host "Received $($obj.count) $itemtype from Hunt server in $($time.TotalSeconds) seconds"
+	$obj | % { $_ | ConvertTo-Json -compress | Out-File $OutPath\$scanname.json -Append }
 }
-$obj = $null
-$exportparams = @(
-  "scancompletedon",
-  "hostname",
-  "ip",
-  "targetListName",
-  "scanId",
-  "type",
-  "domain",
-  "osVersion",
-  "architecture",
-  "failed",
-  "compromised"
-)
-$Hosts | Select $exportparams | ConvertTo-JSON | Out-File Hosts.json
+
+
