@@ -61,16 +61,19 @@ Start-Sleep 1
 # Error if token no longer valid is:
 # WARNING: Error: The underlying connection was closed: An unexpected error occurred on a send.
 
-# Get Target Lists.  If our specified list isn't there, create it.
-$TargetList = Get-ICTargetList | where { $_.name -eq $TargetListName -AND $_.deleted -eq $False}
+# Get Target Lists.  
+$TargetList = Get-ICTargetList
 if ($TargetList -match "Error") {
-	Write-Warning $TargetList
+	Write-Warning "$TargetList"
 	return
+} else {
+	$TargetList = $TargetList | where { $_.name -eq $TargetListName -AND $_.deleted -eq $False}
 }
-elseif ($TargetList) {
+ 
+if ($TargetList) {
 	$TargetListId = $TargetList.id
-} 
-else {
+} else {
+	# If our specified list isn't there, create it.
 	Write-Host "Creating TargetList named $TargetListName"
 	$TargetListId = (New-ICTargetList $TargetListName).id
 	
@@ -88,7 +91,7 @@ else {
 	Write-Host "Waiting for enumeration to complete"
 	Write-Progress -Activity "Enumerating Target" -status "Initiating Enumeration"
 	while ($active) { 
-		$status = Get-ICActiveTasks | where { $_.type -eq "Enumerate" -AND $_.status -eq "Active"}
+		$status = Get-ICActiveTasks
 		if ($status -match "Error") {
 			Write-Host "$Status"
 			Write-Host "Attempting to re-connecting to $HuntServer"
@@ -96,20 +99,25 @@ else {
 			if ($NewToken.id) {
 				Write-Host "Login successful to $HuntServer"
 				Write-Host "Login Token id: $($NewToken.id)"
+				continue
 			} else {
 				Write-Warning "ERROR: Could not get a token from $HuntServer using credentials $($HuntCredential.username)"
 				return
 			}
-		} elseif ($status) {
+		} else {
+			$status = $status | where { $_.type -eq "Enumerate" -AND $_.status -eq "Active"}
+		}
+		
+		if ($status) {
 			$lastStatus = $status
 			$elapsedtime = "$($($status.elapsed)/1000)"
 			Write-Progress -Activity "Enumerating Target" -status "[Elapsed (seconds): $elapsedtime] $($status.message)" -percentComplete ($status.progress)	
 			Start-Sleep 0.5
-		} elseif ($Status.message -like "error") {
+		} elseif ($Status.message -match "error") {
 			$active = $false
 			Write-Warning "ERROR: Could not enumerate Target: $($Status.message)"
 			return "ERROR: Could not enumerate Target: $($Status.message)"
-		}else {
+		} else {
 			$active = $false
 			Write-Warning "Enumeration Complete: $($lastStatus.message)"
 		}
@@ -119,7 +127,7 @@ Start-Sleep 1
 
 #Copy .iclz files into upload folder (temp dir)
 $TempFolderName = "temp$([guid]::NewGuid())"
-Write-Host "Copying .iclz files to temp directory: $UploadDir\$TempFolderName"
+Write-Host "Copying folder of .iclz files to staging temp directory: $UploadDir\$TempFolderName"
 Copy-Item -Path $Path -Destination $UploadDir\$TempFolderName -recurse -Container
 <# 
 # TODO: Change this to grab the iclz files only and rename them using their md5 hash so we're not uploading the same iclz file twice (which would break everything)
@@ -131,9 +139,9 @@ Get-ChildItem $Path -filter *.iclz | Foreach-Object {
 
 Write-Host "Retrieving Last Job and ScanId"
 $LastFolder = (gci 'C:\Program Files\Infocyte\Hunt\uploads\' | Sort-Object LastWriteTime -Descending)[0].Name
-$ScanJobs = Get-ICActiveJobs | Sort-Object timestamp -Descending | where { $_.status -eq "Scanning" }
+$ScanJobs = Get-ICActiveJobs
 if ($ScanJobs -match "Error") {
-	Write-Warning $ScanJobs
+	Write-Warning "$ScanJobs"
 	Write-Host "Attempting to re-connecting to $HuntServer"
 	$NewToken = New-ICToken $HuntCredential $HuntServer
 	if ($NewToken.id) {
@@ -143,7 +151,11 @@ if ($ScanJobs -match "Error") {
 		Write-Warning "ERROR: Could not get a token from $HuntServer using credentials $($HuntCredential.username)"
 		return
 	}
-} elseif ($ScanJobs) {
+} else {
+	$ScanJobs = $ScanJobs | Sort-Object timestamp -Descending | where { $_.status -eq "Scanning" }
+}
+
+if ($ScanJobs) {
 	$baseScanId = $ScanJobs[0].ScanId
 } else {
 	$baseScanId = "NO_SCAN"
@@ -151,6 +163,7 @@ if ($ScanJobs -match "Error") {
 Write-Host "Last Folder name: $LastFolder"
 Write-Host "Last Active ScanId: $baseScanId"
 	
+
 # Initiate Scan
 Write-Host "Initiating Scan of $Target"
 Invoke-ICScan $TargetListId
@@ -158,9 +171,9 @@ Invoke-ICScan $TargetListId
 # Wait for new scan to be created
 $scanId = $baseScanId
 while ($scanId -eq $baseScanId) {
-	$ScanJobs = Get-ICActiveJobs | Sort-Object timestamp -Descending | where { $_.status -eq "Scanning" }
-	if ($ScanJobs -match "Error") {
-		Write-Warning $ScanJobs
+	$ScanJobs = Get-ICActiveJobs
+	if (!$ScanJobs -OR ($ScanJobs -match "Error")) {
+		Write-Warning "$ScanJobs"
 		Write-Host "Attempting to re-connecting to $HuntServer"
 		$NewToken = New-ICToken $HuntCredential $HuntServer
 		if ($NewToken.id) {
@@ -170,7 +183,11 @@ while ($scanId -eq $baseScanId) {
 			Write-Warning "ERROR: Could not get a token from $HuntServer using credentials $($HuntCredential.username)"
 			return
 		}
-	} elseif ($ScanJobs) {
+	} else {
+		$ScanJobs = $ScanJobs | Sort-Object timestamp -Descending | where { $_.status -eq "Scanning" }
+	}
+	
+	if ($ScanJobs) {
 		$scanId = $ScanJobs[0].ScanId
 		Write-Host "Waiting for new ScanId to be created... ScanID is currently $scanID $(Get-Date)"
 	} else {
@@ -192,7 +209,7 @@ Write-Host "Your HostSurvey results will be processed as the current scan of Tar
 # Track Status of Scan processing
 $active = $true
 while ($active) { 
-	$status = Get-ICActiveTasks | where { $_.type -eq "Scan" -AND $_.status -eq "Active"}
+	$status = Get-ICActiveTasks
 	if ($status -match "Error") {
 		Write-Host "$Status"
 		Write-Host "Attempting to re-connecting to $HuntServer"
@@ -204,12 +221,16 @@ while ($active) {
 			Write-Warning "ERROR: Could not get a token from $HuntServer using credentials $($HuntCredential.username)"
 			return
 		}
-	} elseif ($status.status -eq "Active") {
+	} else {
+		$status = $status | where { $_.type -eq "Scan" -AND $_.status -eq "Active"}
+	}
+	
+	if ($status.status -eq "Active") {
 		$elapsedtime = "$($($status.elapsed)/1000)"
 		Write-Progress -Activity "Waiting for scan to process" -status "[Elapsed (seconds): $elapsedtime] $($status.message)" -percentComplete ($status.progress)	
 	} else {
 		$active = $false
-		if ($status.message -like "error") {
+		if ($status.message -match "error") {
 			Write-Host "ERROR: Could not scan Target"
 		} else {
 			Write-Host "Scan Completed in $elapsedtime seconds"
