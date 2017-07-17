@@ -60,17 +60,6 @@ if ($NewToken.id) {
 # Error if token no longer valid is:
 # WARNING: Error: The underlying connection was closed: An unexpected error occurred on a send.
 
-#Copy .iclz files into upload folder (temp dir)
-$TempFolderName = "temp$([guid]::NewGuid())"
-Write-Host "Copying folder of .iclz files to staging temp directory: $UploadDir\$TempFolderName"
-Copy-Item -Path $Path -Destination $UploadDir\$TempFolderName -recurse -Container
-<# 
-# TODO: Change this to grab the iclz files only and rename them using their md5 hash so we're not uploading the same iclz file twice (which would break everything)
-Get-ChildItem $Path -filter *.iclz | Foreach-Object { 
-	$newhash = (Get-Hashes -Path $_ -Type MD5).md5
-	Copy-Item -Path $_ -Destination $UploadDir\$TempFolderName\Survey-$newhash.json.iclz -recurse -Container
-}	
-#>
 
 # Get Target Lists.  
 $TargetList = Get-ICTargetList
@@ -81,13 +70,17 @@ if ($TargetList -match "Error") {
 	$TargetList = $TargetList | where { $_.name -eq $TargetListName -AND $_.deleted -eq $False}
 }
  
-if ($TargetList) {
+if ($TargetList -AND $TargetList.accessibleAddressCount -ne 0) {
 	$TargetListId = $TargetList.id
 } else {
-	# If our specified list isn't there, create it.
-	Write-Host "Creating TargetList named $TargetListName"
-	$TargetListId = (New-ICTargetList $TargetListName).id
-	
+    if (-NOT $TargetList) {
+	    # If our specified list isn't there, create it.
+	    Write-Host "Creating TargetList named $TargetListName"
+	    $TargetListId = (New-ICTargetList $TargetListName).id
+    } else {
+        $TargetListId = $TargetList.id
+    }
+
 	#Create new Query for target
 	Write-Host "Creating new Query for: $Target"
 	$QueryId = (New-ICQuery $TargetListId $Target $ScanCredential).id
@@ -136,6 +129,33 @@ if ($TargetList) {
 }
 Start-Sleep 1
 
+$TargetListResults = Get-ICTargetList $TargetListId
+if ($TargetListResults) {
+    if ($TargetListResults.accessibleAddressCount -eq 0) {
+        $failreason = (Get-ICAddresses $TargetListId).failureReason
+
+        Write-Warning "ERROR: Enumeration was not successful ($failreason). Please check your ScanCredentials for the hunt server localhost and try again"
+        return
+    } else {
+        Write-Host "Enumeration Successful!"
+    }
+} else {
+    Write-Warning "ERROR: Could not get target list"
+    return
+}
+
+
+#Copy .iclz files into upload folder (temp dir)
+$TempFolderName = "temp$([guid]::NewGuid())"
+Write-Host "Copying folder of .iclz files to staging temp directory: $UploadDir\$TempFolderName"
+Copy-Item -Path $Path -Destination $UploadDir\$TempFolderName -recurse -Container
+<# 
+# TODO: Change this to grab the iclz files only and rename them using their md5 hash so we're not uploading the same iclz file twice (which would break everything)
+Get-ChildItem $Path -filter *.iclz | Foreach-Object { 
+	$newhash = (Get-Hashes -Path $_ -Type MD5).md5
+	Copy-Item -Path $_ -Destination $UploadDir\$TempFolderName\Survey-$newhash.json.iclz -recurse -Container
+}	
+#>
 
 Write-Host "Retrieving Last Job and ScanId"
 $LastFolder = (gci 'C:\Program Files\Infocyte\Hunt\uploads\' | Sort-Object LastWriteTime -Descending)[0].Name

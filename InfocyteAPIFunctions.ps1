@@ -59,7 +59,7 @@ function Get-ICTargetList {
 function Get-ICScans {
 	$skip = 0
 	Write-Verbose "Exporting Scans from $HuntServerAddress"
-	Write-Progress -Activity "Exporting Scans from Hunt Server" -status "Requesting Scans from $scanid [$skip]" 
+	Write-Progress -Activity "Exporting Scans from Hunt Server" -status "Requesting Scans from $scanId [$skip]" 
 	
 	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
 	$headers.Add("Authorization", $Global:ICToken)
@@ -74,7 +74,7 @@ function Get-ICScans {
 	$more = $true
 	While ($more) {
 		$skip += 1000
-		Write-Progress -Activity "Exporting Scans from Hunt Server" -status "Requesting Scans from $scanid [$skip]" 
+		Write-Progress -Activity "Exporting Scans from Hunt Server" -status "Requesting Scans from $scanId [$skip]" 
 		$headers.remove('filter') | Out-Null
 		$headers.Add("filter", '{"limit":1000,"skip":'+$skip+'}')
 		try {
@@ -92,32 +92,32 @@ function Get-ICScans {
 }
 
 
-# Get Full FileReports on all Suspicious and Malicious objects by scanid
-function Get-ICFileReports ($scanid) {
+# Get Full FileReports on all Suspicious and Malicious objects by scanId
+function Get-ICFileReports ($scanId) {
 	$skip = 0
 	Write-Verbose "Exporting FileReports from $HuntServerAddress"
-	Write-Progress -Activity "Exporting FileReports from Hunt Server" -status "Requesting FileReports from $scanid [$skip]" 
+	Write-Progress -Activity "Exporting FileReports from Hunt Server" -status "Requesting FileReports from $scanId [$skip]" 
 	
 	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
 	$headers.Add("Authorization", $Global:ICToken)
 	try {
-		$scan = Invoke-RestMethod ("$HuntServerAddress/api/scans/$scanid") -Headers $headers -Method GET -ContentType 'application/json'
+		$scan = Invoke-RestMethod ("$HuntServerAddress/api/scans/$scanId") -Headers $headers -Method GET -ContentType 'application/json'
 	} catch {
 		Write-Warning "Error: $_"
 		return "ERROR: $($_.Exception.Message)"	
 	}
 	
 	$skip = 0
-	$headers.Add("filter", '{"where":{"scanid":"'+$scanid+'"},"limit":1000,"skip":'+$skip+'}')
+	$headers.Add("filter", '{"where":{"scanId":"'+$scanId+'"},"limit":1000,"skip":'+$skip+'}')
 	try {
 		$objects = Invoke-RestMethod ("$HuntServerAddress/api/ScanReportFiles") -Headers $headers -Method GET -ContentType 'application/json'
 	} catch {}
 	$more = $true
 	While ($more) {
 		$skip += 1000
-		Write-Progress -Activity "Exporting FileReports from Hunt Server" -status "Requesting FileReports from $scanid [$skip]" 
+		Write-Progress -Activity "Exporting FileReports from Hunt Server" -status "Requesting FileReports from $scanId [$skip]" 
 		$headers.remove('filter') | Out-Null
-		$headers.Add("filter", '{"where":{"scanid":"'+$scanid+'"},"limit":1000,"skip":'+$skip+'}')
+		$headers.Add("filter", '{"where":{"scanId":"'+$scanId+'"},"limit":1000,"skip":'+$skip+'}')
 		try {
 			$moreobjects = Invoke-RestMethod ("$HuntServerAddress/api/ScanReportFiles") -Headers $headers -Method GET -ContentType 'application/json'
 		} catch {
@@ -152,15 +152,15 @@ function Get-ICFileReports ($scanid) {
 }
 
 
-# Get objects by scanid
-function Get-ICProcesses ($scanid){
+# Get objects by scanId
+function Get-ICProcesses ($scanId){
 	$skip = 0
-	Write-Verbose "Exporting Processes from $scanid [$skip]" 
-	Write-Progress -Activity "Exporting Process Instances from Hunt Server" -status "Requesting Processes from $scanid [$skip]" 
+	Write-Verbose "Exporting Processes from $scanId [$skip]" 
+	Write-Progress -Activity "Exporting Process Instances from Hunt Server" -status "Requesting Processes from $scanId [$skip]" 
 	
 	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
 	$headers.Add("Authorization", $Global:ICToken)
-	$headers.Add("filter", '{"where":{"scanid":"'+$scanid+'"},"limit":1000,"skip":'+$skip+'}')
+	$headers.Add("filter", '{"where":{"scanId":"'+$scanId+'"},"limit":1000,"skip":'+$skip+'}')
 	try {
 		$objects = Invoke-RestMethod ("$HuntServerAddress/api/SplunkProcesses") -Headers $headers -Method GET -ContentType 'application/json'
 	} catch {
@@ -171,9 +171,9 @@ function Get-ICProcesses ($scanid){
 	$more = $true
 	While ($more) {
 		$skip += 1000
-		Write-Progress -Activity "Exporting Process Instances from Hunt Server" -status "Requesting Processes from $scanid [$skip]" 
+		Write-Progress -Activity "Exporting Process Instances from Hunt Server" -status "Requesting Processes from $scanId [$skip]" 
 		$headers.remove('filter') | Out-Null
-		$headers.Add("filter", '{"where":{"scanid":"'+$scanid+'"},"limit":1000,"skip":'+$skip+'}')
+		$headers.Add("filter", '{"where":{"scanId":"'+$scanId+'"},"limit":1000,"skip":'+$skip+'}')
 		try {
 			$moreobjects = Invoke-RestMethod ("$HuntServerAddress/api/SplunkProcesses") -Headers $headers -Method GET -ContentType 'application/json'
 		} catch {
@@ -188,14 +188,14 @@ function Get-ICProcesses ($scanid){
 	}
 }
 
-function Get-ICModules ($scanid){
+function Get-ICModules ($scanId){
 	$skip = 0
-	Write-Verbose "Exporting Modules from $scanid [$skip]" 
-	Write-Progress -Activity "Exporting Module Instances from Hunt Server" -status "Requesting Modules from $scanid [$skip]" 
+	Write-Verbose "Exporting Modules from $scanId [$skip]" 
+	Write-Progress -Activity "Exporting Module Instances from Hunt Server" -status "Requesting Modules from $scanId [$skip]" 
 	
 	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
 	$headers.Add("Authorization", $Global:ICToken)
-	$headers.Add("filter", '{"where":{"scanid":"'+$scanid+'"},"limit":1000,"skip":'+$skip+'}')
+	$headers.Add("filter", '{"where":{"scanId":"'+$scanId+'"},"limit":1000,"skip":'+$skip+'}')
 	try {
 		$objects = Invoke-RestMethod ("$HuntServerAddress/api/SplunkModules") -Headers $headers -Method GET -ContentType 'application/json'
 	} catch {
@@ -206,9 +206,9 @@ function Get-ICModules ($scanid){
 	$more = $true
 	While ($more) {
 		$skip += 1000
-		Write-Progress -Activity "Exporting Module Instances from Hunt Server" -status "Requesting Modules from $scanid [$skip]" 
+		Write-Progress -Activity "Exporting Module Instances from Hunt Server" -status "Requesting Modules from $scanId [$skip]" 
 		$headers.remove('filter') | Out-Null
-		$headers.Add("filter", '{"where":{"scanid":"'+$scanid+'"},"limit":1000,"skip":'+$skip+'}')
+		$headers.Add("filter", '{"where":{"scanId":"'+$scanId+'"},"limit":1000,"skip":'+$skip+'}')
 		try {
 			$moreobjects = Invoke-RestMethod ("$HuntServerAddress/api/SplunkModules") -Headers $headers -Method GET -ContentType 'application/json'
 		} catch {
@@ -223,14 +223,14 @@ function Get-ICModules ($scanid){
 	}
 }
 
-function Get-ICDrivers ($scanid){
+function Get-ICDrivers ($scanId){
 	$skip = 0
-	Write-Verbose "Exporting Drivers from $scanid [$skip]" 
-	Write-Progress -Activity "Exporting Driver Instances from Hunt Server" -status "Requesting Drivers from $scanid [$skip]" 
+	Write-Verbose "Exporting Drivers from $scanId [$skip]" 
+	Write-Progress -Activity "Exporting Driver Instances from Hunt Server" -status "Requesting Drivers from $scanId [$skip]" 
 	
 	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
 	$headers.Add("Authorization", $Global:ICToken)
-	$headers.Add("filter", '{"where":{"scanid":"'+$scanid+'"},"limit":1000,"skip":'+$skip+'}')
+	$headers.Add("filter", '{"where":{"scanId":"'+$scanId+'"},"limit":1000,"skip":'+$skip+'}')
 	try {
 		$objects = Invoke-RestMethod ("$HuntServerAddress/api/SplunkDrivers") -Headers $headers -Method GET -ContentType 'application/json'
 	} catch {
@@ -241,9 +241,9 @@ function Get-ICDrivers ($scanid){
 	$more = $true
 	While ($more) {
 		$skip += 1000
-		Write-Progress -Activity "Exporting Driver Instances from Hunt Server" -status "Requesting Drivers from $scanid [$skip]" 
+		Write-Progress -Activity "Exporting Driver Instances from Hunt Server" -status "Requesting Drivers from $scanId [$skip]" 
 		$headers.remove('filter') | Out-Null
-		$headers.Add("filter", '{"where":{"scanid":"'+$scanid+'"},"limit":1000,"skip":'+$skip+'}')
+		$headers.Add("filter", '{"where":{"scanId":"'+$scanId+'"},"limit":1000,"skip":'+$skip+'}')
 		try {
 			$moreobjects = Invoke-RestMethod ("$HuntServerAddress/api/SplunkDrivers") -Headers $headers -Method GET -ContentType 'application/json'
 		} catch {
@@ -258,14 +258,14 @@ function Get-ICDrivers ($scanid){
 	}
 }
 
-function Get-ICAutostarts ($scanid){
+function Get-ICAutostarts ($scanId){
 	$skip = 0
-	Write-Verbose "Exporting Autostarts from $scanid [$skip]" 
-	Write-Progress -Activity "Exporting Autostart Instances from Hunt Server" -status "Requesting Autostarts from $scanid [$skip]" 
+	Write-Verbose "Exporting Autostarts from $scanId [$skip]" 
+	Write-Progress -Activity "Exporting Autostart Instances from Hunt Server" -status "Requesting Autostarts from $scanId [$skip]" 
 	
 	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
 	$headers.Add("Authorization", $Global:ICToken)
-	$headers.Add("filter", '{"where":{"scanid":"'+$scanid+'"},"limit":1000,"skip":'+$skip+'}')
+	$headers.Add("filter", '{"where":{"scanId":"'+$scanId+'"},"limit":1000,"skip":'+$skip+'}')
 	try {
 		$objects = Invoke-RestMethod ("$HuntServerAddress/api/SplunkAutostarts") -Headers $headers -Method GET -ContentType 'application/json'
 	} catch {
@@ -276,9 +276,9 @@ function Get-ICAutostarts ($scanid){
 	$more = $true
 	While ($more) {
 		$skip += 1000
-		Write-Progress -Activity "Exporting Autostart Instances from Hunt Server" -status "Requesting Autostarts from $scanid [$skip]" 
+		Write-Progress -Activity "Exporting Autostart Instances from Hunt Server" -status "Requesting Autostarts from $scanId [$skip]" 
 		$headers.remove('filter') | Out-Null
-		$headers.Add("filter", '{"where":{"scanid":"'+$scanid+'"},"limit":1000,"skip":'+$skip+'}')
+		$headers.Add("filter", '{"where":{"scanId":"'+$scanId+'"},"limit":1000,"skip":'+$skip+'}')
 		try {
 			$moreobjects = Invoke-RestMethod ("$HuntServerAddress/api/SplunkAutostarts") -Headers $headers -Method GET -ContentType 'application/json'
 		} catch {
@@ -293,14 +293,14 @@ function Get-ICAutostarts ($scanid){
 	}
 }
 
-function Get-ICMemscans ($scanid){
+function Get-ICMemscans ($scanId){
 	$skip = 0
-	Write-Verbose "Exporting Memscans from $scanid [$skip]" 
-	Write-Progress -Activity "Exporting Memscan Instances from Hunt Server" -status "Requesting Memscans from $scanid [$skip]" 
+	Write-Verbose "Exporting Memscans from $scanId [$skip]" 
+	Write-Progress -Activity "Exporting Memscan Instances from Hunt Server" -status "Requesting Memscans from $scanId [$skip]" 
 	
 	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
 	$headers.Add("Authorization", $Global:ICToken)
-	$headers.Add("filter", '{"where":{"scanid":"'+$scanid+'"},"limit":1000,"skip":'+$skip+'}')
+	$headers.Add("filter", '{"where":{"scanId":"'+$scanId+'"},"limit":1000,"skip":'+$skip+'}')
 	try {
 		$objects = Invoke-RestMethod "$HuntServerAddress/api/SplunkMemscans" -Headers $headers -Method GET -ContentType 'application/json'
 	} catch {
@@ -311,9 +311,9 @@ function Get-ICMemscans ($scanid){
 	$more = $true
 	While ($more) {
 		$skip += 1000
-		Write-Progress -Activity "Exporting Memscan Instances from Hunt Server" -status "Requesting Memscans from $scanid [$skip]" 
+		Write-Progress -Activity "Exporting Memscan Instances from Hunt Server" -status "Requesting Memscans from $scanId [$skip]" 
 		$headers.remove('filter') | Out-Null
-		$headers.Add("filter", '{"where":{"scanid":"'+$scanid+'"},"limit":1000,"skip":'+$skip+'}')
+		$headers.Add("filter", '{"where":{"scanId":"'+$scanId+'"},"limit":1000,"skip":'+$skip+'}')
 		try {
 			$moreobjects = Invoke-RestMethod ("$HuntServerAddress/api/SplunkMemscans") -Headers $headers -Method GET -ContentType 'application/json'
 		} catch {
@@ -328,14 +328,14 @@ function Get-ICMemscans ($scanid){
 	}
 }
 
-function Get-ICConnections ([String]$scanid, [Switch]$All) {
+function Get-ICConnections ([String]$scanId, [Switch]$All) {
 	$skip = 0
-	Write-Verbose "Exporting Connections from $scanid [$skip]" 
-	Write-Progress -Activity "Exporting Connection Instances from Hunt Server" -status "Requesting Connections from $scanid [$skip]" 
+	Write-Verbose "Exporting Connections from $scanId [$skip]" 
+	Write-Progress -Activity "Exporting Connection Instances from Hunt Server" -status "Requesting Connections from $scanId [$skip]" 
 	
 	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
 	$headers.Add("Authorization", $Global:ICToken)
-	$headers.Add("filter", '{"where":{"and":[{"scanid":"'+$scanid+'"},{"or":[{"state":"SYN-SENT"},{"state":"ESTABLISHED"}]}]},"limit":1000,"skip":'+$skip+'}')
+	$headers.Add("filter", '{"where":{"and":[{"scanId":"'+$scanId+'"},{"or":[{"state":"SYN-SENT"},{"state":"ESTABLISHED"}]}]},"limit":1000,"skip":'+$skip+'}')
 	try {
 		$objects = (Invoke-RestMethod ("$HuntServerAddress/api/SplunkConnections") -Headers $headers -Method GET -ContentType 'application/json') | where { $_.localaddr -ne $_.remoteaddr }
 	} catch {
@@ -346,9 +346,9 @@ function Get-ICConnections ([String]$scanid, [Switch]$All) {
 	$more = $true
 	While ($more) {
 		$skip += 1000
-		Write-Progress -Activity "Exporting Connection Instances from Hunt Server" -status "Requesting Connections from $scanid [$skip]" 
+		Write-Progress -Activity "Exporting Connection Instances from Hunt Server" -status "Requesting Connections from $scanId [$skip]" 
 		$headers.remove('filter') | Out-Null
-		$headers.Add("filter", '{"where":{"and":[{"scanid":"'+$scanid+'"},{"or":[{"state":"SYN-SENT"},{"state":"ESTABLISHED"}]}]},"limit":1000,"skip":'+$skip+'}')
+		$headers.Add("filter", '{"where":{"and":[{"scanId":"'+$scanId+'"},{"or":[{"state":"SYN-SENT"},{"state":"ESTABLISHED"}]}]},"limit":1000,"skip":'+$skip+'}')
 		try {
 			$moreobjects = Invoke-RestMethod ("$HuntServerAddress/api/SplunkConnections") -Headers $headers -Method GET -ContentType 'application/json'
 		} catch {
@@ -363,14 +363,14 @@ function Get-ICConnections ([String]$scanid, [Switch]$All) {
 	}
 }
 
-function Get-ICAccounts ($scanid) {
+function Get-ICAccounts ($scanId) {
 	$skip = 0
-	Write-Verbose "Exporting Accounts from $scanid [$skip]" 
-	Write-Progress -Activity "Exporting Account Instances from Hunt Server" -status "Requesting Accounts from $scanid [$skip]" 
+	Write-Verbose "Exporting Accounts from $scanId [$skip]" 
+	Write-Progress -Activity "Exporting Account Instances from Hunt Server" -status "Requesting Accounts from $scanId [$skip]" 
 	
 	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
 	$headers.Add("Authorization", $Global:ICToken)
-	$headers.Add("filter", '{"where":{"scanid":"'+$scanid+'"},"limit":1000,"skip":'+$skip+'}')
+	$headers.Add("filter", '{"where":{"scanId":"'+$scanId+'"},"limit":1000,"skip":'+$skip+'}')
 	try {
 		$objects = Invoke-RestMethod "$HuntServerAddress/api/SplunkAccounts" -Headers $headers -Method GET -ContentType 'application/json'
 	} catch {
@@ -381,9 +381,9 @@ function Get-ICAccounts ($scanid) {
 	$more = $true
 	While ($more) {
 		$skip += 1000
-		Write-Progress -Activity "Exporting Account Instances from Hunt Server" -status "Requesting Accounts from $scanid [$skip]" 
+		Write-Progress -Activity "Exporting Account Instances from Hunt Server" -status "Requesting Accounts from $scanId [$skip]" 
 		$headers.remove('filter') | Out-Null
-		$headers.Add("filter", '{"where":{"scanid":"'+$scanid+'"},"limit":1000,"skip":'+$skip+'}')
+		$headers.Add("filter", '{"where":{"scanId":"'+$scanId+'"},"limit":1000,"skip":'+$skip+'}')
 		try {
 			$moreobjects = Invoke-RestMethod ("$HuntServerAddress/api/SplunkAccounts") -Headers $headers -Method GET -ContentType 'application/json'
 		} catch {
@@ -398,14 +398,14 @@ function Get-ICAccounts ($scanid) {
 	}
 }
 
-function Get-ICHosts ($scanid) {
+function Get-ICHosts ($scanId) {
 	$skip = 0
-	Write-Verbose "Exporting Hosts from $scanid [$skip]" 
-	Write-Progress -Activity "Exporting Host Instances from Hunt Server" -status "Requesting Hosts from $scanid [$skip]" 
+	Write-Verbose "Exporting Hosts from $scanId [$skip]" 
+	Write-Progress -Activity "Exporting Host Instances from Hunt Server" -status "Requesting Hosts from $scanId [$skip]" 
 	
 	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
 	$headers.Add("Authorization", $Global:ICToken)
-	$headers.Add("filter", '{"where":{"scanid":"'+$scanid+'"},"limit":1000,"skip":'+$skip+'}')
+	$headers.Add("filter", '{"where":{"scanId":"'+$scanId+'"},"limit":1000,"skip":'+$skip+'}')
 	try {
 		$objects = Invoke-RestMethod ("$HuntServerAddress/api/SplunkHosts") -Headers $headers -Method GET -ContentType 'application/json'
 	} catch {
@@ -416,9 +416,9 @@ function Get-ICHosts ($scanid) {
 	$more = $true
 	While ($more) {
 		$skip += 1000
-		Write-Progress -Activity "Exporting Host Instances from Hunt Server" -status "Requesting Hosts from $scanid [$skip]" 
+		Write-Progress -Activity "Exporting Host Instances from Hunt Server" -status "Requesting Hosts from $scanId [$skip]" 
 		$headers.remove('filter') | Out-Null
-		$headers.Add("filter", '{"where":{"scanid":"'+$scanid+'"},"limit":1000,"skip":'+$skip+'}')
+		$headers.Add("filter", '{"where":{"scanId":"'+$scanId+'"},"limit":1000,"skip":'+$skip+'}')
 		try {
 			$moreobjects = Invoke-RestMethod ("$HuntServerAddress/api/SplunkHosts") -Headers $headers -Method GET -ContentType 'application/json'
 		} catch {
@@ -433,14 +433,14 @@ function Get-ICHosts ($scanid) {
 	}
 }
 
-function Get-ICAccounts ($scanid) {
+function Get-ICAccounts ($scanId) {
 	$skip = 0
-	Write-Verbose "Exporting Accounts from $scanid [$skip]" 
-	Write-Progress -Activity "Exporting Account Instances from Hunt Server" -status "Requesting Accounts from $scanid [$skip]" 
+	Write-Verbose "Exporting Accounts from $scanId [$skip]" 
+	Write-Progress -Activity "Exporting Account Instances from Hunt Server" -status "Requesting Accounts from $scanId [$skip]" 
 	
 	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
 	$headers.Add("Authorization", $Global:ICToken)
-	$headers.Add("filter", '{"where":{"scanid":"'+$scanid+'"},"limit":1000,"skip":'+$skip+'}')
+	$headers.Add("filter", '{"where":{"scanId":"'+$scanId+'"},"limit":1000,"skip":'+$skip+'}')
 	try {
 		$objects = Invoke-RestMethod "$HuntServerAddress/api/ScanAccountInstances" -Headers $headers -Method GET -ContentType 'application/json'
 	} catch {
@@ -450,9 +450,9 @@ function Get-ICAccounts ($scanid) {
 	$more = $true
 	While ($more) {
 		$skip += 1000
-		Write-Progress -Activity "Exporting Account Instances from Hunt Server" -status "Requesting Accounts from $scanid [$skip]" 
+		Write-Progress -Activity "Exporting Account Instances from Hunt Server" -status "Requesting Accounts from $scanId [$skip]" 
 		$headers.remove('filter') | Out-Null
-		$headers.Add("filter", '{"where":{"scanid":"'+$scanid+'"},"limit":1000,"skip":'+$skip+'}')
+		$headers.Add("filter", '{"where":{"scanId":"'+$scanId+'"},"limit":1000,"skip":'+$skip+'}')
 		try {
 			$moreobjects = Invoke-RestMethod ("$HuntServerAddress/api/ScanAccountInstances") -Headers $headers -Method GET -ContentType 'application/json'
 		} catch {
@@ -490,7 +490,7 @@ function Get-ICAccounts ($scanid) {
 		}
 	}
 	
-	$Hosts = Get-ICHosts $scanid
+	$Hosts = Get-ICHosts $scanId
 	$objects | % {
 		# Add Host Info
 		$hostId = $_.hostId
@@ -509,13 +509,12 @@ function Get-ICAccounts ($scanid) {
 
 function Get-ICAddresses ($TargetId) {
 	$skip = 0
-	Write-Verbose "Exporting Addresses from $scanid [$skip]" 
-	Write-Progress -Activity "Exporting Address Instances from Hunt Server" -status "Requesting Addresses from $scanid [$skip]" 
+	Write-Verbose "Exporting Addresses from $scanId [$skip]" 
+	Write-Progress -Activity "Exporting Address Instances from Hunt Server" -status "Requesting Addresses from $scanId [$skip]" 
 	
 	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
 	$headers.Add("Authorization", $Global:ICToken)
-	$skip = 0
-	$headers.Add("filter", '{"where":{"and":[{"targetid":"'+$targetid+'"}]},"limit":1000,"skip":'+$skip+'}')
+	$headers.Add("filter", '{"where":{"and":[{"targetId":"'+$targetId+'"}]},"limit":1000,"skip":'+$skip+'}')
 	try {
 		$objects += Invoke-RestMethod ("$HuntServerAddress/api/Addresses") -Headers $headers -Method GET -ContentType 'application/json'		
 	} catch {
@@ -525,9 +524,9 @@ function Get-ICAddresses ($TargetId) {
 	$more = $true
 	While ($more) {
 		$skip += 1000
-		Write-Progress -Activity "Exporting Address Instances from Hunt Server" -status "Requesting Addresses from $scanid [$skip]" 
+		Write-Progress -Activity "Exporting Address Instances from Hunt Server" -status "Requesting Addresses from $scanId [$skip]" 
 		$headers.remove('filter') | Out-Null
-		$headers.Add("filter", '{"where":{"and":[{"targetid":"'+$targetid+'"}]},"limit":1000,"skip":'+$skip+'}')
+		$headers.Add("filter", '{"where":{"and":[{"targetId":"'+$targetId+'"}]},"limit":1000,"skip":'+$skip+'}')
 		try {
 			$moreobjects = Invoke-RestMethod ("$HuntServerAddress/api/Addresses") -Headers $headers -Method GET -ContentType 'application/json'
 		} catch {
@@ -577,8 +576,8 @@ function Get-ICActiveTasks {
 	$objects | where { $_.status -eq "Active" }
 }
 
-function Get-ICLastScanId {
-	Write-Verbose "Getting last ScanId from Infocyte HUNT: $HuntServerAddress"
+function Get-ICLastscanId {
+	Write-Verbose "Getting last scanId from Infocyte HUNT: $HuntServerAddress"
 	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
 	$headers.Add("Authorization", $Global:ICToken)
 	try {
@@ -636,7 +635,7 @@ function New-ICQuery ([String]$TargetListId, [String]$query, [PSCredential]$Cred
 	$headers.Add("Authorization", $Global:ICToken)
 	$user = $Cred.Username | ConvertTo-JSON
 	$pass = $Cred.GetNetworkCredential().Password
-	$body = '{"type":"custom","username":'+$user+',"password":"'+$pass+'","value":"'+$query+'","targetid":"'+$TargetListId+'"}'
+	$body = '{"type":"custom","username":'+$user+',"password":"'+$pass+'","value":"'+$query+'","targetId":"'+$TargetListId+'"}'
 	try {
 		$objects += Invoke-RestMethod ("$HuntServerAddress/api/queries") -Headers $headers -Body $body -Method POST -ContentType 'application/json'		
 	} catch {
@@ -675,10 +674,10 @@ function Invoke-ICScan ($TargetListId) {
 }
 
 function Remove-ICAddresses ($TargetListId) {
-	Write-Verbose "Removing all addresses from TargetList $TargetListId"
+	Write-Verbose "Getting all addresses from TargetList $TargetListId"
 	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
 	$headers.Add("Authorization", $Global:ICToken)
-	$data = 'where=%7B%22and%22:%5B%7B%22targetid%22:%22'+$TargetListId+'%22%7D%5D%7D'
+	$data = 'where=%7B%22and%22:%5B%7B%22targetId%22:%22'+$TargetListId+'%22%7D%5D%7D'
 	try {
 		$objects += Invoke-RestMethod ("$HuntServerAddress/api/Addresses?$data") -Headers $headers -Method DELETE -ContentType 'application/json'		
 	} catch {
@@ -687,4 +686,3 @@ function Remove-ICAddresses ($TargetListId) {
 	}	
 	$objects
 }
-
