@@ -114,7 +114,8 @@ if ($TargetList -AND $TargetList.accessibleAddressCount -ne 0) {
 		}
 		
 		if ($status) {
-			$lastStatus = $status
+			$lastStatus = $status[0]
+			$Status = $status[0]
 			$elapsedtime = "$($($status.elapsed)/1000)"
 			Write-Progress -Activity "Enumerating Target" -status "[Elapsed (seconds): $elapsedtime] $($status.message)" -percentComplete ($status.progress)	
 		} elseif ($Status.message -match "error") {
@@ -258,10 +259,9 @@ while ($active) {
 			Write-Warning "ERROR: Could not get a token from $HuntServer using credentials $($HuntCredential.username)"
 			return
 		}
-	} else {
-		$status = $status | where { $_.type -eq "Scan" -AND $_.status -eq "Active"}
 	}
-	
+	$status = $status | where { $_.type -eq "Scan" -AND $_.scanId - eq $scanId}
+		
 	if ($status.status -eq "Active") {
 		$elapsedtime = "$($($status.elapsed)/1000)"
 		Write-Progress -Activity "Waiting for scan to process" -status "[Elapsed (seconds): $elapsedtime] $($status.message)" -percentComplete ($status.progress)	
