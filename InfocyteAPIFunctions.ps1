@@ -576,6 +576,39 @@ function Get-ICActiveTasks {
 	$objects | where { $_.status -eq "Active" }
 }
 
+function Get-ICUserTasks {
+	Write-Verbose "Getting Active Tasks from Infocyte HUNT: $HuntServerAddress"
+	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+	$headers.Add("Authorization", $Global:ICToken)	
+	$Skip = 0
+	$headers.Add("filter", '{"where":{"or":[]},"order":["createdOn"],"limit":1000,"skip":'+$skip+'}')
+	try {
+		$objects = Invoke-RestMethod ("$HuntServerAddress/api/usertasks") -Headers $headers -Method GET -ContentType 'application/json'		
+	} catch {
+		Write-Warning "Error: $_"
+		return "ERROR: $($_.Exception.Message)"
+	}	
+	Write-Output $objects	
+	
+	$more = $true
+	While ($more) {
+		$skip += 1000
+		$headers.remove('filter') | Out-Null
+		$headers.Add("filter", '{"where":{"or":[]},"order":["createdOn"],"limit":1000,"skip":'+$skip+'}')
+		try {
+			$moreobjects = Invoke-RestMethod ("$HuntServerAddress/api/usertasks") -Headers $headers -Method GET -ContentType 'application/json'
+		} catch {
+			Write-Warning "Error: $_"
+			return "ERROR: $($_.Exception.Message)"
+		}
+		if ($moreobjects.count -gt 0) {
+			Write-Output $moreobjects
+		} else {
+			$more = $false
+		}
+	}
+}
+
 function Get-ICLastscanId {
 	Write-Verbose "Getting last scanId from Infocyte HUNT: $HuntServerAddress"
 	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
@@ -611,6 +644,44 @@ function Get-ICActiveJobs {
 	} else {
 		return $null
 	}	
+}
+
+function Get-ICCoreJobs {
+	Write-Verbose "Getting Active Jobs from Infocyte HUNT: $HuntServerAddress"
+	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+	$headers.Add("Authorization", $Global:ICToken)
+	$Skip = 0
+	#$headers.Add("filter", '{"where":{"or":[{"status":"Scanning"},{"status":"Scanning"}]},"order":["timestamp"],"limit":1000,"skip":'+$skip+'}')
+	$headers.Add("filter", '{"where":{"or":[]},"order":["timestamp"],"limit":1000,"skip":'+$skip+'}')
+	try {
+		$Objects = Invoke-RestMethod ("$HuntServerAddress/api/CoreJobs") -Headers $headers -Method GET -ContentType 'application/json'
+	} catch {
+		Write-Warning "Error: $_"
+		return "ERROR: $($_.Exception.Message)"
+	}
+	if ($Objects) {
+		Write-Output $Objects
+	} else {
+		return $null
+	}
+	
+	$more = $true
+	While ($more) {
+		$skip += 1000
+		$headers.remove('filter') | Out-Null
+		$headers.Add("filter", '{"where":{"or":[]},"order":["timestamp"],"limit":1000,"skip":'+$skip+'}')
+		try {
+			$moreobjects = Invoke-RestMethod ("$HuntServerAddress/api/CoreJobs") -Headers $headers -Method GET -ContentType 'application/json'
+		} catch {
+			Write-Warning "Error: $_"
+			return "ERROR: $($_.Exception.Message)"
+		}
+		if ($moreobjects.count -gt 0) {
+			Write-Output $moreobjects
+		} else {
+			$more = $false
+		}
+	}
 }
 
 

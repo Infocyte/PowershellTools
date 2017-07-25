@@ -63,7 +63,7 @@ if ($NewToken.id) {
 
 # Get Target Lists.  
 $TargetList = Get-ICTargetList
-if ($TargetList -match "Error") {
+if ($TargetList -like "Error:*") {
 	Write-Warning "$TargetList"
 	return
 } else {
@@ -97,7 +97,7 @@ if ($TargetList -AND $TargetList.accessibleAddressCount -ne 0) {
 	while ($active) { 
 		Start-Sleep 1
 		$status = Get-ICActiveTasks
-		if ($status -match "Error") {
+		if ($status -like "Error:*") {
 			Write-Host "$Status"
 			Write-Host "Attempting to re-connecting to $HuntServer"
 			$NewToken = New-ICToken $HuntCredential $HuntServer
@@ -161,7 +161,7 @@ Get-ChildItem $Path -filter *.iclz | Foreach-Object {
 Write-Host "Retrieving Last Job and ScanId"
 $LastFolder = (gci 'C:\Program Files\Infocyte\Hunt\uploads\' | Sort-Object LastWriteTime -Descending)[0].Name
 $ScanJobs = Get-ICActiveJobs
-if ($ScanJobs -match "Error") {
+if ($ScanJobs -like "Error:*") {
 	Write-Warning "$ScanJobs"
 	Write-Host "Attempting to re-connecting to $HuntServer"
 	$NewToken = New-ICToken $HuntCredential $HuntServer
@@ -189,7 +189,7 @@ Write-Host "Last Active ScanId: $baseScanId"
 Write-Host "Initiating Scan of $Target"
 $ScanTask = Invoke-ICScan $TargetListId
 Start-Sleep 1
-if ($ScanTask -match "Error") {
+if ($ScanTask -like "Error:*") {
 	Write-Warning "$ScanTask"
 	Write-Host "Attempting to re-connecting to $HuntServer"
 	$NewToken = New-ICToken $HuntCredential $HuntServer
@@ -197,7 +197,7 @@ if ($ScanTask -match "Error") {
 		Write-Host "Login successful to $HuntServer"
 		Write-Host "Login Token id: $($NewToken.id)"
         $ScanTask = Invoke-ICScan $TargetListId
-		Start-Sleep 1
+		Start-Sleep 2
 	} else {
 		Write-Warning "ERROR: Could not get a token from $HuntServer using credentials $($HuntCredential.username)"
 		return
@@ -208,7 +208,7 @@ if ($ScanTask -match "Error") {
 # Wait for new scan to be created
 $scanId = $baseScanId
 while ($scanId -eq $baseScanId) {
-	Start-Sleep 2
+	Start-Sleep 3
 	$ScanJobs = Get-ICActiveJobs
 	if (!$ScanJobs -OR ($ScanJobs -match "Error")) {
 		Write-Warning "$ScanJobs"
@@ -246,8 +246,8 @@ Write-Host "Your HostSurvey results will be processed as the current scan of Tar
 $active = $true
 while ($active) { 
 	Start-Sleep 0.5
-	$status = Get-ICActiveTasks
-	if ($status -match "Error") {
+	$status = Get-ICUserTasks
+	if ($status -like "Error:*") {
 		Write-Host "$Status"
 		Write-Host "Attempting to re-connecting to $HuntServer"
 		$NewToken = New-ICToken $HuntCredential $HuntServer
@@ -260,11 +260,12 @@ while ($active) {
 			return
 		}
 	}
-	$status = $status | where { $_.type -eq "Scan" -AND $_.scanId - eq $scanId}
-		
+	$status = $status | where { $_.type -eq "Scan" -AND $_.options.ScanId -eq $scanId}
+	
 	if ($status.status -eq "Active") {
-		$elapsedtime = "$($($status.elapsed)/1000)"
-		Write-Progress -Activity "Waiting for scan to process" -status "[Elapsed (seconds): $elapsedtime] $($status.message)" -percentComplete ($status.progress)	
+		$elapsedtime = ((Get-Date) - [datetime]$status.createdOn).TotalSeconds
+		$statusmessage = "[Elapsed (seconds): {0:N2} ] {1}" -f $elapsedtime, $status.message
+		Write-Progress -Activity "Waiting for scan to process" -status $statusmessage -percentComplete ($status.progress)	
 	} else {
 		$active = $false
 		if ($status.message -match "error") {
