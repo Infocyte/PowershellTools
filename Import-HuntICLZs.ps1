@@ -27,14 +27,14 @@ $UploadDir = "C:\Program Files\Infocyte\Hunt\uploads"
 #Infocyte Credentials
 if ($HuntCredential -eq [System.Management.Automation.PSCredential]::Empty) {
 	$username = 'infocyte'
-	$password = 'pulse' | ConvertTo-SecureString -asPlainText -Force
+	$password = 'hunt' | ConvertTo-SecureString -asPlainText -Force
 	$Script:HuntCredential = New-Object System.Management.Automation.PSCredential($username,$password)
 }
 
 #Query Credentials (Scanning Admin/Service Account)
 if ($ScanCredential -eq [System.Management.Automation.PSCredential]::Empty) {
 	$username = 'galactica.int\administrator'
-	$password = 'pulse' | ConvertTo-SecureString -asPlainText -Force
+	$password = 'hunt' | ConvertTo-SecureString -asPlainText -Force
 	$Script:ScanCredential = New-Object System.Management.Automation.PSCredential($username,$password)
 }
 
