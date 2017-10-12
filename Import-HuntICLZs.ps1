@@ -24,6 +24,11 @@ Param(
 if (Test-Path -Path ".\InfocyteAPIFunctions.ps1") {
 	Import-Module ".\InfocyteAPIFunctions.ps1"
 }
+else {
+	Write-Error "You must import the InfocyteAPIFunctions.ps1 script."
+	Write-Host "Include it in the same folder as this script, and rerun this script with the same parameters."
+	Exit-PSHostProcess
+}
 
 $Target = "localhost"
 $UploadDir = "C:\Program Files\Infocyte\Hunt\uploads"
