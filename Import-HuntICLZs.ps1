@@ -19,19 +19,33 @@ Param(
 	$ScanCredential = [System.Management.Automation.PSCredential]::Empty
 )
 
+# Automatically import the Infocyte API calls
+# Makes it easier for users, so they don't have to do this separately
+if (Test-Path -Path ".\InfocyteAPIFunctions.ps1") {
+	Import-Module ".\InfocyteAPIFunctions.ps1"
+}
+
 $Target = "localhost"
 $UploadDir = "C:\Program Files\Infocyte\Hunt\uploads"
 
+if (-NOT (Test-Path -Path $UploadDir)) {
+	Write-Warning "You are not on the Hunt Server. You must run this script on the Hunt server."
+	Exit-PSHostProcess
+}
+
 # Hardcoded Credentials (unsafe in production but convenient for testing)
 
-#Infocyte Credentials
+# Infocyte Credentials
+# If a user did not add their credentials, use the default ones.
 if ($HuntCredential -eq [System.Management.Automation.PSCredential]::Empty) {
 	$username = 'infocyte'
 	$password = 'hunt' | ConvertTo-SecureString -asPlainText -Force
 	$Script:HuntCredential = New-Object System.Management.Automation.PSCredential($username,$password)
 }
 
-#Query Credentials (Scanning Admin/Service Account)
+# Query Credentials (Scanning Admin/Service Account)
+# If a user did not add their credentials, use the default ones.
+# This will not work unless it is on that specific machine, so make sure you add your credentials at the beginning. 
 if ($ScanCredential -eq [System.Management.Automation.PSCredential]::Empty) {
 	$username = 'galactica.int\administrator'
 	$password = 'hunt' | ConvertTo-SecureString -asPlainText -Force
@@ -67,7 +81,7 @@ if ($TargetList -like "Error:*") {
 	Write-Warning "$TargetList"
 	return
 } else {
-	$TargetList = $TargetList | where { $_.name -eq $TargetListName -AND $_.deleted -eq $False}
+	$TargetList = $TargetList | Where-Object { $_.name -eq $TargetListName -AND $_.deleted -eq $False}
 }
  
 if ($TargetList -AND $TargetList.accessibleAddressCount -ne 0) {
@@ -110,7 +124,7 @@ if ($TargetList -AND $TargetList.accessibleAddressCount -ne 0) {
 				return
 			}
 		} else {
-			$status = $status | where { $_.type -eq "Enumerate" -AND $_.status -eq "Active"}
+			$status = $status | Where-Object { $_.type -eq "Enumerate" -AND $_.status -eq "Active"}
 		}
 		
 		if ($status) {
@@ -159,7 +173,7 @@ Get-ChildItem $Path -filter *.iclz | Foreach-Object {
 #>
 
 Write-Host "Retrieving Last Job and ScanId"
-$LastFolder = (gci 'C:\Program Files\Infocyte\Hunt\uploads\' | Sort-Object LastWriteTime -Descending)[0].Name
+$LastFolder = (Get-ChildItem 'C:\Program Files\Infocyte\Hunt\uploads\' | Sort-Object LastWriteTime -Descending)[0].Name
 $ScanJobs = Get-ICActiveJobs
 if ($ScanJobs -like "Error:*") {
 	Write-Warning "$ScanJobs"
@@ -175,7 +189,7 @@ if ($ScanJobs -like "Error:*") {
 	}
 } 
 
-$ScanJobs = $ScanJobs | Sort-Object timestamp -Descending | where { $_.status -eq "Scanning" }
+$ScanJobs = $ScanJobs | Sort-Object timestamp -Descending | Where-Object { $_.status -eq "Scanning" }
 if ($ScanJobs) {
 	$baseScanId = $ScanJobs[0].scanId
 } else {
@@ -222,7 +236,7 @@ while ($scanId -eq $baseScanId) {
 			return
 		}
 	} elseif ($ScanJobs) {
-        $ScanJobs = $ScanJobs | Sort-Object timestamp -Descending | where { $_.status -eq "Scanning" }
+        $ScanJobs = $ScanJobs | Sort-Object timestamp -Descending | Where-Object { $_.status -eq "Scanning" }
 		if ($ScanJobs) {
             $scanId = $ScanJobs[0].ScanId
         }
@@ -260,7 +274,7 @@ while ($active) {
 			return
 		}
 	}
-	$status = $status | where { $_.type -eq "Scan" -AND $_.options.ScanId -eq $scanId}
+	$status = $status | Where-Object { $_.type -eq "Scan" -AND $_.options.ScanId -eq $scanId}
 	
 	if ($status.status -eq "Active") {
 		$elapsedtime = ((Get-Date) - [datetime]$status.createdOn).TotalSeconds
