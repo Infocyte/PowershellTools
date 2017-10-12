@@ -21,11 +21,11 @@ The `Import-HuntICLZs.ps1` script has several parameters, of which three are nec
 
 | Parameter | Description |
 |-----------|-------------|
-| -path   | The local windows folder that has the ICLZ survey files that are going to be imported |
-| -TargetListName | The target list/group that the endpoints will be added to. The default value is "OfflineScans" and can be changed in the script itself. |
-| -HuntServer  | The base URL of the Infocyte HUNT Server portal. The default value is "https://localhost:4443" and can be changed in the script itself. |
-| -HuntCredential | The credentials are the local Infocyte HUNT login credentials. |
-| -ScanCredential | The credentials are a local workstation, or domain account, that is a member of the local administrator group. |
+|-path   | The local windows folder that has the ICLZ survey files that are going to be imported |
+|-TargetListName | The target list/group that the endpoints will be added to. The default value is "OfflineScans" and can be changed in the script itself. |
+|-HuntServer  | The base URL of the Infocyte HUNT Server portal. The default value is "https://localhost:4443" and can be changed in the script itself. |
+|-HuntCredential | The credentials are the local Infocyte HUNT login credentials. |
+|-ScanCredential | The credentials are a local workstation, or domain account, that is a member of the local administrator group. |
 
 To get the credentials for the local Infocyte HUNT login and to the local workstation or domain account, you can use these commands to store them in a variable.
 
