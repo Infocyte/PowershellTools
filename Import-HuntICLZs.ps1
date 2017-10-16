@@ -22,7 +22,12 @@ Param(
 # Automatically import the Infocyte API calls
 # Makes it easier for users, so they don't have to do this separately
 if (Test-Path -Path ".\InfocyteAPIFunctions.ps1") {
-	Import-Module ".\InfocyteAPIFunctions.ps1"
+	if (Get-Command New-ICToken -errorAction SilentlyContinue) {
+		# InfocyteAPIFunctions.ps1 already imported
+	} else {
+		Write-Host "Importing Infocyte API Functions"
+		Import-Module ".\InfocyteAPIFunctions.ps1"
+	}
 }
 else {
 	Write-Error "You must import the InfocyteAPIFunctions.ps1 script."
