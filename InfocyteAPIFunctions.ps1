@@ -684,6 +684,33 @@ function Get-ICCoreJobs {
 	}
 }
 
+function Get-ICCredentials {
+	Write-Verbose "Getting Credential Objects from Infocyte HUNT: $HuntServerAddress"
+	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+	$headers.Add("Authorization", $Global:ICToken)
+	try {
+		$objects += Invoke-RestMethod ("$HuntServerAddress/api/credentials") -Headers $headers -Method GET -ContentType 'application/json'		
+	} catch {
+		Write-Warning "Error: $_"
+		return "ERROR: $($_.Exception.Message)"
+	}	
+	$objects
+}
+
+function Get-ICQuery ([String]$targetListId) {
+	Write-Verbose "Creating new Credential ($name) for username $($Cred.Username)"
+	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+	$headers.Add("Authorization", $Global:ICToken)
+	$headers.Add("filter", '{"where":{"and":[{"targetId":"'+$targetListId+'"}]},"include":["credential","sshCredential"]}')
+	try {
+		$objects += Invoke-RestMethod ("$HuntServerAddress/api/queries") -Headers $headers -Method GET -ContentType 'application/json'		
+	} catch {
+		Write-Warning "Error: $_"
+		return "ERROR: $($_.Exception.Message)"
+	}	
+	$objects
+}
+
 
 # Creation APIs
 function New-ICTargetList ([String]$Name) {
@@ -700,13 +727,27 @@ function New-ICTargetList ([String]$Name) {
 	$objects
 }
 
-function New-ICQuery ([String]$TargetListId, [String]$query, [PSCredential]$Cred) {
-	Write-Verbose "Creating new Query in TargetList $TargetListId ($query) using username $($Cred.Username)"
+function New-ICCredential ([String]$Name, [PSCredential]$Cred) {
+	Write-Verbose "Creating new Credential ($name) for username $($Cred.Username)"
 	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
 	$headers.Add("Authorization", $Global:ICToken)
 	$user = $Cred.Username | ConvertTo-JSON
 	$pass = $Cred.GetNetworkCredential().Password
-	$body = '{"type":"custom","username":'+$user+',"password":"'+$pass+'","value":"'+$query+'","targetId":"'+$TargetListId+'"}'
+	$body = '{"type":"login","name":"'+$Name+'","username":'+$user+',"password":"'+$pass+'"}'
+	try {
+		$objects += Invoke-RestMethod ("$HuntServerAddress/api/credentials") -Headers $headers -Body $body -Method POST -ContentType 'application/json'		
+	} catch {
+		Write-Warning "Error: $_"
+		return "ERROR: $($_.Exception.Message)"
+	}	
+	$objects
+}
+
+function New-ICQuery ([String]$targetListId, [String]$credentialId = $null, [String]$sshCredentialId = $null, [String]$query) {
+	Write-Verbose "Creating new Query in TargetList $TargetListId ($query) using username $($Cred.Username)"
+	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+	$headers.Add("Authorization", $Global:ICToken)
+	$body = '{"type":"custom","value":"'+$query+'","targetId":"'+$targetListId+'","credentialId":"'+$CredentialId+'","sshCredentialId":null}'
 	try {
 		$objects += Invoke-RestMethod ("$HuntServerAddress/api/queries") -Headers $headers -Body $body -Method POST -ContentType 'application/json'		
 	} catch {

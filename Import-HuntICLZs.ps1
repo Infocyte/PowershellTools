@@ -61,71 +61,94 @@ if ($NewToken.id) {
 # WARNING: Error: The underlying connection was closed: An unexpected error occurred on a send.
 
 
-# Get Target Lists.  
+# Get Target List.  
 $TargetList = Get-ICTargetList
 if ($TargetList -like "Error:*") {
 	Write-Warning "$TargetList"
 	return
 } else {
 	$TargetList = $TargetList | where { $_.name -eq $TargetListName -AND $_.deleted -eq $False}
+	if ($TargetList) {
+		$TargetListId = $TargetList[0].id
+	} else {
+		# If our specified list isn't there, create it.
+		Write-Host "Creating TargetList named $TargetListName"
+		$TargetListId = (New-ICTargetList $TargetListName).id
+	}
 }
- 
-if ($TargetList -AND $TargetList.accessibleAddressCount -ne 0) {
-	$TargetListId = $TargetList.id
+
+# Get Credentials
+$CredObjects = Get-ICCredentials
+if ($CredObjects -like "Error:*") {
+	Write-Warning "$CredObjects"
+	return
 } else {
-    if (-NOT $TargetList) {
-	    # If our specified list isn't there, create it.
-	    Write-Host "Creating TargetList named $TargetListName"
-	    $TargetListId = (New-ICTargetList $TargetListName).id
-    } else {
-        $TargetListId = $TargetList.id
-    }
+	$CredObjects = $CredObjects | where { $_.name -eq "HuntLocal"}
+	if ($CredObjects) {
+		$CredentialId = $CredObjects[0].id
+	} else {
+		#Create new Credential for target
+		Write-Host "Creating new Credential for the local Hunt Server: $($ScanCredential.username)"
+		$CredentialId = (New-ICCredential -Name "HuntLocal" -Cred $ScanCredential).id	
+	}
+}
 
-	#Create new Query for target
-	Write-Host "Creating new Query for: $Target"
-	$QueryId = (New-ICQuery $TargetListId $Target $ScanCredential).id
+# Get Queries
+$Queries = Get-ICQuery $TargetListId
+if ($Queries -like "Error:*") {
+	Write-Warning "$Queries"
+	return
+} else {	
+	$Queries = $Queries | where { $_.name -eq $Target}
+	if ($Queries) {
+		$QueryId = $Queries[0].id
+	} else {
+		#Create new Query for target
+		Write-Host "Creating new Query for: $Target within TargetList $TargetListId"
+		$QueryId = (New-ICQuery -targetListId $TargetListId -credentialId $CredentialId -query $Target).id
+	}
+}
 
-	# Initiate Enumeration
-	Write-Host "Enumerating $Target"
-	Invoke-ICEnumeration $TargetListId $QueryId
-	Start-Sleep 1
+# Initiate Enumeration
+Write-Host "Enumerating $Target"
+Invoke-ICEnumeration $TargetListId $QueryId
+Start-Sleep 1
 	
-	# Track Status of Enumeration
-	$active = $true
-	Write-Host "Waiting for enumeration to complete"
-	Write-Progress -Activity "Enumerating Target" -status "Initiating Enumeration"
-	while ($active) { 
-		Start-Sleep 1
-		$status = Get-ICActiveTasks
-		if ($status -like "Error:*") {
-			Write-Host "$Status"
-			Write-Host "Attempting to re-connecting to $HuntServer"
-			$NewToken = New-ICToken $HuntCredential $HuntServer
-			if ($NewToken.id) {
-				Write-Host "Login successful to $HuntServer"
-				Write-Host "Login Token id: $($NewToken.id)"
-				continue
-			} else {
-				Write-Warning "ERROR: Could not get a token from $HuntServer using credentials $($HuntCredential.username)"
-				return
-			}
+# Track Status of Enumeration
+$active = $true
+Write-Host "Waiting for enumeration to complete"
+Write-Progress -Activity "Enumerating Target" -status "Initiating Enumeration"
+while ($active) { 
+	Start-Sleep 1
+	$status = Get-ICActiveTasks
+	if ($status -like "Error:*") {
+		Write-Host "$Status"
+		Write-Host "Attempting to re-connecting to $HuntServer"
+		$NewToken = New-ICToken $HuntCredential $HuntServer
+		if ($NewToken.id) {
+			Write-Host "Login successful to $HuntServer"
+			Write-Host "Login Token id: $($NewToken.id)"
+			continue
 		} else {
-			$status = $status | where { $_.type -eq "Enumerate" -AND $_.status -eq "Active"}
+			Write-Warning "ERROR: Could not get a token from $HuntServer using credentials $($HuntCredential.username)"
+			return
 		}
-		
-		if ($status) {
-			$lastStatus = $status[0]
-			$Status = $status[0]
-			$elapsedtime = "$($($status.elapsed)/1000)"
-			Write-Progress -Activity "Enumerating Target" -status "[Elapsed (seconds): $elapsedtime] $($status.message)" -percentComplete ($status.progress)	
-		} elseif ($Status.message -match "error") {
-			$active = $false
-			Write-Warning "ERROR: Could not enumerate Target: $($Status.message)"
-			return "ERROR: Could not enumerate Target: $($Status.message)"
-		} else {
-			$active = $false
-			Write-Warning "Enumeration Complete: $($lastStatus.message)"
-		}
+	} else {
+		$status = $status | where { $_.type -eq "Enumerate" -AND $_.status -eq "Active"}
+	}
+	
+	if ($status) {
+		$lastStatus = $status[0]
+		$Status = $status[0]
+		$elapsedtime = "$($($status.elapsed)/1000)"
+		Write-Progress -Activity "Enumerating Target" -status "[Elapsed (seconds): $elapsedtime] $($status.message)" -percentComplete ($status.progress)	
+	} elseif ($Status.message -match "error") {
+		$active = $false
+		Write-Warning "ERROR: Could not enumerate Target: $($Status.message)"
+		return "ERROR: Could not enumerate Target: $($Status.message)"
+	} else {
+		$active = $false
+		Write-Warning "Enumeration Complete: $($lastStatus.message)"
 	}
 }
 Start-Sleep 1
@@ -135,7 +158,7 @@ if ($TargetListResults) {
     if ($TargetListResults.accessibleAddressCount -eq 0) {
         $failreason = (Get-ICAddresses $TargetListId).failureReason
 
-        Write-Warning "ERROR: Enumeration was not successful ($failreason). Please check your ScanCredentials for the hunt server localhost and try again"
+        Write-Warning "ERROR: Enumeration was not successful ($failreason). Please check your ScanCredentials for the hunt server (HuntLocal) localhost within the Infocyte HUNT UI Credential Manager and try again"
         return
     } else {
         Write-Host "Enumeration Successful!"
