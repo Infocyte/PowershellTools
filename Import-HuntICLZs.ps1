@@ -244,7 +244,7 @@ if ($ScanTask -like "Error:*") {
 		Write-Host "Login successful to $HuntServer"
 		Write-Host "Login Token id: $($NewToken.id)"
         $ScanTask = Invoke-ICScan $TargetListId
-		Start-Sleep 2
+		Start-Sleep 1
 	} else {
 		Write-Warning "ERROR: Could not get a token from $HuntServer using credentials $($HuntCredential.username)"
 		return
@@ -255,9 +255,9 @@ if ($ScanTask -like "Error:*") {
 # Wait for new scan to be created
 $scanId = $baseScanId
 while ($scanId -eq $baseScanId) {
-	Start-Sleep 3
+	Start-Sleep 1
 	$ScanJobs = Get-ICActiveJobs
-	if (!$ScanJobs -OR ($ScanJobs -match "Error")) {
+	if ($ScanJobs -match "Error") {
 		Write-Warning "$ScanJobs"
 		Write-Host "Attempting to re-connecting to $HuntServer"
 		$NewToken = New-ICToken $HuntCredential $HuntServer
