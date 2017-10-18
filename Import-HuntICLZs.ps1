@@ -8,7 +8,11 @@ Param(
 	[String]
 	$TargetListName = "OfflineScans",
 	
-	[String]$HuntServer = "https://localhost:4443",
+	[String]
+	$Target = "localhost"
+	
+	[String]
+	$HuntServer = "https://localhost:4443",
 	
 	[PSCredential]
 	[System.Management.Automation.Credential()]
@@ -19,28 +23,27 @@ Param(
 	$ScanCredential = [System.Management.Automation.PSCredential]::Empty
 )
 
+Write-Host "PSVersion Check: $($PSVersionTable.PSVersion.tostring())"
+$UploadDir = "C:\Program Files\Infocyte\Hunt\uploads"
+
 # Automatically import the Infocyte API calls
 # Makes it easier for users, so they don't have to do this separately
-if (Test-Path -Path ".\InfocyteAPIFunctions.ps1") {
-	if (Get-Command New-ICToken -errorAction SilentlyContinue) {
-		# InfocyteAPIFunctions.ps1 already imported
-	} else {
+if (Get-Command New-ICToken -errorAction SilentlyContinue) {
+	# InfocyteAPIFunctions.ps1 already imported
+} else {
+	if (Test-Path -Path "$PSScriptRoot\InfocyteAPIFunctions.ps1") {
 		Write-Host "Importing Infocyte API Functions"
-		Import-Module ".\InfocyteAPIFunctions.ps1"
+		Import-Module "$PSScriptRoot\InfocyteAPIFunctions.ps1"		
+	} else {
+		Write-Error "You must import the InfocyteAPIFunctions.ps1 script."
+		Write-Host "Include it in the same folder as this script, and rerun this script with the same parameters."
+		return
 	}
 }
-else {
-	Write-Error "You must import the InfocyteAPIFunctions.ps1 script."
-	Write-Host "Include it in the same folder as this script, and rerun this script with the same parameters."
-	Exit-PSHostProcess
-}
-
-$Target = "localhost"
-$UploadDir = "C:\Program Files\Infocyte\Hunt\uploads"
 
 if (-NOT (Test-Path -Path $UploadDir)) {
 	Write-Warning "You are not on the Hunt Server. You must run this script on the Hunt server."
-	Exit-PSHostProcess
+	return
 }
 
 # Hardcoded Credentials (unsafe in production but convenient for testing)
@@ -93,6 +96,7 @@ if ($TargetList -like "Error:*") {
 } else {
 	$TargetList = $TargetList | Where-Object { $_.name -eq $TargetListName -AND $_.deleted -eq $False}
 	if ($TargetList) {
+		Write-Host "TargetList $TargetListName is already created"
 		$TargetListId = $TargetList[0].id
 	} else {
 		# If our specified list isn't there, create it.
@@ -109,6 +113,7 @@ if ($CredObjects -like "Error:*") {
 } else {
 	$CredObjects = $CredObjects | where { $_.name -eq "HuntLocal"}
 	if ($CredObjects) {
+		Write-Host "HuntLocal Credential is already loaded. Check the HUNT interface if you need to change the password or account."
 		$CredentialId = $CredObjects[0].id
 	} else {
 		#Create new Credential for target
@@ -125,6 +130,7 @@ if ($Queries -like "Error:*") {
 } else {	
 	$Queries = $Queries | where { $_.name -eq $Target}
 	if ($Queries) {
+		Write-Host "Query already created for $Target within TargetList $TargetListId"
 		$QueryId = $Queries[0].id
 	} else {
 		#Create new Query for target
@@ -146,8 +152,8 @@ while ($active) {
 	Start-Sleep 1
 	$status = Get-ICActiveTasks
 	if ($status -like "Error:*") {
-		Write-Host "$Status"
-		Write-Host "Attempting to re-connecting to $HuntServer"
+		Write-Warning "Error on Get-ICActiveTasks: $status"
+		Write-Warning "Attempting to re-connecting to $HuntServer"
 		$NewToken = New-ICToken $HuntCredential $HuntServer
 		if ($NewToken.id) {
 			Write-Host "Login successful to $HuntServer"
@@ -172,7 +178,7 @@ while ($active) {
 		return "ERROR: Could not enumerate Target: $($Status.message)"
 	} else {
 		$active = $false
-		Write-Warning "Enumeration Complete: $($lastStatus.message)"
+		Write-Host "Enumeration Complete: $($lastStatus.message)"
 	}
 }
 Start-Sleep 1

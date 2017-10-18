@@ -572,8 +572,13 @@ function Get-ICActiveTasks {
 	} catch {
 		Write-Warning "Error: $_"
 		return "ERROR: $($_.Exception.Message)"
-	}	
-	$objects | where { $_.status -eq "Active" }
+	}
+	if ($objects) {
+		$objects | where { $_.status -eq "Active" }
+	} else {
+		return
+	}
+	
 }
 
 function Get-ICUserTasks {
