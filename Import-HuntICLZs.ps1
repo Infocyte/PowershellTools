@@ -9,7 +9,7 @@ Param(
 	$TargetListName = "OfflineScans",
 	
 	[String]
-	$Target = "localhost"
+	$Target = "localhost",
 	
 	[String]
 	$HuntServer = "https://localhost:4443",
@@ -32,17 +32,27 @@ if (Get-Command New-ICToken -errorAction SilentlyContinue) {
 	# InfocyteAPIFunctions.ps1 already imported
 } else {
 	if (Test-Path -Path "$PSScriptRoot\InfocyteAPIFunctions.ps1") {
-		Write-Host "Importing Infocyte API Functions"
-		Import-Module "$PSScriptRoot\InfocyteAPIFunctions.ps1"		
+		Write-Host "Importing Infocyte API Functions ($PSScriptRoot\InfocyteAPIFunctions.ps1)"
+		. "$PSScriptRoot\InfocyteAPIFunctions.ps1" 
 	} else {
-		Write-Error "You must import the InfocyteAPIFunctions.ps1 script."
-		Write-Host "Include it in the same folder as this script, and rerun this script with the same parameters."
+		Write-Host -ForegroundColor Red "You must import the InfocyteAPIFunctions.ps1 script."
+		Write-Host -ForegroundColor Red  "Include it in the same folder as this script, and rerun this script with the same parameters."
 		return
 	}
 }
 
 if (-NOT (Test-Path -Path $UploadDir)) {
-	Write-Warning "You are not on the Hunt Server. You must run this script on the Hunt server."
+	Write-Host -ForegroundColor Red "You are not on the Hunt Server. You must run this script on the Hunt server."
+	return
+}
+
+if (Test-Path $Path -PathType Container) { 
+	if (-NOT (Get-ChildItem $Path -filter *.iclz)) {
+		Write-Host -ForegroundColor Red "ERROR: $Path does not contain .iclz files"
+		return	
+	}
+} else {
+	Write-Host -ForegroundColor Red "ERROR: $Path is not a directory"
 	return
 }
 
@@ -66,11 +76,11 @@ if ($ScanCredential -eq [System.Management.Automation.PSCredential]::Empty) {
 }
 
 if (-NOT (Test-Path $Path)) {
-	Write-Warning "Path does not exist, place your ICLZ files in $Path"
+	Write-Host -ForegroundColor Red "Path does not exist, place your ICLZ files in $Path"
 	return
 } 
 elseif (-NOT (Get-ChildItem -Recurse -Path $Path -Filter *.iclz)) {
-	Write-Warning "Path does not contain any .ICLZ files"
+	Write-Host -ForegroundColor Red "Path does not contain any .ICLZ files"
 	return
 }
 
@@ -81,7 +91,7 @@ if ($NewToken.id) {
 	Write-Host "Login successful to $HuntServer"
 	Write-Host "Login Token id: $($NewToken.id)"
 } else {
-	Write-Warning "ERROR: Could not get a token from $HuntServer using credentials $($HuntCredential.username)"
+	Write-Host -ForegroundColor Red "ERROR: Could not get a token from $HuntServer using credentials $($HuntCredential.username)"
 	return
 }
 # Error if token no longer valid is:
@@ -91,7 +101,7 @@ if ($NewToken.id) {
 # Get Target List.  
 $TargetList = Get-ICTargetList
 if ($TargetList -like "Error:*") {
-	Write-Warning "$TargetList"
+	Write-Host -ForegroundColor Red "$TargetList"
 	return
 } else {
 	$TargetList = $TargetList | Where-Object { $_.name -eq $TargetListName -AND $_.deleted -eq $False}
@@ -108,7 +118,7 @@ if ($TargetList -like "Error:*") {
 # Get Credentials
 $CredObjects = Get-ICCredentials
 if ($CredObjects -like "Error:*") {
-	Write-Warning "$CredObjects"
+	Write-Host -ForegroundColor Red "$CredObjects"
 	return
 } else {
 	$CredObjects = $CredObjects | where { $_.name -eq "HuntLocal"}
@@ -125,10 +135,10 @@ if ($CredObjects -like "Error:*") {
 # Get Queries
 $Queries = Get-ICQuery $TargetListId
 if ($Queries -like "Error:*") {
-	Write-Warning "$Queries"
+	Write-Host -ForegroundColor Red "$Queries"
 	return
 } else {	
-	$Queries = $Queries | where { $_.name -eq $Target}
+	$Queries = $Queries | where { $_.value -eq $Target -AND $_.credentialId -eq $CredentialId}
 	if ($Queries) {
 		Write-Host "Query already created for $Target within TargetList $TargetListId"
 		$QueryId = $Queries[0].id
@@ -152,7 +162,7 @@ while ($active) {
 	Start-Sleep 1
 	$status = Get-ICActiveTasks
 	if ($status -like "Error:*") {
-		Write-Warning "Error on Get-ICActiveTasks: $status"
+		Write-Host -ForegroundColor Red "Error on Get-ICActiveTasks: $status"
 		Write-Warning "Attempting to re-connecting to $HuntServer"
 		$NewToken = New-ICToken $HuntCredential $HuntServer
 		if ($NewToken.id) {
@@ -160,7 +170,7 @@ while ($active) {
 			Write-Host "Login Token id: $($NewToken.id)"
 			continue
 		} else {
-			Write-Warning "ERROR: Could not get a token from $HuntServer using credentials $($HuntCredential.username)"
+			Write-Host -ForegroundColor Red "ERROR: Could not get a token from $HuntServer using credentials $($HuntCredential.username)"
 			return
 		}
 	} else {
@@ -171,10 +181,12 @@ while ($active) {
 		$lastStatus = $status[0]
 		$Status = $status[0]
 		$elapsedtime = "$($($status.elapsed)/1000)"
-		Write-Progress -Activity "Enumerating Target" -status "[Elapsed (seconds): $elapsedtime] $($status.message)" -percentComplete ($status.progress)	
+		if ($status.progress) {
+			Write-Progress -Activity "Enumerating Target" -status "[Elapsed (seconds): $elapsedtime] $($status.message)" -percentComplete ($status.progress)	
+		}
 	} elseif ($Status.message -match "error") {
 		$active = $false
-		Write-Warning "ERROR: Could not enumerate Target: $($Status.message)"
+		Write-Host -ForegroundColor Red "ERROR: Could not enumerate Target: $($Status.message)"
 		return "ERROR: Could not enumerate Target: $($Status.message)"
 	} else {
 		$active = $false
@@ -183,26 +195,34 @@ while ($active) {
 }
 Start-Sleep 1
 
-$TargetListResults = Get-ICTargetList $TargetListId
+$TargetListResults = Get-ICAddresses $TargetListId
 if ($TargetListResults) {
     if ($TargetListResults.accessibleAddressCount -eq 0) {
         $failreason = (Get-ICAddresses $TargetListId).failureReason
 
-        Write-Warning "ERROR: Enumeration was not successful ($failreason). Please check your ScanCredentials for the hunt server (HuntLocal) localhost within the Infocyte HUNT UI Credential Manager and try again"
+        Write-Host -ForegroundColor Red "ERROR: Enumeration was not successful ($failreason). Please check your ScanCredentials for the hunt server (HuntLocal) localhost within the Infocyte HUNT UI Credential Manager and try again"
         return
     } else {
         Write-Host "Enumeration Successful!"
     }
 } else {
-    Write-Warning "ERROR: Could not get target list"
+    Write-Host -ForegroundColor Red "ERROR: Could not get target list"
     return
 }
 
 
 #Copy .iclz files into upload folder (temp dir)
+# $LastFolder = (Get-ChildItem $UploadDir | Sort-Object LastWriteTime -Descending)[0].Name
 $TempFolderName = "temp$([guid]::NewGuid())"
-Write-Host "Copying folder of .iclz files to staging temp directory: $UploadDir\$TempFolderName"
-Copy-Item -Path $Path -Destination $UploadDir\$TempFolderName -recurse -Container
+$iclznum = get-childitem $Path -filter *.iclz -recurse
+Write-Host "Copying folder of $($iclznum.count) .iclz files from $Path to staging temp directory: $UploadDir\$TempFolderName"
+try {
+	Copy-Item -Path $Path -Destination "$UploadDir\$TempFolderName" -recurse -ErrorAction Stop
+} catch {
+	Write-Host -ForegroundColor Red "ERROR: Could not copy files from $Path to the infocyte upload directory: $UploadDir"
+	Write-Host -ForegroundColor Red "ERROR: $_"
+	return
+}
 <# 
 # TODO: Change this to grab the iclz files only and rename them using their md5 hash so we're not uploading the same iclz file twice (which would break everything)
 Get-ChildItem $Path -filter *.iclz | Foreach-Object { 
@@ -212,18 +232,18 @@ Get-ChildItem $Path -filter *.iclz | Foreach-Object {
 #>
 
 Write-Host "Retrieving Last Job and ScanId"
-$LastFolder = (Get-ChildItem 'C:\Program Files\Infocyte\Hunt\uploads\' | Sort-Object LastWriteTime -Descending)[0].Name
+#$LastFolder = (Get-ChildItem $UploadDir | Sort-Object LastWriteTime -Descending)[0].Name
 $ScanJobs = Get-ICActiveJobs
 if ($ScanJobs -like "Error:*") {
-	Write-Warning "$ScanJobs"
-	Write-Host "Attempting to re-connecting to $HuntServer"
+	Write-Host -ForegroundColor Red "$ScanJobs"
+	Write-Warning "Attempting to re-connecting to $HuntServer"
 	$NewToken = New-ICToken $HuntCredential $HuntServer
 	if ($NewToken.id) {
 		Write-Host "Login successful to $HuntServer"
 		Write-Host "Login Token id: $($NewToken.id)"
 		$ScanJobs = Get-ICActiveJobs
 	} else {
-		Write-Warning "ERROR: Could not get a token from $HuntServer using credentials $($HuntCredential.username)"
+		Write-Host -ForegroundColor Red "ERROR: Could not get a token from $HuntServer using credentials $($HuntCredential.username)"
 		return
 	}
 } 
@@ -234,17 +254,17 @@ if ($ScanJobs) {
 } else {
 	$baseScanId = "NO_SCAN"
 }
-Write-Host "Last Folder name: $LastFolder"
 Write-Host "Last Active ScanId: $baseScanId (Should say NO_SCAN if no scan is currently running)"
 	
 
 # Initiate Scan
 Write-Host "Initiating Scan of $Target"
 $ScanTask = Invoke-ICScan $TargetListId
+$ScanTask
 Start-Sleep 1
 if ($ScanTask -like "Error:*") {
-	Write-Warning "$ScanTask"
-	Write-Host "Attempting to re-connecting to $HuntServer"
+	Write-Host -ForegroundColor Red "$ScanTask"
+	Write-Warning "Attempting to re-connecting to $HuntServer"
 	$NewToken = New-ICToken $HuntCredential $HuntServer
 	if ($NewToken.id) {
 		Write-Host "Login successful to $HuntServer"
@@ -252,7 +272,7 @@ if ($ScanTask -like "Error:*") {
         $ScanTask = Invoke-ICScan $TargetListId
 		Start-Sleep 1
 	} else {
-		Write-Warning "ERROR: Could not get a token from $HuntServer using credentials $($HuntCredential.username)"
+		Write-Host -ForegroundColor Red "ERROR: Could not get a token from $HuntServer using credentials $($HuntCredential.username)"
 		return
 	}
 }
@@ -264,24 +284,27 @@ while ($scanId -eq $baseScanId) {
 	Start-Sleep 1
 	$ScanJobs = Get-ICActiveJobs
 	if ($ScanJobs -match "Error") {
-		Write-Warning "$ScanJobs"
-		Write-Host "Attempting to re-connecting to $HuntServer"
+		Write-Host -ForegroundColor Red "$ScanJobs"
+		Write-Warning "Attempting to re-connecting to $HuntServer"
 		$NewToken = New-ICToken $HuntCredential $HuntServer
 		if ($NewToken.id) {
 			Write-Host "Login successful to $HuntServer"
 			Write-Host "Login Token id: $($NewToken.id)"
 		} else {
-			Write-Warning "ERROR: Could not get a token from $HuntServer using credentials $($HuntCredential.username)"
+			Write-Host -ForegroundColor Red "ERROR: Could not get a token from $HuntServer using credentials $($HuntCredential.username)"
 			return
 		}
 	} elseif ($ScanJobs) {
         $ScanJobs = $ScanJobs | Sort-Object timestamp -Descending | Where-Object { $_.status -eq "Scanning" }
 		if ($ScanJobs) {
             $scanId = $ScanJobs[0].ScanId
-        }
-		Write-Host "Waiting for new ScanId to be created... ScanID is currently $scanID as of $(Get-Date)"
+        } else {
+			Write-Host "Waiting for new ScanId to be created... ScanID is currently $scanID as of $(Get-Date)"
+			Get-ICUserTasks | Where-Object { $_.type -eq "Scan" -AND $_.status -eq "Active"}
+		}
 	} else {
-		Write-Warning "No Active Scan! Waiting for scan to be initiated..."
+		Write-Host -ForegroundColor Red "No Active Scan! Waiting for scan to be initiated..."
+		Get-ICUserTasks | Where-Object { $_.type -eq "Scan" -AND $_.status -eq "Active"}
 		$ScanId = "NO_SCAN"
 	}
 }
@@ -289,11 +312,18 @@ Write-Host "New ScanID created! Now: $scanId"
 
 Write-Host "Renaming $UploadDir\$TempFolderName Directory to $UploadDir\$ScanId"
 if (Test-Path $UploadDir\$ScanId) {
-	Write-Warning "Folder $UploadDir\$ScanId already exists!"
+	Write-Host -ForegroundColor Red "Folder $UploadDir\$ScanId already exists!"
 } else {
-	Rename-Item $UploadDir\$TempFolderName $UploadDir\$ScanId -Force
+	try {
+		Rename-Item -path $UploadDir\$TempFolderName -newname $ScanId -ErrorAction Stop
+	} catch {
+		Write-Host -ForegroundColor Red "ERROR: Could not rename temp folder ($UploadDir\$TempFolderName --> $UploadDir\$ScanId), survey results will not be processed"
+		Write-Host -ForegroundColor Red "ERROR: $_"
+		return
+	}
 }
 Write-Host "Your HostSurvey results will be processed as the current scan of TargetList $TargetListName moves to the processing phase."
+Start-Sleep 1
 
 # Track Status of Scan processing
 $active = $true
@@ -301,15 +331,15 @@ while ($active) {
 	Start-Sleep 0.5
 	$status = Get-ICUserTasks
 	if ($status -like "Error:*") {
-		Write-Host "$Status"
-		Write-Host "Attempting to re-connecting to $HuntServer"
+		Write-Host -ForegroundColor Red "$Status"
+		Write-Warning "Attempting to re-connecting to $HuntServer"
 		$NewToken = New-ICToken $HuntCredential $HuntServer
 		if ($NewToken.id) {
 			Write-Host "Login successful to $HuntServer"
 			Write-Host "Login Token id: $($NewToken.id)"
 			continue
 		} else {
-			Write-Warning "ERROR: Could not get a token from $HuntServer using credentials $($HuntCredential.username)"
+			Write-Host -ForegroundColor Red "ERROR: Could not get a token from $HuntServer using credentials $($HuntCredential.username)"
 			return
 		}
 	}
@@ -318,13 +348,21 @@ while ($active) {
 	if ($status.status -eq "Active") {
 		$elapsedtime = ((Get-Date) - [datetime]$status.createdOn).TotalSeconds
 		$statusmessage = "[Elapsed (seconds): {0:N2} ] {1}" -f $elapsedtime, $status.message
-		Write-Progress -Activity "Waiting for scan to process" -status $statusmessage -percentComplete ($status.progress)	
+		if ($status.progress) {
+			Write-Progress -Activity "Waiting for scan to process" -status $statusmessage -percentComplete ($status.progress)	
+		} else {
+			Write-Progress -Activity "Waiting for scan to process" -status $statusmessage
+		}
 	} else {
 		$active = $false
-		if ($status.message -match "error") {
-			Write-Host "ERROR: Could not scan Target"
-		} else {
+		if ($status.status -eq "Error") {
+			Write-Host -ForegroundColor Red "ERROR: Could not complete scan and analysis."
+			Write-Host -ForegroundColor Red "$status.message"
+		} elseif ($status.status -eq "Completed") {
 			Write-Host "Scan Completed in $elapsedtime seconds"
+		} else {
+			Write-Host -ForegroundColor Red "Something went wrong..."
+			Write-Host -ForegroundColor Red "$status.message"
 		}
 	}
 }
