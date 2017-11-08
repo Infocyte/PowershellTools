@@ -85,7 +85,7 @@ elseif (-NOT (Get-ChildItem -Recurse -Path $Path -Filter *.iclz)) {
 }
 
 # Create new login Token and add it to Script variable
-Write-Host "Connecting $HuntServer using account $($HuntCredential.username)"
+Write-Host "Connecting to $HuntServer using account $($HuntCredential.username)"
 $NewToken = New-ICToken $HuntCredential $HuntServer
 if ($NewToken.id) {
 	Write-Host "Login successful to $HuntServer"
@@ -151,6 +151,7 @@ if ($Queries -like "Error:*") {
 
 # Initiate Enumeration
 Write-Host "Enumerating $Target"
+$enumtime = get-date
 Invoke-ICEnumeration $TargetListId $QueryId
 Start-Sleep 1
 	
@@ -160,9 +161,9 @@ Write-Host "Waiting for enumeration to complete"
 Write-Progress -Activity "Enumerating Target" -status "Initiating Enumeration"
 while ($active) { 
 	Start-Sleep 1
-	$status = Get-ICActiveTasks
+	$status = Get-ICUserTasks
 	if ($status -like "Error:*") {
-		Write-Host -ForegroundColor Red "Error on Get-ICActiveTasks: $status"
+		Write-Host -ForegroundColor Red "Error on Get-ICUserTasks: $status"
 		Write-Warning "Attempting to re-connecting to $HuntServer"
 		$NewToken = New-ICToken $HuntCredential $HuntServer
 		if ($NewToken.id) {
@@ -173,24 +174,32 @@ while ($active) {
 			Write-Host -ForegroundColor Red "ERROR: Could not get a token from $HuntServer using credentials $($HuntCredential.username)"
 			return
 		}
+	} elseif ($status) {
+		$status = $status | Where-Object { $_.userid -eq $NewToken.userid -AND $_.type -eq "Enumerate" -AND [datetime]$_.createdon -gt $enumtime}
 	} else {
-		$status = $status | Where-Object { $_.type -eq "Enumerate" -AND $_.status -eq "Active"}
+		Write-Host -ForegroundColor Red "Error on Get-ICUserTasks: No Jobs have been started..." 
+		Start-Sleep 1
+		continue
 	}
 	
 	if ($status) {
-		$lastStatus = $status[0]
-		$Status = $status[0]
-		$elapsedtime = "$($($status.elapsed)/1000)"
+		$lastStatus = $status[0].message
+		if ($Status.message -match "error") {
+			$active = $false
+			Write-Host -ForegroundColor Red "ERROR: Could not enumerate Target: $($Status.message)"
+			return "ERROR: Could not enumerate Target: $($Status.message)"
+		}
 		if ($status.progress) {
+			$elapsedtime = "$($($status.elapsed)/1000)"
 			Write-Progress -Activity "Enumerating Target" -status "[Elapsed (seconds): $elapsedtime] $($status.message)" -percentComplete ($status.progress)	
 		}
-	} elseif ($Status.message -match "error") {
-		$active = $false
-		Write-Host -ForegroundColor Red "ERROR: Could not enumerate Target: $($Status.message)"
-		return "ERROR: Could not enumerate Target: $($Status.message)"
+		if ($status.status -eq "Completed") {
+			$active = $false
+			Write-Host "Enumeration Complete: $($lastStatus)"	
+		}
 	} else {
+		Write-Host -ForegroundColor Red "Unhandled Error on enumeration Get-ICUserTasks: $Status"
 		$active = $false
-		Write-Host "Enumeration Complete: $($lastStatus.message)"
 	}
 }
 Start-Sleep 1
@@ -201,7 +210,7 @@ if ($TargetListResults) {
         $failreason = (Get-ICAddresses $TargetListId).failureReason
 
         Write-Host -ForegroundColor Red "ERROR: Enumeration was not successful ($failreason). Please check your ScanCredentials for the hunt server (HuntLocal) localhost within the Infocyte HUNT UI Credential Manager and try again"
-        return
+        return "ERROR: Enumeration was not successful ($failreason)"
     } else {
         Write-Host "Enumeration Successful!"
     }
@@ -230,40 +239,19 @@ Get-ChildItem $Path -filter *.iclz | Foreach-Object {
 	Copy-Item -Path $_ -Destination $UploadDir\$TempFolderName\Survey-$newhash.json.iclz -recurse -Container
 }	
 #>
-
-Write-Host "Retrieving Last Job and ScanId"
-#$LastFolder = (Get-ChildItem $UploadDir | Sort-Object LastWriteTime -Descending)[0].Name
-$ScanJobs = Get-ICActiveJobs
-if ($ScanJobs -like "Error:*") {
-	Write-Host -ForegroundColor Red "$ScanJobs"
-	Write-Warning "Attempting to re-connecting to $HuntServer"
-	$NewToken = New-ICToken $HuntCredential $HuntServer
-	if ($NewToken.id) {
-		Write-Host "Login successful to $HuntServer"
-		Write-Host "Login Token id: $($NewToken.id)"
-		$ScanJobs = Get-ICActiveJobs
-	} else {
-		Write-Host -ForegroundColor Red "ERROR: Could not get a token from $HuntServer using credentials $($HuntCredential.username)"
-		return
-	}
-} 
-
-$ScanJobs = $ScanJobs | Sort-Object timestamp -Descending | Where-Object { $_.status -eq "Scanning" }
-if ($ScanJobs) {
-	$baseScanId = $ScanJobs[0].scanId
-} else {
-	$baseScanId = "NO_SCAN"
-}
-Write-Host "Last Active ScanId: $baseScanId (Should say NO_SCAN if no scan is currently running)"
 	
+$baseScanId = "NO_SCAN"
+$scanId = $baseScanId
+#Write-Host "Last Active ScanId: $baseScanId (Should say NO_SCAN if no scan is currently running)"
 
 # Initiate Scan
 Write-Host "Initiating Scan of $Target"
+$scantime = get-date
 $ScanTask = Invoke-ICScan $TargetListId
 $ScanTask
 Start-Sleep 1
 if ($ScanTask -like "Error:*") {
-	Write-Host -ForegroundColor Red "$ScanTask"
+	Write-Host -ForegroundColor Red "Error on Invoke-ICScan: $ScanTask"
 	Write-Warning "Attempting to re-connecting to $HuntServer"
 	$NewToken = New-ICToken $HuntCredential $HuntServer
 	if ($NewToken.id) {
@@ -277,14 +265,13 @@ if ($ScanTask -like "Error:*") {
 	}
 }
 
-
 # Wait for new scan to be created
 $scanId = $baseScanId
 while ($scanId -eq $baseScanId) {
 	Start-Sleep 1
-	$ScanJobs = Get-ICActiveJobs
-	if ($ScanJobs -match "Error") {
-		Write-Host -ForegroundColor Red "$ScanJobs"
+	$ScanJobs = Get-ICUserTasks
+	if ($ScanJobs -like "ERROR:*") {
+		Write-Host -ForegroundColor Red "Error on Get-ICUserTasks: $ScanJobs"
 		Write-Warning "Attempting to re-connecting to $HuntServer"
 		$NewToken = New-ICToken $HuntCredential $HuntServer
 		if ($NewToken.id) {
@@ -292,23 +279,25 @@ while ($scanId -eq $baseScanId) {
 			Write-Host "Login Token id: $($NewToken.id)"
 		} else {
 			Write-Host -ForegroundColor Red "ERROR: Could not get a token from $HuntServer using credentials $($HuntCredential.username)"
-			return
+			return "ERROR: Could not get a token from $HuntServer using credentials $($HuntCredential.username)"
 		}
 	} elseif ($ScanJobs) {
-        $ScanJobs = $ScanJobs | Sort-Object timestamp -Descending | Where-Object { $_.status -eq "Scanning" }
-		if ($ScanJobs) {
-            $scanId = $ScanJobs[0].ScanId
+		$ScanJobs = $ScanJobs | Sort-Object timestamp -Descending | where { $_.userid -eq $NewToken.userid -AND [datetime]$_.createdon -gt $scantime -AND ($_.type -eq "Scan")}
+		if ($ScanJobs -AND ($ScanJobs -match "Error")) {
+			Write-Host -ForegroundColor Red "Error on scan. Check error message and investigate scan failure in HUNT server logs:"
+			Write-Host -ForegroundColor Red $ScanJobs
+			return "Error on last scan job. Check error message and investigate scan failure in HUNT server logs"
+		}
+		if ($ScanJobs | Where-Object { $_.status -eq "Active"}) {
+            $scanId = $ScanJobs[0].options.scanid
+			Write-Host "New ScanId created! Now: $scanId"
         } else {
 			Write-Host "Waiting for new ScanId to be created... ScanID is currently $scanID as of $(Get-Date)"
-			Get-ICUserTasks | Where-Object { $_.type -eq "Scan" -AND $_.status -eq "Active"}
 		}
 	} else {
 		Write-Host -ForegroundColor Red "No Active Scan! Waiting for scan to be initiated..."
-		Get-ICUserTasks | Where-Object { $_.type -eq "Scan" -AND $_.status -eq "Active"}
-		$ScanId = "NO_SCAN"
 	}
 }
-Write-Host "New ScanID created! Now: $scanId"
 
 Write-Host "Renaming $UploadDir\$TempFolderName Directory to $UploadDir\$ScanId"
 if (Test-Path $UploadDir\$ScanId) {
@@ -318,8 +307,8 @@ if (Test-Path $UploadDir\$ScanId) {
 		Rename-Item -path $UploadDir\$TempFolderName -newname $ScanId -ErrorAction Stop
 	} catch {
 		Write-Host -ForegroundColor Red "ERROR: Could not rename temp folder ($UploadDir\$TempFolderName --> $UploadDir\$ScanId), survey results will not be processed"
-		Write-Host -ForegroundColor Red "ERROR: $_"
-		return
+		Write-Host -ForegroundColor Red "$_"
+		return $_
 	}
 }
 Write-Host "Your HostSurvey results will be processed as the current scan of TargetList $TargetListName moves to the processing phase."
@@ -343,8 +332,7 @@ while ($active) {
 			return
 		}
 	}
-	$status = $status | Where-Object { $_.type -eq "Scan" -AND $_.options.ScanId -eq $scanId}
-	
+	$status = $status | Where-Object { $_.options.ScanId -eq $scanId }
 	if ($status.status -eq "Active") {
 		$elapsedtime = ((Get-Date) - [datetime]$status.createdOn).TotalSeconds
 		$statusmessage = "[Elapsed (seconds): {0:N2} ] {1}" -f $elapsedtime, $status.message
@@ -354,15 +342,17 @@ while ($active) {
 			Write-Progress -Activity "Waiting for scan to process" -status $statusmessage
 		}
 	} else {
-		$active = $false
 		if ($status.status -eq "Error") {
 			Write-Host -ForegroundColor Red "ERROR: Could not complete scan and analysis."
 			Write-Host -ForegroundColor Red "$status.message"
+			$active = $false
 		} elseif ($status.status -eq "Completed") {
 			Write-Host "Scan Completed in $elapsedtime seconds"
+			$active = $false
 		} else {
-			Write-Host -ForegroundColor Red "Something went wrong..."
+			Write-Host -ForegroundColor Red "[Unhandled Error] Something went wrong..."
 			Write-Host -ForegroundColor Red "$status.message"
+			$status
 		}
 	}
 }
