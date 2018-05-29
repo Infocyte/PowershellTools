@@ -41,57 +41,6 @@ function New-ICToken ([PSCredential]$Credential, [String]$HuntServer = "https://
 }
 
 
-# Get Scan Metadata
-function Get-ICTargetList {
-	Write-Verbose "Requesting TargetLists from $HuntServerAddress"
-	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-	$headers.Add("Authorization", $Global:ICToken)
-	$headers.Add("filter", '{"order":["name","id"]}')
-	try {
-		$objects += Invoke-RestMethod ("$HuntServerAddress/api/targets") -Headers $headers -Method GET -ContentType 'application/json'		
-	} catch {
-		Write-Warning "Error: $_"
-		return "ERROR: $($_.Exception.Message)"
-	}	
-	$objects
-}
-
-function Get-ICScans {
-	$skip = 0
-	Write-Verbose "Exporting Scans from $HuntServerAddress"
-	Write-Progress -Activity "Exporting Scans from Hunt Server" -status "Requesting Scans from $scanId [$skip]" 
-	
-	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-	$headers.Add("Authorization", $Global:ICToken)
-	$headers.Add("filter", '{"limit":1000,"skip":'+$skip+'}')
-	try {
-		$objects = Invoke-RestMethod "$HuntServerAddress/api/IntegrationScans" -Headers $headers -Method GET -ContentType 'application/json'
-	} catch {
-		Write-Warning "Error: $_"
-		return "ERROR: $($_.Exception.Message)"
-	}
-	Write-Output $objects
-	$more = $true
-	While ($more) {
-		$skip += 1000
-		Write-Progress -Activity "Exporting Scans from Hunt Server" -status "Requesting Scans from $scanId [$skip]" 
-		$headers.remove('filter') | Out-Null
-		$headers.Add("filter", '{"limit":1000,"skip":'+$skip+'}')
-		try {
-			$moreobjects = Invoke-RestMethod ("$HuntServerAddress/api/IntegrationScans") -Headers $headers -Method GET -ContentType 'application/json'
-		} catch {
-			Write-Warning "Error: $_"	
-		}
-		if ($moreobjects.count -gt 0) {
-			Write-Output $moreobjects
-			# $objects += $moreobjects
-		} else {
-			$more = $false
-		}
-	}
-}
-
-
 # Get Full FileReports on all Suspicious and Malicious objects by scanId
 function Get-ICFileReports ($scanId) {
 	$skip = 0
@@ -433,114 +382,6 @@ function Get-ICHosts ($scanId) {
 	}
 }
 
-function Get-ICAccounts ($scanId) {
-	$skip = 0
-	Write-Verbose "Exporting Accounts from $scanId [$skip]" 
-	Write-Progress -Activity "Exporting Account Instances from Hunt Server" -status "Requesting Accounts from $scanId [$skip]" 
-	
-	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-	$headers.Add("Authorization", $Global:ICToken)
-	$headers.Add("filter", '{"where":{"scanId":"'+$scanId+'"},"limit":1000,"skip":'+$skip+'}')
-	try {
-		$objects = Invoke-RestMethod "$HuntServerAddress/api/ScanAccountInstances" -Headers $headers -Method GET -ContentType 'application/json'
-	} catch {
-		Write-Warning "Error: $_"
-		return "ERROR: $($_.Exception.Message)"	
-	}
-	$more = $true
-	While ($more) {
-		$skip += 1000
-		Write-Progress -Activity "Exporting Account Instances from Hunt Server" -status "Requesting Accounts from $scanId [$skip]" 
-		$headers.remove('filter') | Out-Null
-		$headers.Add("filter", '{"where":{"scanId":"'+$scanId+'"},"limit":1000,"skip":'+$skip+'}')
-		try {
-			$moreobjects = Invoke-RestMethod ("$HuntServerAddress/api/ScanAccountInstances") -Headers $headers -Method GET -ContentType 'application/json'
-		} catch {
-			Write-Warning "Error: $_"	
-		}
-		if ($moreobjects.count -gt 0) {
-			$objects += $moreobjects
-		} else {
-			$more = $false
-		}
-	}
-	
-	$skip = 0
-	$headers.remove('filter') | Out-Null
-	$headers.Add("filter", '{"limit":1000,"skip":'+$skip+'}')
-	try {
-		$Accounts = Invoke-RestMethod ("$HuntServerAddress/api/Accounts") -Headers $headers -Method GET -ContentType 'application/json'
-	} catch {
-		Write-Warning "Error: $_"	
-	}
-	$more = $true
-	While ($more) {
-		$skip += 1000
-		$headers.remove('filter') | Out-Null
-		$headers.Add("filter", '{"limit":1000,"skip":'+$skip+'}')
-		try {
-			$moreobjects = Invoke-RestMethod ("$HuntServerAddress/api/Accounts") -Headers $headers -Method GET -ContentType 'application/json'
-		} catch {
-			Write-Warning "Error: $_"	
-		}
-		if ($moreobjects.count -gt 0) {
-			$Accounts += $moreobjects
-		} else {
-			$more = $false
-		}
-	}
-	
-	$Hosts = Get-ICHosts $scanId
-	$objects | % {
-		# Add Host Info
-		$hostId = $_.hostId
-		$hostinfo = $Hosts | where { $_.hostId -eq $hostId }
-		$_ | Add-Member -Type NoteProperty -Name 'hostname' -Value $hostinfo.hostname
-		$_ | Add-Member -Type NoteProperty -Name 'ip' -Value $hostinfo.ip
-		
-		# Add account Info
-		$accountId = $_.accountId
-		$acctinfo = $Accounts | where { $_.accountId -eq $accountId }
-		$_ | Add-Member -Type NoteProperty -Name 'fullname' -Value $acctinfo.fullname		
-	}
-	
-	$objects
-}
-
-function Get-ICAddresses ($TargetId) {
-	$skip = 0
-	Write-Verbose "Exporting Addresses from $scanId [$skip]" 
-	Write-Progress -Activity "Exporting Address Instances from Hunt Server" -status "Requesting Addresses from $scanId [$skip]" 
-	
-	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-	$headers.Add("Authorization", $Global:ICToken)
-	$headers.Add("filter", '{"where":{"and":[{"targetId":"'+$targetId+'"}]},"limit":1000,"skip":'+$skip+'}')
-	try {
-		$objects += Invoke-RestMethod ("$HuntServerAddress/api/Addresses") -Headers $headers -Method GET -ContentType 'application/json'		
-	} catch {
-		Write-Warning "Error: $_"
-		return "ERROR: $($_.Exception.Message)"
-	}
-	$more = $true
-	While ($more) {
-		$skip += 1000
-		Write-Progress -Activity "Exporting Address Instances from Hunt Server" -status "Requesting Addresses from $scanId [$skip]" 
-		$headers.remove('filter') | Out-Null
-		$headers.Add("filter", '{"where":{"and":[{"targetId":"'+$targetId+'"}]},"limit":1000,"skip":'+$skip+'}')
-		try {
-			$moreobjects = Invoke-RestMethod ("$HuntServerAddress/api/Addresses") -Headers $headers -Method GET -ContentType 'application/json'
-		} catch {
-			Write-Warning "Error: $_"	
-		}
-		if ($moreobjects.count -gt 0) {
-			$objects += $moreobjects
-		} else {
-			$more = $false
-		}
-	}	
-	$objects
-}
-
 
 # Get Full FileReport on an object by sha1
 function Get-ICFileReport ($sha1){
@@ -562,77 +403,7 @@ function Get-ICFileReport ($sha1){
 }
 
 
-# Get Job Functions
-function Get-ICActiveTasks {
-	Write-Verbose "Getting Active Tasks from Infocyte HUNT: $HuntServerAddress"
-	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-	$headers.Add("Authorization", $Global:ICToken)	
-	try {
-		$objects += Invoke-RestMethod ("$HuntServerAddress/api/usertasks/active") -Headers $headers -Method GET -ContentType 'application/json'		
-	} catch {
-		Write-Warning "Error: $_"
-		return "ERROR: $($_.Exception.Message)"
-	}
-	if ($objects) {
-		$objects | where { $_.status -eq "Active" }
-	} else {
-		return
-	}
-	
-}
-
-function Get-ICUserTasks {
-	Write-Verbose "Getting Active Tasks from Infocyte HUNT: $HuntServerAddress"
-	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-	$headers.Add("Authorization", $Global:ICToken)	
-	$Skip = 0
-	$headers.Add("filter", '{"where":{"or":[]},"order":["createdOn"],"limit":1000,"skip":'+$skip+'}')
-	try {
-		$objects = Invoke-RestMethod ("$HuntServerAddress/api/usertasks") -Headers $headers -Method GET -ContentType 'application/json'		
-	} catch {
-		Write-Warning "Error: $_"
-		return "ERROR: $($_.Exception.Message)"
-	}	
-	Write-Output $objects	
-	
-	$more = $true
-	While ($more) {
-		$skip += 1000
-		$headers.remove('filter') | Out-Null
-		$headers.Add("filter", '{"where":{"or":[]},"order":["createdOn"],"limit":1000,"skip":'+$skip+'}')
-		try {
-			$moreobjects = Invoke-RestMethod ("$HuntServerAddress/api/usertasks") -Headers $headers -Method GET -ContentType 'application/json'
-		} catch {
-			Write-Warning "Error: $_"
-			return "ERROR: $($_.Exception.Message)"
-		}
-		if ($moreobjects.count -gt 0) {
-			Write-Output $moreobjects
-		} else {
-			$more = $false
-		}
-	}
-}
-
-function Get-ICLastscanId {
-	Write-Verbose "Getting last scanId from Infocyte HUNT: $HuntServerAddress"
-	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-	$headers.Add("Authorization", $Global:ICToken)
-	try {
-		$Scans = Invoke-RestMethod ("$HuntServerAddress/api/Scans") -Headers $headers -Method GET -ContentType 'application/json'
-	} catch {
-		Write-Warning "Error: $_"
-		return "ERROR: $($_.Exception.Message)"
-	}
-	if ($Scans) {
-		($Scans | sort-object completedOn -descending)[0].id
-	} else {
-		return $null
-	}	
-}
-
-
-
+# Status and Progress APIs
 function Get-ICJobs {
 	Write-Verbose "Getting Active Jobs from Infocyte HUNT: $HuntServerAddress"
 	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
@@ -678,35 +449,76 @@ function Get-ICActiveJobs {
 	}
 }
 
-function Get-ICCredentials {
-	Write-Verbose "Getting Credential Objects from Infocyte HUNT: $HuntServerAddress"
+function Get-ICUserTasks {
+	Write-Verbose "Getting Active Tasks from Infocyte HUNT: $HuntServerAddress"
 	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-	$headers.Add("Authorization", $Global:ICToken)
+	$headers.Add("Authorization", $Global:ICToken)	
+	$Skip = 0
+	$headers.Add("filter", '{"where":{"or":[]},"order":["createdOn"],"limit":1000,"skip":'+$skip+'}')
 	try {
-		$objects += Invoke-RestMethod ("$HuntServerAddress/api/credentials") -Headers $headers -Method GET -ContentType 'application/json'		
+		$objects = Invoke-RestMethod ("$HuntServerAddress/api/usertasks") -Headers $headers -Method GET -ContentType 'application/json'		
 	} catch {
 		Write-Warning "Error: $_"
 		return "ERROR: $($_.Exception.Message)"
 	}	
-	$objects
+	Write-Output $objects	
+	
+	$more = $true
+	While ($more) {
+		$skip += 1000
+		$headers.remove('filter') | Out-Null
+		$headers.Add("filter", '{"where":{"or":[]},"order":["createdOn"],"limit":1000,"skip":'+$skip+'}')
+		try {
+			$moreobjects = Invoke-RestMethod ("$HuntServerAddress/api/usertasks") -Headers $headers -Method GET -ContentType 'application/json'
+		} catch {
+			Write-Warning "Error: $_"
+			return "ERROR: $($_.Exception.Message)"
+		}
+		if ($moreobjects.count -gt 0) {
+			Write-Output $moreobjects
+		} else {
+			$more = $false
+		}
+	}
 }
 
-function Get-ICQuery ([String]$targetListId) {
-	Write-Verbose "Creating new Credential ($name) for username $($Cred.Username)"
+function Get-ICActiveTasks {
+	Write-Verbose "Getting Active Tasks from Infocyte HUNT: $HuntServerAddress"
 	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-	$headers.Add("Authorization", $Global:ICToken)
-	$headers.Add("filter", '{"where":{"and":[{"targetId":"'+$targetListId+'"}]},"include":["credential","sshCredential"]}')
+	$headers.Add("Authorization", $Global:ICToken)	
 	try {
-		$objects += Invoke-RestMethod ("$HuntServerAddress/api/queries") -Headers $headers -Method GET -ContentType 'application/json'		
+		$objects += Invoke-RestMethod ("$HuntServerAddress/api/usertasks/active") -Headers $headers -Method GET -ContentType 'application/json'		
 	} catch {
 		Write-Warning "Error: $_"
 		return "ERROR: $($_.Exception.Message)"
+	}
+	if ($objects) {
+		$objects | where { $_.status -eq "Active" }
+	} else {
+		return
+	}
+	
+}
+
+function Get-ICLastscanId {
+	Write-Verbose "Getting last scanId from Infocyte HUNT: $HuntServerAddress"
+	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+	$headers.Add("Authorization", $Global:ICToken)
+	try {
+		$Scans = Invoke-RestMethod ("$HuntServerAddress/api/Scans") -Headers $headers -Method GET -ContentType 'application/json'
+	} catch {
+		Write-Warning "Error: $_"
+		return "ERROR: $($_.Exception.Message)"
+	}
+	if ($Scans) {
+		($Scans | sort-object completedOn -descending)[0].id
+	} else {
+		return $null
 	}	
-	$objects
 }
 
 
-# Creation APIs
+# Setup APIs
 function New-ICTargetList ([String]$Name) {
 	Write-Verbose "Creating new target list: $Name"
 	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
@@ -737,6 +549,19 @@ function New-ICCredential ([String]$Name, [PSCredential]$Cred) {
 	$objects
 }
 
+function Get-ICCredentials {
+	Write-Verbose "Getting Credential Objects from Infocyte HUNT: $HuntServerAddress"
+	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+	$headers.Add("Authorization", $Global:ICToken)
+	try {
+		$objects += Invoke-RestMethod ("$HuntServerAddress/api/credentials") -Headers $headers -Method GET -ContentType 'application/json'		
+	} catch {
+		Write-Warning "Error: $_"
+		return "ERROR: $($_.Exception.Message)"
+	}	
+	$objects
+}
+
 function New-ICQuery ([String]$targetListId, [String]$credentialId = $null, [String]$sshCredentialId = $null, [String]$query) {
 	Write-Verbose "Creating new Query in TargetList $TargetListId ($query) using username $($Cred.Username)"
 	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
@@ -751,6 +576,120 @@ function New-ICQuery ([String]$targetListId, [String]$credentialId = $null, [Str
 	$objects
 }
 
+function Get-ICQuery ([String]$targetListId) {
+	Write-Verbose "Creating new Credential ($name) for username $($Cred.Username)"
+	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+	$headers.Add("Authorization", $Global:ICToken)
+	$headers.Add("filter", '{"where":{"and":[{"targetId":"'+$targetListId+'"}]},"include":["credential","sshCredential"]}')
+	try {
+		$objects += Invoke-RestMethod ("$HuntServerAddress/api/queries") -Headers $headers -Method GET -ContentType 'application/json'		
+	} catch {
+		Write-Warning "Error: $_"
+		return "ERROR: $($_.Exception.Message)"
+	}	
+	$objects
+}
+
+
+# Scan Metadata
+function Get-ICTargetList {
+	Write-Verbose "Requesting TargetLists from $HuntServerAddress"
+	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+	$headers.Add("Authorization", $Global:ICToken)
+	$headers.Add("filter", '{"order":["name","id"]}')
+	try {
+		$objects += Invoke-RestMethod ("$HuntServerAddress/api/targets") -Headers $headers -Method GET -ContentType 'application/json'		
+	} catch {
+		Write-Warning "Error: $_"
+		return "ERROR: $($_.Exception.Message)"
+	}	
+	$objects
+}
+
+function Get-ICScans {
+	$skip = 0
+	Write-Verbose "Exporting Scans from $HuntServerAddress"
+	Write-Progress -Activity "Exporting Scans from Hunt Server" -status "Requesting Scans from $scanId [$skip]" 
+	
+	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+	$headers.Add("Authorization", $Global:ICToken)
+	$headers.Add("filter", '{"limit":1000,"skip":'+$skip+'}')
+	try {
+		$objects = Invoke-RestMethod "$HuntServerAddress/api/IntegrationScans" -Headers $headers -Method GET -ContentType 'application/json'
+	} catch {
+		Write-Warning "Error: $_"
+		return "ERROR: $($_.Exception.Message)"
+	}
+	Write-Output $objects
+	$more = $true
+	While ($more) {
+		$skip += 1000
+		Write-Progress -Activity "Exporting Scans from Hunt Server" -status "Requesting Scans from $scanId [$skip]" 
+		$headers.remove('filter') | Out-Null
+		$headers.Add("filter", '{"limit":1000,"skip":'+$skip+'}')
+		try {
+			$moreobjects = Invoke-RestMethod ("$HuntServerAddress/api/IntegrationScans") -Headers $headers -Method GET -ContentType 'application/json'
+		} catch {
+			Write-Warning "Error: $_"	
+		}
+		if ($moreobjects.count -gt 0) {
+			Write-Output $moreobjects
+			# $objects += $moreobjects
+		} else {
+			$more = $false
+		}
+	}
+}
+
+function Get-ICAddresses ($TargetListId) {
+	$skip = 0
+	Write-Verbose "Getting all addresses from TargetList $TargetListId" 
+	Write-Progress -Activity "Exporting from $HuntServerAddress" -status "Getting Addresses from $TargetListId [$skip]"
+	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+	$headers.Add("Authorization", $Global:ICToken)
+	$headers.Add("filter", '{"where":{"and":[{"targetId":"'+$targetId+'"}]},"limit":1000,"skip":'+$skip+'}')
+	try {
+		$objects = Invoke-RestMethod ("$HuntServerAddress/api/Addresses") -Headers $headers -Method GET -ContentType 'application/json'
+	} catch {
+		Write-Warning "Error: $_"
+		return "ERROR: $($_.Exception.Message)"
+	}
+	$more = $true
+	While ($more) {
+		$skip += 1000
+		Write-Progress -Activity "Exporting from $HuntServerAddress" -status "Getting Addresses from $TargetListId [$skip]"  
+		$headers.remove('filter') | Out-Null
+		$headers.Add("filter", '{"where":{"and":[{"targetId":"'+$targetId+'"}]},"limit":1000,"skip":'+$skip+'}')
+		try {
+			$moreobjects = Invoke-RestMethod ("$HuntServerAddress/api/Addresses") -Headers $headers -Method GET -ContentType 'application/json'
+		} catch {
+			Write-Warning "Error: $_"	
+		}
+		if ($moreobjects.count -gt 0) {
+			$objects += $moreobjects
+		} else {
+			$more = $false
+		}
+	}	
+	$objects
+}
+
+function Remove-ICAddresses ($TargetListId) {
+	Write-Verbose "Clearing all resolved hosts from TargetList $TargetListId"
+	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+	$headers.Add("Authorization", $Global:ICToken)
+	$data = 'where=%7B%22and%22:%5B%7B%22targetId%22:%22'+$TargetListId+'%22%7D%5D%7D'
+	try {
+		$objects += Invoke-RestMethod ("$HuntServerAddress/api/Addresses?$data") -Headers $headers -Method DELETE -ContentType 'application/json'		
+	} catch {
+		Write-Warning "Error: $_"
+		return "ERROR: $($_.Exception.Message)"
+	}	
+	$objects
+}
+
+
+# Scan APIs
 function Invoke-ICEnumeration ($TargetListId, $QueryId) {
 	Write-Verbose "Starting Enumeration of $TargetListId with Query $QueryId"
 	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
@@ -772,20 +711,6 @@ function Invoke-ICScan ($TargetListId) {
 	$body = '{"options":{"EnableProcess":true,"EnableModule":true,"EnableDriver":true,"EnableMemory":true,"EnableAccount":true,"EnableAutostart":true,"EnableHook":true,"EnableNetwork":true,"EnableLog":true,"EnableDelete":true}}'
 	try {
 		$objects += Invoke-RestMethod ("$HuntServerAddress/api/targets/$TargetListId/scan") -Headers $headers -Body $body -Method POST -ContentType 'application/json'		
-	} catch {
-		Write-Warning "Error: $_"
-		return "ERROR: $($_.Exception.Message)"
-	}	
-	$objects
-}
-
-function Remove-ICAddresses ($TargetListId) {
-	Write-Verbose "Getting all addresses from TargetList $TargetListId"
-	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-	$headers.Add("Authorization", $Global:ICToken)
-	$data = 'where=%7B%22and%22:%5B%7B%22targetId%22:%22'+$TargetListId+'%22%7D%5D%7D'
-	try {
-		$objects += Invoke-RestMethod ("$HuntServerAddress/api/Addresses?$data") -Headers $headers -Method DELETE -ContentType 'application/json'		
 	} catch {
 		Write-Warning "Error: $_"
 		return "ERROR: $($_.Exception.Message)"
