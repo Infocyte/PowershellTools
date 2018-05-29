@@ -65,7 +65,7 @@ function Get-ICScans {
 	$headers.Add("Authorization", $Global:ICToken)
 	$headers.Add("filter", '{"limit":1000,"skip":'+$skip+'}')
 	try {
-		$objects = Invoke-RestMethod "$HuntServerAddress/api/SplunkScans" -Headers $headers -Method GET -ContentType 'application/json'
+		$objects = Invoke-RestMethod "$HuntServerAddress/api/IntegrationScans" -Headers $headers -Method GET -ContentType 'application/json'
 	} catch {
 		Write-Warning "Error: $_"
 		return "ERROR: $($_.Exception.Message)"
@@ -78,7 +78,7 @@ function Get-ICScans {
 		$headers.remove('filter') | Out-Null
 		$headers.Add("filter", '{"limit":1000,"skip":'+$skip+'}')
 		try {
-			$moreobjects = Invoke-RestMethod ("$HuntServerAddress/api/SplunkScans") -Headers $headers -Method GET -ContentType 'application/json'
+			$moreobjects = Invoke-RestMethod ("$HuntServerAddress/api/IntegrationScans") -Headers $headers -Method GET -ContentType 'application/json'
 		} catch {
 			Write-Warning "Error: $_"	
 		}
@@ -162,7 +162,7 @@ function Get-ICProcesses ($scanId){
 	$headers.Add("Authorization", $Global:ICToken)
 	$headers.Add("filter", '{"where":{"scanId":"'+$scanId+'"},"limit":1000,"skip":'+$skip+'}')
 	try {
-		$objects = Invoke-RestMethod ("$HuntServerAddress/api/SplunkProcesses") -Headers $headers -Method GET -ContentType 'application/json'
+		$objects = Invoke-RestMethod ("$HuntServerAddress/api/IntegrationProcesses") -Headers $headers -Method GET -ContentType 'application/json'
 	} catch {
 		Write-Warning "Error: $_"
 		return "ERROR: $($_.Exception.Message)"	
@@ -175,7 +175,7 @@ function Get-ICProcesses ($scanId){
 		$headers.remove('filter') | Out-Null
 		$headers.Add("filter", '{"where":{"scanId":"'+$scanId+'"},"limit":1000,"skip":'+$skip+'}')
 		try {
-			$moreobjects = Invoke-RestMethod ("$HuntServerAddress/api/SplunkProcesses") -Headers $headers -Method GET -ContentType 'application/json'
+			$moreobjects = Invoke-RestMethod ("$HuntServerAddress/api/IntegrationProcesses") -Headers $headers -Method GET -ContentType 'application/json'
 		} catch {
 			Write-Warning "Error: $_"	
 		}
@@ -197,7 +197,7 @@ function Get-ICModules ($scanId){
 	$headers.Add("Authorization", $Global:ICToken)
 	$headers.Add("filter", '{"where":{"scanId":"'+$scanId+'"},"limit":1000,"skip":'+$skip+'}')
 	try {
-		$objects = Invoke-RestMethod ("$HuntServerAddress/api/SplunkModules") -Headers $headers -Method GET -ContentType 'application/json'
+		$objects = Invoke-RestMethod ("$HuntServerAddress/api/IntegrationModules") -Headers $headers -Method GET -ContentType 'application/json'
 	} catch {
 		Write-Warning "Error: $_"
 		return "ERROR: $($_.Exception.Message)"	
@@ -210,7 +210,7 @@ function Get-ICModules ($scanId){
 		$headers.remove('filter') | Out-Null
 		$headers.Add("filter", '{"where":{"scanId":"'+$scanId+'"},"limit":1000,"skip":'+$skip+'}')
 		try {
-			$moreobjects = Invoke-RestMethod ("$HuntServerAddress/api/SplunkModules") -Headers $headers -Method GET -ContentType 'application/json'
+			$moreobjects = Invoke-RestMethod ("$HuntServerAddress/api/IntegrationModules") -Headers $headers -Method GET -ContentType 'application/json'
 		} catch {
 			Write-Warning "Error: $_"	
 		}
@@ -232,7 +232,7 @@ function Get-ICDrivers ($scanId){
 	$headers.Add("Authorization", $Global:ICToken)
 	$headers.Add("filter", '{"where":{"scanId":"'+$scanId+'"},"limit":1000,"skip":'+$skip+'}')
 	try {
-		$objects = Invoke-RestMethod ("$HuntServerAddress/api/SplunkDrivers") -Headers $headers -Method GET -ContentType 'application/json'
+		$objects = Invoke-RestMethod ("$HuntServerAddress/api/IntegrationDrivers") -Headers $headers -Method GET -ContentType 'application/json'
 	} catch {
 		Write-Warning "Error: $_"
 		return "ERROR: $($_.Exception.Message)"	
@@ -245,7 +245,7 @@ function Get-ICDrivers ($scanId){
 		$headers.remove('filter') | Out-Null
 		$headers.Add("filter", '{"where":{"scanId":"'+$scanId+'"},"limit":1000,"skip":'+$skip+'}')
 		try {
-			$moreobjects = Invoke-RestMethod ("$HuntServerAddress/api/SplunkDrivers") -Headers $headers -Method GET -ContentType 'application/json'
+			$moreobjects = Invoke-RestMethod ("$HuntServerAddress/api/IntegrationDrivers") -Headers $headers -Method GET -ContentType 'application/json'
 		} catch {
 			Write-Warning "Error: $_"	
 		}
@@ -267,7 +267,7 @@ function Get-ICAutostarts ($scanId){
 	$headers.Add("Authorization", $Global:ICToken)
 	$headers.Add("filter", '{"where":{"scanId":"'+$scanId+'"},"limit":1000,"skip":'+$skip+'}')
 	try {
-		$objects = Invoke-RestMethod ("$HuntServerAddress/api/SplunkAutostarts") -Headers $headers -Method GET -ContentType 'application/json'
+		$objects = Invoke-RestMethod ("$HuntServerAddress/api/IntegrationAutostarts") -Headers $headers -Method GET -ContentType 'application/json'
 	} catch {
 		Write-Warning "Error: $_"
 		return "ERROR: $($_.Exception.Message)"	
@@ -280,7 +280,7 @@ function Get-ICAutostarts ($scanId){
 		$headers.remove('filter') | Out-Null
 		$headers.Add("filter", '{"where":{"scanId":"'+$scanId+'"},"limit":1000,"skip":'+$skip+'}')
 		try {
-			$moreobjects = Invoke-RestMethod ("$HuntServerAddress/api/SplunkAutostarts") -Headers $headers -Method GET -ContentType 'application/json'
+			$moreobjects = Invoke-RestMethod ("$HuntServerAddress/api/IntegrationAutostarts") -Headers $headers -Method GET -ContentType 'application/json'
 		} catch {
 			Write-Warning "Error: $_"	
 		}
@@ -302,7 +302,7 @@ function Get-ICMemscans ($scanId){
 	$headers.Add("Authorization", $Global:ICToken)
 	$headers.Add("filter", '{"where":{"scanId":"'+$scanId+'"},"limit":1000,"skip":'+$skip+'}')
 	try {
-		$objects = Invoke-RestMethod "$HuntServerAddress/api/SplunkMemscans" -Headers $headers -Method GET -ContentType 'application/json'
+		$objects = Invoke-RestMethod "$HuntServerAddress/api/IntegrationMemscans" -Headers $headers -Method GET -ContentType 'application/json'
 	} catch {
 		Write-Warning "Error: $_"
 		return "ERROR: $($_.Exception.Message)"	
@@ -315,7 +315,7 @@ function Get-ICMemscans ($scanId){
 		$headers.remove('filter') | Out-Null
 		$headers.Add("filter", '{"where":{"scanId":"'+$scanId+'"},"limit":1000,"skip":'+$skip+'}')
 		try {
-			$moreobjects = Invoke-RestMethod ("$HuntServerAddress/api/SplunkMemscans") -Headers $headers -Method GET -ContentType 'application/json'
+			$moreobjects = Invoke-RestMethod ("$HuntServerAddress/api/IntegrationMemscans") -Headers $headers -Method GET -ContentType 'application/json'
 		} catch {
 			Write-Warning "Error: $_"	
 		}
@@ -337,7 +337,7 @@ function Get-ICConnections ([String]$scanId, [Switch]$All) {
 	$headers.Add("Authorization", $Global:ICToken)
 	$headers.Add("filter", '{"where":{"and":[{"scanId":"'+$scanId+'"},{"or":[{"state":"SYN-SENT"},{"state":"ESTABLISHED"}]}]},"limit":1000,"skip":'+$skip+'}')
 	try {
-		$objects = (Invoke-RestMethod ("$HuntServerAddress/api/SplunkConnections") -Headers $headers -Method GET -ContentType 'application/json') | where { $_.localaddr -ne $_.remoteaddr }
+		$objects = (Invoke-RestMethod ("$HuntServerAddress/api/IntegrationConnections") -Headers $headers -Method GET -ContentType 'application/json') | where { $_.localaddr -ne $_.remoteaddr }
 	} catch {
 		Write-Warning "Error: $_"
 		return "ERROR: $($_.Exception.Message)"
@@ -350,7 +350,7 @@ function Get-ICConnections ([String]$scanId, [Switch]$All) {
 		$headers.remove('filter') | Out-Null
 		$headers.Add("filter", '{"where":{"and":[{"scanId":"'+$scanId+'"},{"or":[{"state":"SYN-SENT"},{"state":"ESTABLISHED"}]}]},"limit":1000,"skip":'+$skip+'}')
 		try {
-			$moreobjects = Invoke-RestMethod ("$HuntServerAddress/api/SplunkConnections") -Headers $headers -Method GET -ContentType 'application/json'
+			$moreobjects = Invoke-RestMethod ("$HuntServerAddress/api/IntegrationConnections") -Headers $headers -Method GET -ContentType 'application/json'
 		} catch {
 			Write-Warning "Error: $_"	
 		}
@@ -372,7 +372,7 @@ function Get-ICAccounts ($scanId) {
 	$headers.Add("Authorization", $Global:ICToken)
 	$headers.Add("filter", '{"where":{"scanId":"'+$scanId+'"},"limit":1000,"skip":'+$skip+'}')
 	try {
-		$objects = Invoke-RestMethod "$HuntServerAddress/api/SplunkAccounts" -Headers $headers -Method GET -ContentType 'application/json'
+		$objects = Invoke-RestMethod "$HuntServerAddress/api/IntegrationAccounts" -Headers $headers -Method GET -ContentType 'application/json'
 	} catch {
 		Write-Warning "Error: $_"
 		return "ERROR: $($_.Exception.Message)"	
@@ -385,7 +385,7 @@ function Get-ICAccounts ($scanId) {
 		$headers.remove('filter') | Out-Null
 		$headers.Add("filter", '{"where":{"scanId":"'+$scanId+'"},"limit":1000,"skip":'+$skip+'}')
 		try {
-			$moreobjects = Invoke-RestMethod ("$HuntServerAddress/api/SplunkAccounts") -Headers $headers -Method GET -ContentType 'application/json'
+			$moreobjects = Invoke-RestMethod ("$HuntServerAddress/api/IntegrationAccounts") -Headers $headers -Method GET -ContentType 'application/json'
 		} catch {
 			Write-Warning "Error: $_"	
 		}
@@ -407,7 +407,7 @@ function Get-ICHosts ($scanId) {
 	$headers.Add("Authorization", $Global:ICToken)
 	$headers.Add("filter", '{"where":{"scanId":"'+$scanId+'"},"limit":1000,"skip":'+$skip+'}')
 	try {
-		$objects = Invoke-RestMethod ("$HuntServerAddress/api/SplunkHosts") -Headers $headers -Method GET -ContentType 'application/json'
+		$objects = Invoke-RestMethod ("$HuntServerAddress/api/IntegrationHosts") -Headers $headers -Method GET -ContentType 'application/json'
 	} catch {
 		Write-Warning "Error: $_"
 		return "ERROR: $($_.Exception.Message)"
@@ -420,7 +420,7 @@ function Get-ICHosts ($scanId) {
 		$headers.remove('filter') | Out-Null
 		$headers.Add("filter", '{"where":{"scanId":"'+$scanId+'"},"limit":1000,"skip":'+$skip+'}')
 		try {
-			$moreobjects = Invoke-RestMethod ("$HuntServerAddress/api/SplunkHosts") -Headers $headers -Method GET -ContentType 'application/json'
+			$moreobjects = Invoke-RestMethod ("$HuntServerAddress/api/IntegrationHosts") -Headers $headers -Method GET -ContentType 'application/json'
 		} catch {
 			Write-Warning "Error: $_"	
 		}
@@ -631,35 +631,16 @@ function Get-ICLastscanId {
 	}	
 }
 
-function Get-ICActiveJobs {
-	Write-Verbose "Getting Active Jobs from Infocyte HUNT: $HuntServerAddress"
-	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-	$headers.Add("Authorization", $Global:ICToken)
-	$Skip = 0
-	#$headers.Add("filter", '{"where":{"or":[{"status":"Scanning"},{"status":"Scanning"}]},"order":["timestamp"],"limit":1000,"skip":'+$skip+'}')
-	$headers.Add("filter", '{"where":{"or":[]},"order":["timestamp"],"limit":1000,"skip":'+$skip+'}')
-	try {
-		$Scans = Invoke-RestMethod ("$HuntServerAddress/api/CoreJobs") -Headers $headers -Method GET -ContentType 'application/json'
-	} catch {
-		Write-Warning "Error: $_"
-		return "ERROR: $($_.Exception.Message)"
-	}
-	if ($Scans) {
-		$Scans | where { $_.status -ne "Complete" }
-	} else {
-		return $null
-	}	
-}
 
-function Get-ICCoreJobs {
+
+function Get-ICJobs {
 	Write-Verbose "Getting Active Jobs from Infocyte HUNT: $HuntServerAddress"
 	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
 	$headers.Add("Authorization", $Global:ICToken)
 	$Skip = 0
-	#$headers.Add("filter", '{"where":{"or":[{"status":"Scanning"},{"status":"Scanning"}]},"order":["timestamp"],"limit":1000,"skip":'+$skip+'}')
-	$headers.Add("filter", '{"where":{"or":[]},"order":["timestamp"],"limit":1000,"skip":'+$skip+'}')
+	$headers.Add("filter", '{"where":{"or":[]},"order":["createdOn"],"limit":1000,"skip":'+$skip+'}')
 	try {
-		$Objects = Invoke-RestMethod ("$HuntServerAddress/api/CoreJobs") -Headers $headers -Method GET -ContentType 'application/json'
+		$Objects = Invoke-RestMethod ("$HuntServerAddress/api/jobs") -Headers $headers -Method GET -ContentType 'application/json'
 	} catch {
 		Write-Warning "Error: $_"
 		return "ERROR: $($_.Exception.Message)"
@@ -674,9 +655,9 @@ function Get-ICCoreJobs {
 	While ($more) {
 		$skip += 1000
 		$headers.remove('filter') | Out-Null
-		$headers.Add("filter", '{"where":{"or":[]},"order":["timestamp"],"limit":1000,"skip":'+$skip+'}')
+		$headers.Add("filter", '{"where":{"or":[]},"order":["createdOn"],"limit":1000,"skip":'+$skip+'}')
 		try {
-			$moreobjects = Invoke-RestMethod ("$HuntServerAddress/api/CoreJobs") -Headers $headers -Method GET -ContentType 'application/json'
+			$moreobjects = Invoke-RestMethod ("$HuntServerAddress/api/jobs") -Headers $headers -Method GET -ContentType 'application/json'
 		} catch {
 			Write-Warning "Error: $_"
 			return "ERROR: $($_.Exception.Message)"
@@ -686,6 +667,14 @@ function Get-ICCoreJobs {
 		} else {
 			$more = $false
 		}
+	}
+}
+
+function Get-ICActiveJobs {
+	Write-Verbose "Getting Active Jobs from Infocyte HUNT: $HuntServerAddress"
+	$Jobs = Get-ICJobs
+	if ($Jobs) {
+		$Jobs | where { $_.status -ne "Complete" }
 	}
 }
 
