@@ -1,7 +1,7 @@
 # example script to upload a survey file to HUNT (2.10+)
 
 $url = "https://localhost"
-$survey = "HostSurvey.json.bz2"
+$survey = "HostSurvey.json.gz"
 $targetId = $null
 $scanId = $null
 $scanName = $null
