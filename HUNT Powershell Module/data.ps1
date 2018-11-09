@@ -1,7 +1,7 @@
 
 
 # General function for getting various objects (files, processes, memory injects, autostarts, etc.) from HUNT
-function Get-ICObjects ($Type, $TargetGroupId=$null, $ScanId=$null, [HashTable]$where=$null, [Switch]$NoLimit) {
+function Get-ICObjects ($Type, $TargetGroupId=$null, $BoxId=$null, $ScanId=$null, [HashTable]$where=@{}, [Switch]$NoLimit) {
   $ObjTypes = @(
     "Processes"
     "Modules"
@@ -37,12 +37,10 @@ function Get-ICObjects ($Type, $TargetGroupId=$null, $ScanId=$null, [HashTable]$
     limit = 1000
     skip = 0
   }
-  if (-NOT $where) {
-    $where = @{}
-    if ($TargetGroupId) { $where['targetId'] = $TargetGroupId }
-    if ($scanId) { $where['scanId'] = $scanId }
-  }
-  if ($where.count -gt 0) { $filter['where'] = $where }
+  if ($TargetGroupId) { $where['targetId'] = $TargetGroupId }
+  if ($scanId) { $where['scanId'] = $scanId }
+  if ($BoxId) { $where['boxId'] = $BoxId }
+  
   _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
 }
 
