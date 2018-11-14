@@ -88,7 +88,12 @@ FunctionsToExport = @(
   "Get-ICJobs",
   "Get-ICUserTasks",
   "Get-ICLastScanId",
-  "Get-ICBoxes"
+  "Get-ICBoxes",
+  "Get-ICFlagColourCodes",
+  "New-ICFlag",
+  "Get-ICFlags",
+  "Update-ICFlag",
+  "Remove-ICFlag"
 )
 
 # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
