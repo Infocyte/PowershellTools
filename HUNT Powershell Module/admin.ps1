@@ -43,9 +43,20 @@ function Get-ICFlagColorCodes {
 }
 
 #
-function New-ICFlag ([String]$FlagName, [String]$FlagColor, [int]$FlagWeight) {
+function New-ICFlag {
+  Param(
+    [ValidateNotNullorEmpty]
+    [String]$FlagName,
+
+    [ValidateNotNullorEmpty]
+    [String]$FlagColor,
+
+    [ValidateNotNullorEmpty]
+    [int]$FlagWeight
+  )
+
 	$Endpoint = "flags"
-	Write-Verbose "Adding new flag with Color $FlagColor named $FlagName [Weight: $FlagWeight]"
+	Write-Host "Adding new flag with Color $FlagColor named $FlagName [Weight: $FlagWeight]"
 	$body = @{
   	name = $FlagName
 		color = $FlagColor
@@ -55,7 +66,7 @@ function New-ICFlag ([String]$FlagName, [String]$FlagColor, [int]$FlagWeight) {
 }
 
 
-function Get-ICFlags ([String]$FlagId=$Null) {
+function Get-ICFlags ([String]$FlagId) {
   if ($FlagId) {
     $Endpoint = "flags/$FlagId"
   } else {
@@ -76,9 +87,15 @@ function Update-ICFlag ([String]$FlagId, [String]$FlagName=$null, [String]$FlagC
 	_ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method PUT
 }
 
-function Remove-ICFlag ([String]$FlagId) {
+function Remove-ICFlag {
+  Param(
+    [ValidateNotNullorEmpty]
+    [String]$FlagId
+  )
   $Flags = get-ICFlags | where { ($_.FlagWeight -eq 0) -OR ($_.FlagWeight -eq 10)}
   if ($Flags) { Write-Warning "Cannot Delete Verified Good or Verified Bad flags. They are a special case and would break the user interface" }
+  $flag = Get-Flags -FlagId $FlagId
+  Write-Host "Removing $($Flag.name) [$($Flag.color)] with flagId '$FlagId'"
   $Endpoint = "flags/$FlagId"
   _ICRestMethod -url $HuntServerAddress/api/$Endpoint -method DELETE
 }

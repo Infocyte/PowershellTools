@@ -15,13 +15,14 @@ Authentication Functions:
 Target Group Management Functions:
 
 	New-ICTargetGroup (Input: Name)
-    Get-ICTargetGroups (Input: TargetGroupId)
-    New-ICCredential (Input: )
-    Get-ICCredentials (Input: )
-    New-ICQuery (Input: TargetGroupId, Query)
-    Get-ICQueries (Input: TargetGroupId)
-    Get-ICAddresses (Input: TargetGroupId)
-    Remove-ICAddresses (Input: TargetGroupId)
+  Get-ICTargetGroups (Input: TargetGroupId)
+  Remove-ICTargetGRoup (Input: TargetGroupId)
+  New-ICCredential (Input: )
+  Get-ICCredentials (Input: )
+  New-ICQuery (Input: TargetGroupId, Query)
+  Get-ICQueries (Input: TargetGroupId)
+  Get-ICAddresses (Input: TargetGroupId)
+  Remove-ICAddresses (Input: TargetGroupId)
 
 
 HUNT Server Status Functions:
@@ -32,16 +33,16 @@ HUNT Server Status Functions:
     Get-ICLastScanId
 
 Data Export Functions:
-	
-    Get-ICObjects (Input: Type, BoxId )
+
+  Get-ICObjects (Input: Type, ScanId, BoxId )
 	Get-ICConnections (Input: BoxId )
 	Get-ICApplications (Input: BoxId )
 	Get-ICVulnerabilities (Input: BoxId )
 	Get-ICFileDetail (Input: Hash)
-	Get-ICBoxes (Input: ($AllScans, $Last7 or $Last30), $targetGroupId)  # This gives you the boxid (a box is a bunch of scan data over a time period)
+	Get-ICBoxes (Input: (AllScans, Last7 or Last30), targetGroupId)  # This gives you the boxid (a box is grouped scan data over a time period)
 
 Scanning Functions:
 
-	Import-ICSurvey [WIP]
+	Import-ICSurvey (Input: FilePath, (ScanId, TargetGroupId, TargetGroup))
 	Invoke-ICScan (Input: TargetGroupId)
 	Invoke-ICEnumeration (Input: TargetGroupId, QueryId)

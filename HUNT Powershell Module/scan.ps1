@@ -37,94 +37,142 @@ function Invoke-ICScan ($TargetGroupId) {
 	_ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method POST
 }
 
-<#
+
+function _Get-ICTimeStampUTC {
+  return (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+}
+
 function Import-ICSurvey {
   # example script to upload a survey file to HUNT (2.10+)
   # Script to upload manual .bz2 file to hunt server.
-  Param(
-  	[Parameter(Mandatory = $false,
-  			ValueFromPipeline=$true)]
-  	[String[]]
-  	$Path, # <folder containing the survey results (.bz2) files to upload>
+	[cmdletbinding(DefaultParameterSetName = 'Path')]
+	param(
+		[parameter(
+				Mandatory,
+				ParameterSetName  = 'Path',
+				Position = 0,
+				ValueFromPipeline,
+				ValueFromPipelineByPropertyName
+		)]
+		[ValidateNotNullOrEmpty()]
+		[SupportsWildcards()]
+		[string[]]$Path, # <paths of the survey results (.bz2) files to upload>
+
+		[parameter(
+				Mandatory,
+				ParameterSetName = 'LiteralPath',
+				Position = 0,
+				ValueFromPipelineByPropertyName
+		)]
+		[ValidateNotNullOrEmpty()]
+		[Alias('PSPath')]
+		[string[]]$LiteralPath,
+
+		[String]
+		$ScanId,
+
+		[String]
+		$TargetGroupId,
 
   	[String]
-  	$TargetGroup = "OfflineScans"
+  	$TargetGroupName = "OfflineScans"
   )
 
-  BEGIN{
+  BEGIN {
   	# INITIALIZE
-  	$survey = "HostSurvey.json.bz2"
-  	$surveyext = "*.json.bz2"
-  	$api = "$HuntServer/api"
+  	$survey = "HostSurvey.json.gz"
+  	$surveyext = "*.json.gz"
 
-  	function Send-ICSurveys ([String]$File, [String]$ScanId){
+  	function Upload-ICSurveys ([String]$FilePath, [String]$ScanId){
   		Write-Verbose "Uploading Surveys"
-
-  		$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-  		$headers.Add("Authorization", $Global:ICToken)
-  		$headers.Add("scanid", $ScanId)
+			$headers = @{
+		    Authorization = $Global:ICToken
+				scanid = $ScanId
+		  }
   		try {
-  			$objects = Invoke-RestMethod ("$HuntServerAddress/api/survey") -Headers $headers -Method POST -InFile $File -ContentType "application/octet-stream"
+  			$objects = Invoke-RestMethod $HuntServerAddress/api/survey -Headers $headers -Method POST -InFile $FilePath -ContentType "application/octet-stream"
   		} catch {
   			Write-Warning "Error: $_"
-  			return "ERROR: $($_.Exception.Message)"
+  			throw "ERROR: $($_.Exception.Message)"
   		}
   		$objects
   	}
 
-  	# MAIN
-  	Write-Host "Acquiring token..."
-  	$Token = New-ICToken $Credential $HuntServer
+		if ($ScanId) {
+			# Check for existing ScanId and use it
+			$scans = Get-ICScans -NoLimit
+			if ($scans.id -contains $ScanId) {
+				$TargetGroupName = ($Scans | where { $_.scanId -eq $ScanId}).targetList
+			} else {
+				Throw "No scan exists with ScanId $ScanId. Specify an existing ScanId to add this survey result to or use other parameters to generate one."
+			}
+		}
+		elseif ($TargetGroupId) {
+			# Check TargetGroupId and create new ScanId for that group
+			Write-Host "Checking for existance of target group with TargetGroupId: '$TargetGroupId' and generating new ScanId"
+			$TargetGroups = Get-ICTargetGroups
+			if ($TargetGroups.id -contains $TargetGroupId) {
+				$TargetGroupName = ($TargetGroups | where { $_.id -eq $TargetGroupId }).name
+			} else {
+				Throw "No Target Group exists with TargetGroupId $TargetGroupId. Specify an existing TargetGroupId to add this survey to or use other parameters to generate one."
+			}
+		}
+		else {
+			Write-Host "No ScanId or TargetGroupId specified. Checking for existance of target group: '$TargetGroupName'"
+	  	$TargetGroups = Get-ICTargetGroups
+	  	if ($TargetGroups.name -contains $TargetGroupName) {
+	  		Write-Host "$TargetGroupName Exists."
+				$TargetGroupId = ($targetGroups | where { $_.name -eq $TargetGroupName}).id
+	  	} else {
+	  			Write-Host "$TargetGroupName does not exist. Creating new Target Group '$TargetGroupName'"
+	  			New-ICTargetGroup -Name $TargetGroupName
+					Start-Sleep 1
+					$TargetGroupId = ($targetGroups | where { $_.name -eq $TargetGroupName}).id
+	  	}
+		}
 
-  	Write-Host "Checking for '$TargetGroup' target group..."
-  	$TargetGroups = Get-ICTargetGroup
-  	if ($TargetGroups.name -contains $TargetGroup) {
-  		Write-Host "$TargetGroup Exists"
-  		$TargetGroupObj = $targetGroups | where { $_.name -eq $TargetGroup}
-  	} else {
-  			Write-Host "$TargetGroup does not exist. Creating new Target Group '$TargetGroup'"
-  			New-ICTargetGroup $TargetGroup
-  	}
+		# Creating ScanId
+		if (-NOT $ScanId) {
+			$ScanName = "Offline-" + (get-date).toString("yyyyMMdd-HHmm")
+			Write-Host "Creating scan named $ScanName [$TargetGroupName-$ScanName]..."
+			$StartTime = _Get-ICTimeStampUTC
+			$body = @{
+				name = $scanName;
+				targetId = $TargetGroupId;
+				startedOn = $StartTime
+			}
+			$newscan = _ICRestMethod -url $HuntServerAddress/api/scans -body $body -Method 'POST'
+			Start-Sleep 1
+			$ScanId = $newscan.id
+		}
 
-  	if($ScanName -eq $null) {
-  		$ScanName = (get-date).toString("yyyy-MM-dd HH:mm")
-  	}
 
-  	if ($ScanId -eq $null) {
-  		Write-Host "Creating scan..."
-  		$ScanId = New-ICScanId $ScanName $TargetId
-  	}
-
+		Write-Host "Importing Survey Results into $TargetGroupName-$ScanName [ScanId: $ScanId] [TargetGroupId: $TargetGroupId]"
   }
 
-  PROCESS{
+  PROCESS {
+		# Resolve path(s)
+        if ($PSCmdlet.ParameterSetName -eq 'Path') {
+            $resolvedPaths = Resolve-Path -Path $Path | Select-Object -ExpandProperty Path
+        } elseif ($PSCmdlet.ParameterSetName -eq 'LiteralPath') {
+            $resolvedPaths = Resolve-Path -LiteralPath $LiteralPath | Select-Object -ExpandProperty Path
+        }
 
-  	if ($Search -eq "Path") {
-  		foreach ($file in $Path) {
-  				if (Test-Path $file -type Leaf -AND $file -like "*.json.bz2") {
-  					Write-Host "Uploading survey [$file]..."
-  					Upload-ICSurveys $_ $ScanId
-  				} else {
-  					Write-Verbose "$file does not exist or is not a .json.bz2 file"
-  				}
-  		}
-  	}
-  	elseif ($Search -eq "Directory") {
-  		Write-Host "Recursing through Directory $Directory "
-  		Get-ChildItem $Directory -recurse -filter $surveyext | foreach {
-  			Write-Host "Uploading $($_.FullName)"
-  			Send-ICSurveys $($_.FullName) $ScanId
-  		}
-  	}
+				# Process each item in resolved paths
+				foreach ($file in $resolvedPaths) {
+		 			Write-Host "Uploading survey [$file]..."
+		 			if ((Test-Path $file -type Leaf) -AND ($file -like $surveyext)) {
+		 				Upload-ICSurveys -FilePath $file -ScanId $ScanId
+		   		} else {
+		   			Write-Warning "$file does not exist or is not a $surveyext file"
+		   		}
+		   	}
+	}
 
-  }
-
-  END{
+  END {
   	# TODO: detect when scan is no longer processing submissions, then mark as completed
-  	Write-Host $(Get-ICActiveTasks)
   	#Write-Host "Closing scan..."
-  	#Invoke-RestMethod -Headers @{ Authorization = $token } -Uri "$api/scans/$scanId/complete" -Method Post
+  	#Invoke-RestMethod -Headers @{ Authorization = $token } -Uri "$HuntServerAddress/api/scans/$scanId/complete" -Method Post
   }
 
 }
-#>

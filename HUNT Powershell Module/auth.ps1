@@ -13,7 +13,7 @@ $sslverificationcode = @"
 "@
 
 function _DisableSSLVerification {
-	Write-Warning "Disabling SSL Verification!"
+	Write-Verbose "Disabling SSL Verification!"
     if (-not ([System.Management.Automation.PSTypeName]"TrustEverything").Type) {
         Add-Type -TypeDefinition $sslverificationcode
     }
@@ -21,9 +21,14 @@ function _DisableSSLVerification {
 }
 
 #Get Login Token (required)
-function New-ICToken ([PSCredential]$Credential, [String]$HuntServer = "https://localhost:443" ) {
-	Write-Verbose "Requesting new Token from $HuntServer using account $($Credential.username)"
-	Write-Verbose "Credentials and Hunt Server Address are stored in global variables for use in all IC cmdlets"
+function New-ICToken {
+	param(
+		[String]
+		$HuntServer = "https://localhost:443",
+
+		[System.Management.Automation.PSCredential]
+		$Credential
+	)
 
 	_DisableSSLVerification
 
@@ -31,9 +36,8 @@ function New-ICToken ([PSCredential]$Credential, [String]$HuntServer = "https://
 
 	if (-NOT $Credential) {
 		# Default Credentials
-		$username = 'infocyte'
-		$password = 'hunt' | ConvertTo-SecureString -asPlainText -Force
-		$Credential = New-Object System.Management.Automation.PSCredential($username,$password)
+		Write-Verbose "No Credentials provided"
+		$Credential = Get-Credential
 	}
 
 	$Global:HuntServerAddress = $HuntServer
@@ -43,6 +47,9 @@ function New-ICToken ([PSCredential]$Credential, [String]$HuntServer = "https://
 		password = $Credential.GetNetworkCredential().password
 	}
 	$i = $data | ConvertTo-JSON
+	Write-Host "Requesting new Token from $HuntServer using account $($Credential.username)"
+	Write-Verbose "Credentials and Hunt Server Address are stored in global variables for use in all IC cmdlets"
+
 	try {
 		$response = Invoke-RestMethod $url -Method POST -Body $i -ContentType 'application/json'
 	} catch {
@@ -60,11 +67,18 @@ function New-ICToken ([PSCredential]$Credential, [String]$HuntServer = "https://
 	}
 }
 
-function Set-ICToken ([String]$HuntServer = "https://localhost:443", [String]$Token) {
-		Write-Verbose "Setting Auth Token for $HuntServer to $Token"
-		Write-Verbose "Token and Hunt Server Address are stored in global variables for use in all IC cmdlets"
+function Set-ICToken {
+	Param(
+		[String]$HuntServer = "https://localhost:443",
 
-		# Set Token to global variable
-		$Global:ICToken = $Token
-		$Global:HuntServerAddress = $HuntServer
+		[ValidateNotNullorEmpty]
+		[String]$Token
+	)
+
+	Write-Host "Setting Auth Token for $HuntServer to $Token"
+	Write-Verbose "Token and Hunt Server Address are stored in global variables for use in all IC cmdlets"
+
+	# Set Token to global variable
+	$Global:ICToken = $Token
+	$Global:HuntServerAddress = $HuntServer
 }

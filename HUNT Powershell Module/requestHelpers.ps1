@@ -27,9 +27,9 @@ function _ICGetMethod ([String]$url, [HashTable]$filter, [Switch]$NoLimit) {
 		return $null
 	}
 
-  if ($NoLimit -AND $Objects.count -eq 1000) { $more = $true } else { $more = $false }
+  if ($NoLimit -AND $Objects.count -eq $resultlimit) { $more = $true } else { $more = $false }
 	While ($more) {
-		$skip += 1000
+		$skip += $resultlimit
 		$filter['skip'] = $skip
 		$body.remove('filter') | Out-Null
 		$body.Add('filter', ($filter | ConvertTo-JSON -Depth 4 -Compress))
@@ -55,8 +55,8 @@ function _ICRestMethod ([String]$url, $body=$null, [String]$method) {
   $headers = @{
     Authorization = $Global:ICToken
   }
-  Write-Host "Sending $method command to $url"
-  Write-Host "$($body | ConvertTo-JSON -Compress -Depth 4)"
+  Write-verbose "Sending $method command to $url"
+  Write-verbose "Body = $($body | ConvertTo-JSON -Compress -Depth 4)"
 	try {
 		$Result = Invoke-RestMethod $url -headers $headers -body ($body|ConvertTo-JSON -Compress -Depth 4) -Method $method -ContentType 'application/json'
 	} catch {

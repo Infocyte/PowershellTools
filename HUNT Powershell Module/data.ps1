@@ -1,7 +1,6 @@
 
-
 # General function for getting various objects (files, processes, memory injects, autostarts, etc.) from HUNT
-function Get-ICObjects ($Type, $TargetGroupId=$null, $BoxId=$null, $ScanId=$null, [HashTable]$where=@{}, [Switch]$NoLimit) {
+function Get-ICObjects ([String]$Type, [String]$TargetGroupId=$null, [String]$BoxId=$null, [String]$ScanId=$null, [HashTable]$where=@{}, [Switch]$NoLimit) {
   $ObjTypes = @(
     "Processes"
     "Modules"
@@ -34,21 +33,21 @@ function Get-ICObjects ($Type, $TargetGroupId=$null, $BoxId=$null, $ScanId=$null
   }
   $filter =  @{
     order = "hostCompletedOn desc"
-    limit = 1000
+    limit = $resultlimit
     skip = 0
   }
   if ($TargetGroupId) { $where['targetId'] = $TargetGroupId }
   if ($scanId) { $where['scanId'] = $scanId }
   if ($BoxId) { $where['boxId'] = $BoxId }
-  
+
   _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
 }
 
 # Get Connection objects
-function Get-ICConnections ($BoxId=$null, [HashTable]$where=$null, [Switch]$All, [Switch]$NoLimit) {
+function Get-ICConnections ([String]$BoxId, [HashTable]$where, [Switch]$All, [Switch]$NoLimit) {
   $Endpoint = "BoxConnectionInstances"
   $filter =  @{
-    limit = 1000
+    limit = $resultlimit
     skip = 0
   }
   if (-NOT $where) {
@@ -63,10 +62,10 @@ function Get-ICConnections ($BoxId=$null, [HashTable]$where=$null, [Switch]$All,
 }
 
 
-function Get-ICApplications ($BoxId=$null, [HashTable]$where=$null, [Switch]$NoLimit) {
+function Get-ICApplications ($BoxId, [HashTable]$where, [Switch]$NoLimit) {
   $Endpoint = "BoxApplicationInstances"
   $filter =  @{
-    limit = 1000
+    limit = $resultlimit
     skip = 0
   }
   if (-NOT $where) {
@@ -77,14 +76,14 @@ function Get-ICApplications ($BoxId=$null, [HashTable]$where=$null, [Switch]$NoL
   _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
 }
 
-function Get-ICVulnerabilities ($BoxId=$null, [HashTable]$where=$null, [Switch]$NoLimit) {
+function Get-ICVulnerabilities ($BoxId, [HashTable]$where, [Switch]$NoLimit) {
   $Vulnerabilities = @()
   # Get Applications
   $apps = Get-ICApplications -BoxId $BoxId -NoLimit:$NoLimit | where { $_.name -notmatch "KB|Update" }
   Write-Verbose "Found $($apps.count) Installed Apps."
   $Endpoint = "ApplicationAdvisories"
   $filter =  @{
-    limit = 1000
+    limit = $resultlimit
     skip = 0
   }
   $apps | % {
@@ -92,7 +91,7 @@ function Get-ICVulnerabilities ($BoxId=$null, [HashTable]$where=$null, [Switch]$
     $Endpoint = "ApplicationAdvisories"
     $filter =  @{
       where = @{ applicationId = $_.applicationId }
-    	limit = 1000
+    	limit = $resultlimit
     	skip = 0
     }
     $appvulns = @()
@@ -100,7 +99,7 @@ function Get-ICVulnerabilities ($BoxId=$null, [HashTable]$where=$null, [Switch]$
     if ($appvulns) {
       Write-Verbose "Recieved $($appvulns.count) App Vulns for $($app.name)."
       $filter =  @{
-        limit = 1000
+        limit = $resultlimit
         skip = 0
       }
       $appvulns | Sort-Object id -unique | % {
@@ -152,7 +151,12 @@ function Get-ICVulnerabilities ($BoxId=$null, [HashTable]$where=$null, [Switch]$
 }
 
 # Get Full FileReport on an object by sha1
-function Get-ICFileDetail ($sha1){
+function Get-ICFileDetail {
+  Param(
+    [ValidateNotNullorEmpty]
+    [String]$sha1
+  )
+
 	Write-Verbose "Requesting FileReport on file with SHA1: $sha1"
 	$Endpoint = "FileReps/$sha1"
   $object = _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter

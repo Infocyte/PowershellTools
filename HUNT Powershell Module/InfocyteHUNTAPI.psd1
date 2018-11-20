@@ -78,6 +78,7 @@ FunctionsToExport = @(
   "Set-ICToken",
   "New-ICTargetGroup",
   "Get-ICTargetGroups",
+  "Remove-ICTargetGroup",
   "New-ICCredential",
   "Get-ICCredentials",
   "New-ICQuery",

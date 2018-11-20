@@ -1,30 +1,59 @@
 # Setup APIs
-function New-ICTargetGroup ([String]$Name) {
+function New-ICTargetGroup {
+  param(
+    [parameter(Mandatory=$true, Position=0)]
+    [String]
+    $Name
+  )
+
   $Endpoint = "targets"
   $body = @{
-    data = @{ name = $Name }
+    name = $Name
   }
   Write-Verbose "Creating new target group: $Name [$HuntServerAddress/api/$Endpoint]"
-  _ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method POST
+  _ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method 'POST'
 }
 
 function Get-ICTargetGroups {
   $Endpoint = "targets"
   $filter =  @{
     order = @("name", "id")
-    limit = 1000
+    limit = $resultlimit
     skip = 0
   }
-  _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter
+  _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$true
 }
 
-function New-ICCredential ([String]$Name, [PSCredential]$Cred) {
+function Remove-ICTargetGroup {
+  param(
+    [parameter(Mandatory=$true, Position=0)]
+    [String]
+    $TargetGroupId
+  )
+
+  $Endpoint = "targets/$TargetGroupId"
+  Write-Warning "Removing target group [$HuntServerAddress/api/$Endpoint]."
+  Write-Warning "This will remove access to all scan data within this target group and is only reversible for the next 7 days"
+  _ICRestMethod -url $HuntServerAddress/api/$Endpoint -method 'DELETE'
+}
+
+function New-ICCredential {
+  Param(
+    [parameter(Mandatory=$True, Position=0)]
+    [String]
+    $Name,
+
+    [parameter(Mandatory=$True)]
+    [PSCredential]$Cred
+  )
+
   $Endpoint = "credentials"
   $data = @{
     name = $Name
     username = $Cred.Username
     password = $Cred.GetNetworkCredential().Password
   }
+  Write-Verbose "Adding new Credential to the Credential Manager"
   $body = @{
     data = $data
   }
@@ -36,13 +65,32 @@ function Get-ICCredentials {
 	Write-Verbose "Getting Credential Objects from Infocyte HUNT: $HuntServerAddress"
   $Endpoint = "credentials"
   $filter =  @{
-    limit = 1000
+    limit = $resultlimit
     skip = 0
   }
   _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter
 }
 
-function New-ICQuery ([String]$TargetGroupId, [String]$credentialId = $null, [String]$sshCredentialId = $null, [String]$query) {
+function New-ICQuery {
+  Param(
+    [parameter(Mandatory=$True)]
+    [String]
+    $TargetGroupId,
+
+    [String]
+    $credentialId = $null,
+
+    [String]
+    $sshCredentialId = $null,
+
+    [ValidateNotNullorEmpty]
+    [String]
+    $query
+    )
+
+  if (-NOT ($credentialId -AND $sshCredentialId)) {
+    Throw "CredentialId and/or sshCredentialId must be specified"
+  }
 	Write-Verbose "Creating new Query in TargetGroup $TargetGroupId ($query) using username $($Cred.Username)"
   $Endpoint = "queries"
   $data = @{
@@ -64,7 +112,7 @@ function New-ICQuery ([String]$TargetGroupId, [String]$credentialId = $null, [St
 function Get-ICQueries ([String]$TargetGroupId) {
   $Endpoint = "queries"
   $filter =  @{
-    limit = 1000
+    limit = $resultlimit
     skip = 0
   }
   if ($TargetGroupId) {
@@ -72,14 +120,14 @@ function Get-ICQueries ([String]$TargetGroupId) {
     Write-Verbose "Getting Queries for Target Group Id: $TargetGroupId"
   }
   #Write-Verbose "Getting all Queries from TargetGroup $TargetGroup"
-  _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter
+  _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$true
 }
 
 function Get-ICAddresses ([String]$TargetGroupId, [Switch]$NoLimit) {
   $Endpoint = "Addresses"
 	$filter =  @{
 		order = "lastAccessedOn"
-		limit = 1000
+		limit = $resultlimit
 		skip = 0
 	}
   if ($TargetGroupId) {
@@ -89,8 +137,14 @@ function Get-ICAddresses ([String]$TargetGroupId, [Switch]$NoLimit) {
   _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
 }
 
-function Remove-ICAddresses ($TargetGroupId) {
-	Write-Verbose "Clearing all resolved hosts from TargetGroup $TargetGroupId"
+function Remove-ICAddresses {
+  Param(
+    [ValidateNotNullorEmpty]
+    [String]
+    $TargetGroupId
+  )
+
+	Write-Warning "Clearing all Addresses from TargetGroup $TargetGroupId"
   $Endpoint = "Addresses"
   $where = @{
     targetId = $TargetGroupId
@@ -105,16 +159,16 @@ function Get-ICScans ([String]$TargetGroupId, $TargetGroupName, [Switch]$NoLimit
   $Endpoint = "IntegrationScans"
   $filter =  @{
     order = "scanCompletedOn desc"
-    limit = 1000
+    limit = $resultlimit
     skip = 0
   }
-  if ($TargetGroupName) {
-    $filter['where'] = @{ targetList = $TargetGroupName }
-    Write-Verbose "Getting Scans against $TargetGroupName from $HuntServerAddress"
-  } elseif ($TargetGroupId) {
-    $tgname = (Get-ICTargetGroup | where { $_.id -eq $TargetGroupId }).name
+  if ($TargetGroupId) {
+    $tgname = (Get-ICTargetGroups | where { $_.id -eq $TargetGroupId }).name
     $filter['where'] = @{ targetList = $tgname }
     Write-Verbose "Getting Scans against Target Group $TargetGroup [$TargetGroupId] from $HuntServerAddress"
+  } elseif ($TargetGroupName) {
+      $filter['where'] = @{ targetList = $TargetGroupName }
+      Write-Verbose "Getting Scans against $TargetGroupName from $HuntServerAddress"
   } else {
     Write-Verbose "Getting Scans from $HuntServerAddress"
   }
@@ -124,7 +178,7 @@ function Get-ICScans ([String]$TargetGroupId, $TargetGroupName, [Switch]$NoLimit
 function Get-ICBoxes ([Switch]$AllScans, [Switch]$Last7, [Switch]$Last30, [String]$targetGroupId, [Switch]$NoLimit) {
   $Endpoint = "Boxes"
   $filter =  @{
-    limit = 1000
+    limit = $resultlimit
     skip = 0
   }
   $where = @{}
