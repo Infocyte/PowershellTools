@@ -19,15 +19,14 @@ Authentication Functions:
 Target Group Management Functions:
 
 	New-ICTargetGroup (Input: Name)
-  Get-ICTargetGroups (Input: TargetGroupId)
-  Remove-ICTargetGRoup (Input: TargetGroupId)
-  New-ICCredential (Input: )
-  Get-ICCredentials (Input: )
-  New-ICQuery (Input: TargetGroupId, Query)
-  Get-ICQueries (Input: TargetGroupId)
-  Get-ICAddresses (Input: TargetGroupId)
-  Remove-ICAddresses (Input: TargetGroupId)
-
+	Get-ICTargetGroups (Input: TargetGroupId)
+	Remove-ICTargetGRoup (Input: TargetGroupId)
+	New-ICCredential (Input: )
+	Get-ICCredentials (Input: )
+	New-ICQuery (Input: TargetGroupId, Query)
+	Get-ICQueries (Input: TargetGroupId)
+	Get-ICAddresses (Input: TargetGroupId)
+	Remove-ICAddresses (Input: TargetGroupId)
 
 HUNT Server Status Functions:
 
@@ -38,7 +37,7 @@ HUNT Server Status Functions:
 
 Data Export Functions:
 
-  Get-ICObjects (Input: Type, ScanId, BoxId )
+	Get-ICObjects (Input: Type, ScanId, BoxId )
 	Get-ICConnections (Input: BoxId )
 	Get-ICApplications (Input: BoxId )
 	Get-ICVulnerabilities (Input: BoxId )
