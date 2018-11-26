@@ -12,7 +12,7 @@ function _ICGetMethod ([String]$url, [HashTable]$filter, [Switch]$NoLimit) {
   if ($filter) {
     $body['filter'] = $filter | ConvertTo-JSON -Depth 4 -Compress
   }
-  Write-Verbose "Requesting data from $url (Limited to 1000 unless using -NoLimit)"
+  Write-Verbose "Requesting data from $url (Limited to $resultlimit unless using -NoLimit)"
   Write-Verbose "$($body | ConvertTo-JSON -Depth 4 -Compress)"
 	try {
 		$Objects = Invoke-RestMethod $url -body $body -Method GET -ContentType 'application/json'

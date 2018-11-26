@@ -1,3 +1,6 @@
+# Variables
+$resultlimit = 1000 # limits the number of results that come back. 1000 is max supported by Infocyte API. Use NoLimit flag on functions to iterate 1000 at a time for all results.
+
 Write-Host "Importing Infocyte HUNT API Powershell Module"
 $PS = $PSVersionTable.PSVersion.tostring()
 if ($PSVersionTable.PSVersion.Major -lt 5) {
@@ -28,16 +31,20 @@ if ($PSVersionTable.PSVersion.Major -lt 5) {
   Write-Host -ForegroundColor Cyan "targetGroupId" -NoNewLine
   Write-Host ")"
   Write-Host "- Time Boxes are Last 7, 30, and 90 Day filters for all data within range"
-  Write-Host "- Results are capped at 5000 results unless you use -NoLimit on function that support it`n"
+  Write-Host "- Results are capped at $resultlimit results unless you use -NoLimit on function that support it`n"
   Write-Host "Example:"
   Write-Host -ForegroundColor Cyan 'PS> New-ICToken -HuntServer "https://myserver.infocyte.com"'
   Write-Host -ForegroundColor Cyan 'PS> $Box = Get-ICBoxes -Last30 | where { $_.TargetGroup -eq "Brooklyn Office"}'
   Write-Host -ForegroundColor Cyan 'PS> Get-ICObjects -Type Processes -BoxId $Box.Id'
+
+  Write-Host "Offline Scan Processing Example (Default Target Group = OfflineScans):"
+  Write-Host -ForegroundColor Cyan 'PS> Import-ICSurvey -Path .\surveyresult.json.gz'
+
+  Write-Host "Offline Scan Processing Example (Default Target Group = OfflineScans):"
+  Write-Host -ForegroundColor Cyan 'PS> Get-ICTargetGroup'
+  Write-Host -ForegroundColor Cyan 'PS> Get-ChildItem C:\FolderOfSurveyResults\ -filter *.json.gz | Import-ICSurvey -Path .\surveyresult.json.gz -TargetGroupId b3fe4271-356e-42c0-8d7d-01041665a59b'
+  Write-Host -ForegroundColor Cyan 'PS> Get-ICObjects -Type Processes -BoxId $Box.Id'
 }
-
-
-# Variables
-$resultlimit = 5000 # limits the number of results that come back.
 
 # Read in all ps1 files
 
