@@ -1,9 +1,13 @@
 # Infocyte HUNT API Modules
-Tested on Powershell Version: 5.0 (definately wont work on 3.0)
+Tested on Powershell Version: 5.0
+
+# Getting Started
+Import the module:
+> PS> Import-Module .\InfocyteHUNTAPI.psd1
 
 Pass your Hunt Server credentials into New-ICToken to connect to your HUNT server
 Example:
-> PS> New-ICToken -HuntServer "https://myserver.infocyte.com" -Credential (Get-Credential)
+> PS> New-ICToken -HuntServer "https://myserver.infocyte.com"
 
 This will store your login token and server into a global variable for use by the other commands
 
@@ -43,6 +47,9 @@ Data Export Functions:
 
 Scanning Functions:
 
-	Import-ICSurvey (Input: FilePath, (ScanId, TargetGroupId, TargetGroup))
 	Invoke-ICScan (Input: TargetGroupId)
 	Invoke-ICEnumeration (Input: TargetGroupId, QueryId)
+
+Offline Scans:
+
+	Import-ICSurvey (Input: FilePath, (ScanId, TargetGroupId, or TargetGroupName))
