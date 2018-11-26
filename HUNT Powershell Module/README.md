@@ -1,4 +1,4 @@
-# Infocyte HUNT API Modules
+# Infocyte HUNT API Module
 Tested on Powershell Version: 5.0
 
 ## Getting Started
