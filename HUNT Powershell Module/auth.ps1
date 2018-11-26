@@ -30,6 +30,7 @@ function New-ICToken {
 		$Credential
 	)
 
+	[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 	_DisableSSLVerification
 
   $url = "$HuntServer/api/users/login"
