@@ -1,7 +1,7 @@
 # Infocyte HUNT API Modules
 Tested on Powershell Version: 5.0
 
-# Getting Started
+## Getting Started
 Import the module:
 > PS> Import-Module .\InfocyteHUNTAPI.psd1
 
