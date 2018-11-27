@@ -18,7 +18,9 @@ if ($PSVersionTable.PSVersion.Major -lt 5) {
   Write-Host "Data Export Functions:"
   Write-Host -ForegroundColor Cyan "`tGet-ICBoxes, Get-ICScans, Get-ICObjects, Get-ICConnections, Get-ICApplications, Get-ICVulnerabilities, Get-ICFileDetail`n"
   Write-Host "Scanning Functions:"
-  Write-Host -ForegroundColor Cyan "`tImport-ICSurvey, Invoke-ICScan, Invoke-ICEnumeration`n"
+  Write-Host -ForegroundColor Cyan "`tInvoke-ICScan, Invoke-ICEnumeration`n"
+  Write-Host "Offline Scan Import Functions:"
+  Write-Host -ForegroundColor Cyan "`tImport-ICSurvey`n"
   Write-Host "Admin Functions:"
   Write-Host -ForegroundColor Cyan "`tGet-ICFlagColourCodes, New-ICFlag, Update-ICFlag, Remove-ICFlag`n"
   Write-Host "`n"
@@ -31,7 +33,7 @@ if ($PSVersionTable.PSVersion.Major -lt 5) {
   Write-Host -ForegroundColor Cyan "targetGroupId" -NoNewLine
   Write-Host ")"
   Write-Host "- Time Boxes are Last 7, 30, and 90 Day filters for all data within range"
-  Write-Host "- Results are capped at $resultlimit results unless you use -NoLimit on function that support it`n"
+  Write-Host "- Results are capped at $resultlimit results unless you use -NoLimit on functions that support it`n"
   Write-Host "Example:"
   Write-Host -ForegroundColor Cyan 'PS> New-ICToken -HuntServer "https://myserver.infocyte.com"'
   Write-Host -ForegroundColor Cyan 'PS> $Box = Get-ICBoxes -Last30 | where { $_.TargetGroup -eq "Brooklyn Office"}'
