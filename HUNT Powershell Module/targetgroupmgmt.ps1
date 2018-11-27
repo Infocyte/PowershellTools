@@ -175,7 +175,7 @@ function Get-ICScans ([String]$TargetGroupId, $TargetGroupName, [Switch]$NoLimit
   _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
 }
 
-function Get-ICBoxes ([Switch]$AllScans, [Switch]$Last7, [Switch]$Last30, [String]$targetGroupId, [Switch]$NoLimit) {
+function Get-ICBoxes ([Switch]$Last90, [Switch]$Last7, [Switch]$Last30, [Switch]$IncludeDeleted, [String]$targetGroupId, [Switch]$NoLimit) {
   $Endpoint = "Boxes"
   $filter =  @{
     limit = $resultlimit
@@ -183,7 +183,7 @@ function Get-ICBoxes ([Switch]$AllScans, [Switch]$Last7, [Switch]$Last30, [Strin
   }
   $where = @{}
 
-  if ($AllScans) { $where['name'] = "All scans" }
+  if ($Last90) { $where['name'] = "Last 90 days" }
   elseif ($Last30) { $where['name'] = "Last 30 days" }
   elseif ($Last7) { $where['name'] = "Last 7 days" }
   if ($targetGroupId) { $where['targetId'] = $targetGroupId }
@@ -198,11 +198,16 @@ function Get-ICBoxes ([Switch]$AllScans, [Switch]$Last7, [Switch]$Last30, [Strin
        if ($tg) {
          $_ | Add-Member -MemberType "NoteProperty" -name "targetGroup" -value $tg.name
        } else {
-         $_ | Add-Member -MemberType "NoteProperty" -name "targetGroup" -value "Old"
+         $_ | Add-Member -MemberType "NoteProperty" -name "targetGroup" -value "Deleted"
        }
     } else {
       $_ | Add-Member -MemberType "NoteProperty" -name "targetGroup" -value "All"
     }
   }
-  $boxes | where { $_.targetGroup -ne "Old" }
+  if ($IncludeDeleted) {
+    $boxes
+  } else {
+    $boxes | where { $_.targetGroup -ne "Deleted" }
+  }
+
 }
