@@ -3,10 +3,16 @@ Useful Powershell tools and modules for operating Infocyte HUNT.
 
 ## HUNT API Powershell Module
 
+Download the HUNT Powershell Module folder from this repository.
 
-Need to import an offline scan? Here is how you do it!
+Open up a Powershell terminal and import the Infocyte HUNT API Powershell Module with this command: `Import-Module .\HUNT Powershell Module\InfocyteHUNTAPI.psd1`.
+
+NOTE: If your system is configured not to permit the execution of scripts because of a restrictive local execution policy, open Powershell in an administrative context and execute the following command: `Set-ExecutionPolicy Bypass`. Once that is complete, use the `Import-Module` command again.
+
 
 ## Offline Scanning and Analysis
+
+Need to import an offline scan? Here is how you do it!
 
 Surveys can be run manually on a system without connectivity. The surveys can be found in the HUNT Server's install folder C:\Program Files\Infocyte\HUNT\Surveys\ (for On-Prem) or on the Admin:Downloads page on HUNT Cloud instances.
 
@@ -16,11 +22,7 @@ The result file is an `.json.gz` file and will be found in the temp folder or wh
 
 The first thing you will need are the survey results copied over from the endpoint you have scanned offline (ran survey.exe on). Once that file or set of files is available, you are ready to setup Powershell.
 
-Download the HUNT Powershell Module folder from this repository.
-
-Open up a Powershell terminal and import the Infocyte HUNT API Powershell Module with this command: `Import-Module .\HUNT Powershell Module\InfocyteHUNTAPI.psd1`.
-
-NOTE: If your system is configured not to permit the execution of scripts because of a restrictive local execution policy, open Powershell in an administrative context and execute the following command: `Set-ExecutionPolicy Bypass`. Once that is complete, use the `Import-Module` command again.
+Download and import the HUNT Powershell Module
 
 Establish a session with your HUNT instance with New-ICToken function.
 > New-ICToken -HuntServer https://myinstance.infocyte.com
