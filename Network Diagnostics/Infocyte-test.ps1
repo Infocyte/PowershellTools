@@ -1,9 +1,9 @@
 <# 
     .SYNOPSIS
-        Tests Domain, System, and Credential configuration for use with Infocyte Pulse
+        Tests Domain, System, and Credential configuration for use with Infocyte HUNT
 
     .DESCRIPTION
-        Tests Domain, System, and Credential configuration for use with Infocyte Pulse.  Will attempt several 
+        Tests Domain, System, and Credential configuration for use with Infocyte HUNT.  Will attempt several 
 		tests of the credentials, permissions, remote connectivity, networking, and DNS Resolution.
 
     .PARAMETER Target
@@ -55,7 +55,7 @@ Param(
     [String]
     $Target,
 
-	[Parameter(Position = 1, Mandatory = $True, HelpMessage = "Elevated account that will be used with Pulse")]
+	[Parameter(Position = 1, Mandatory = $True, HelpMessage = "Elevated account that will be used with HUNT")]
 	[ValidateNotNullOrEmpty()]
 	[System.Management.Automation.PSCredential]
 	$Credential,
@@ -71,7 +71,7 @@ Param(
 )
 
 #requires -version 2.0
-$Admin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] “Administrator”)
+$Admin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] â€œAdministratorâ€)
 If (-NOT $Admin) {
 	Write-Warning "NOTE: Your shell is not running as Administrator (But you shouldn't need it for this script)."
 }
@@ -397,8 +397,8 @@ Function New-ProxyWebClient {
     Write-Host -ForegroundColor Cyan "`n==========================================================================="
     Write-Host -ForegroundColor Cyan "==========================================================================="
     Write-Host -ForegroundColor Cyan "==========================================================================="
-    Write-Host -ForegroundColor Gray "This script will run several tests to test for remote connectivity, DNS, Internet Access, and permissions necessary to run Infocyte Pulse" 
-    Write-Host -ForegroundColor Gray "Any failed test or warning may be an issue that needs to be addressed before you use Infocyte Pulse"	
+    Write-Host -ForegroundColor Gray "This script will run several tests to test for remote connectivity, DNS, Internet Access, and permissions necessary to run Infocyte HUNT" 
+    Write-Host -ForegroundColor Gray "Any failed test or warning may be an issue that needs to be addressed before you use Infocyte HUNT"	
 	Write-Host -ForegroundColor Gray "Log File Location: $OutputFileLocation"
     Start-Sleep 3
     Write-Host -ForegroundColor Cyan "`n=== BEGINING TESTS ==="
