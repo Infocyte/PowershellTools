@@ -37,6 +37,73 @@ function Invoke-ICScan ($TargetGroupId) {
 	_ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method POST
 }
 
+function New-ICScanSchedule ($TargetGroupId, $CronExpression) {
+	$tgname = Get-ICTargetGroups | where { $_.targetId -eq $TargetGroupId }
+	$Endpoint = "scheduledJobs"
+	Write-Verbose "Creating new schedule for TargetGroup: $TargetGroupId with Cron Express: $CronExpression"
+	$options = @{
+  	EnableProcess = $true
+		EnableModule = $true
+		EnableDriver = $true
+		EnableMemory = $true
+		EnableAccount = $true
+		EnableAutostart = $true
+		EnableHook = $true
+		EnableNetwork = $true
+		EnableLog = $true
+		EnableDelete = $true
+  }
+  $body = @{
+		name = 'scan-scheduled'
+		relatedId = $TargetGroupId
+		schedule = $CronExpression
+		data = @{
+			targetId = $TargetGroupId
+		}
+  }
+	_ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method POST
+}
+
+function Get-ICScanSchedule {
+  $Endpoint = "ScheduledJobs"
+  $filter =  @{
+    order = @("relatedId")
+    limit = $resultlimit
+    skip = 0
+  }
+  $ScheduledJobs = _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$true
+	$TargetGroups = Get-ICTargetGroups
+	$ScheduledJobs | % {
+		if ($_.relatedId) {
+			 $tgid = $_.relatedId
+			 $tg = $TargetGroups | where { $_.id -eq $tgid }
+			 if ($tg) {
+				 $_ | Add-Member -MemberType "NoteProperty" -name "targetGroup" -value $tg.name
+			 } else {
+				 $_ | Add-Member -MemberType "NoteProperty" -name "targetGroup" -value $Null
+			 }
+		}
+	}
+	$ScheduledJobs | where { $_.targetGroup -ne $Null }
+}
+
+function Remove-ICScanSchedule ($TargetGroupId, $ScheduleId) {
+	$Schedules = Get-ICScanSchedule
+	if ($ScheduleId) {
+		$schedule = $Schedules | where { $_.id -eq $ScheduleId}
+	}
+	elseif ($TargetGroupId) {
+		$schedule = $Schedules | where { $_.relatedId -eq $TargetGroupId}
+		$ScheduleId	= $schedule.id
+	} else {
+		throw "Incorrect input!"
+	}
+	$tgname = $schedule.targetGroup
+	if (-NOT $tgname) { throw "TargetGroupId not found!"}
+	$Endpoint = "scheduledJobs/$ScheduleId"
+	Write-Verbose "Unscheduling collection for Target Group $tgname"
+	_ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method DELETE
+}
 
 function _Get-ICTimeStampUTC {
   return (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
