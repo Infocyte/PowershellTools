@@ -37,10 +37,7 @@ function Invoke-ICScan ($TargetGroupId) {
 	_ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method POST
 }
 
-function New-ICScanSchedule ($TargetGroupId, $CronExpression) {
-	$tgname = Get-ICTargetGroups | where { $_.targetId -eq $TargetGroupId }
-	$Endpoint = "scheduledJobs"
-	Write-Verbose "Creating new schedule for TargetGroup: $TargetGroupId with Cron Express: $CronExpression"
+function New-ICScanScheduleOptions ($CronExpression) {
 	$options = @{
   	EnableProcess = $true
 		EnableModule = $true
@@ -53,12 +50,26 @@ function New-ICScanSchedule ($TargetGroupId, $CronExpression) {
 		EnableLog = $true
 		EnableDelete = $true
   }
+	return $options
+}
+
+function Add-ICScanSchedule ([String]$TargetGroupId, [String]$CronExpression, [PSObject]$ScanScheduleOptions) {
+	$tgname = Get-ICTargetGroups | where { $_.targetId -eq $TargetGroupId }
+	$Endpoint = "scheduledJobs"
+	Write-Verbose "Creating new schedule for TargetGroup: $TargetGroupId with Cron Express: $CronExpression"
   $body = @{
 		name = 'scan-scheduled'
 		relatedId = $TargetGroupId
 		schedule = $CronExpression
 		data = @{
 			targetId = $TargetGroupId
+		}
+		if ($ScanScheduleOptions) {
+			if ($ScanScheduleOptions.EnableProcess -eq $True) {
+					$body.data['options'] = $ScanScheduleOptions
+			} else {
+				Throw "ScanScheduleOptions format is invalid -- use New-ICScanScheduleOptions to create an options object"
+			}
 		}
   }
 	_ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method POST

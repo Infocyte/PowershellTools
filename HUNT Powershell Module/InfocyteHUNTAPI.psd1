@@ -96,7 +96,8 @@ FunctionsToExport = @(
   "Get-ICFlags",
   "Update-ICFlag",
   "Remove-ICFlag",
-  "New-ICScanSchedule",
+  "New-ICScanScheduleOptions",
+  "Add-ICScanSchedule",
   "Get-ICScanSchedule",
   "Remove-ICScanSchedule"
 )

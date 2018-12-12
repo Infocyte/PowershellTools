@@ -153,7 +153,7 @@ function Get-ICVulnerabilities ($BoxId, [HashTable]$where, [Switch]$NoLimit) {
 # Get Full FileReport on an object by sha1
 function Get-ICFileDetail {
   Param(
-    [ValidateNotNullorEmpty]
+    [ValidateNotNullorEmpty()]
     [String]$sha1
   )
 

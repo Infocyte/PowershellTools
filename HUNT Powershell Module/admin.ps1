@@ -45,13 +45,16 @@ function Get-ICFlagColorCodes {
 #
 function New-ICFlag {
   Param(
-    [ValidateNotNullorEmpty]
+    [parameter(Mandatory=$true)]
+    [ValidateNotNullorEmpty()]
     [String]$FlagName,
 
-    [ValidateNotNullorEmpty]
+    [parameter(Mandatory=$true)]
+    [ValidateNotNullorEmpty()]
     [String]$FlagColor,
 
-    [ValidateNotNullorEmpty]
+    [parameter(Mandatory=$true)]
+    [ValidateNotNullorEmpty()]
     [int]$FlagWeight
   )
 
@@ -89,7 +92,8 @@ function Update-ICFlag ([String]$FlagId, [String]$FlagName=$null, [String]$FlagC
 
 function Remove-ICFlag {
   Param(
-    [ValidateNotNullorEmpty]
+    [parameter(Mandatory=$true)]
+    [ValidateNotNullorEmpty()]
     [String]$FlagId
   )
   $Flags = get-ICFlags | where { ($_.FlagWeight -eq 0) -OR ($_.FlagWeight -eq 10)}

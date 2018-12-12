@@ -83,7 +83,7 @@ function New-ICQuery {
     [String]
     $sshCredentialId = $null,
 
-    [ValidateNotNullorEmpty]
+    [ValidateNotNullorEmpty()]
     [String]
     $query
     )
@@ -139,7 +139,7 @@ function Get-ICAddresses ([String]$TargetGroupId, [Switch]$NoLimit) {
 
 function Remove-ICAddresses {
   Param(
-    [ValidateNotNullorEmpty]
+    [ValidateNotNullorEmpty()]
     [String]
     $TargetGroupId
   )

@@ -18,7 +18,7 @@ if ($PSVersionTable.PSVersion.Major -lt 5) {
   Write-Host "Data Export Functions:"
   Write-Host -ForegroundColor Cyan "`tGet-ICBoxes, Get-ICScans, Get-ICObjects, Get-ICConnections, Get-ICApplications, Get-ICVulnerabilities, Get-ICFileDetail`n"
   Write-Host "Scanning Functions:"
-  Write-Host -ForegroundColor Cyan "`tInvoke-ICScan, Invoke-ICEnumeration, New-ICScanSchedule, Get-ICScanSchedule, Remove-ICScanSchedule`n"
+  Write-Host -ForegroundColor Cyan "`tInvoke-ICScan, Invoke-ICEnumeration, New-ICScanScheduleOptions, Add-ICScanSchedule, Get-ICScanSchedule, Remove-ICScanSchedule`n"
   Write-Host "Offline Scan Import Functions:"
   Write-Host -ForegroundColor Cyan "`tImport-ICSurvey`n"
   Write-Host "Admin Functions:"
