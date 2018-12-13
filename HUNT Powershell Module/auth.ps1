@@ -33,7 +33,12 @@ function New-ICToken {
 	[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 	_DisableSSLVerification
 
-  $url = "$HuntServer/api/users/login"
+	if ($HuntServer -notlike "https://*") {
+		$Global:HuntServerAddress = "https://" + $HuntServer
+	} else {
+		$Global:HuntServerAddress = $HuntServer
+	}
+  $url = "$Global:HuntServerAddress/api/users/login"
 
 	if (-NOT $Credential) {
 		# Default Credentials
@@ -41,14 +46,14 @@ function New-ICToken {
 		$Credential = Get-Credential
 	}
 
-	$Global:HuntServerAddress = $HuntServer
+
 
 	$data = @{
 		username = $Credential.GetNetworkCredential().username
 		password = $Credential.GetNetworkCredential().password
 	}
 	$i = $data | ConvertTo-JSON
-	Write-Host "Requesting new Token from $HuntServer using account $($Credential.username)"
+	Write-Host "Requesting new Token from $Global:HuntServerAddress using account $($Credential.username)"
 	Write-Verbose "Credentials and Hunt Server Address are stored in global variables for use in all IC cmdlets"
 
 	try {

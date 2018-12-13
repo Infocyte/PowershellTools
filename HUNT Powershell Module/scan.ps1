@@ -37,18 +37,21 @@ function Invoke-ICScan ($TargetGroupId) {
 	_ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method POST
 }
 
-function New-ICScanScheduleOptions ($CronExpression) {
+function New-ICScanScheduleOptions {
 	$options = @{
   	EnableProcess = $true
-		EnableModule = $true
-		EnableDriver = $true
-		EnableMemory = $true
 		EnableAccount = $true
-		EnableAutostart = $true
-		EnableHook = $true
-		EnableNetwork = $true
-		EnableLog = $true
-		EnableDelete = $true
+		EnableMemory = $true
+		EnableModule = $false
+		EnableDriver = $false
+		EnableArtifact = $true
+		EnableAutostart = $false
+		EnableApplication = $false
+		EnableHook = $false
+		EnableNetwork = $false
+		EnableLogDelete = $false
+	  EnableSurveyDelete = $false
+		LowerPriority = $false
   }
 	return $options
 }
@@ -64,14 +67,14 @@ function Add-ICScanSchedule ([String]$TargetGroupId, [String]$CronExpression, [P
 		data = @{
 			targetId = $TargetGroupId
 		}
-		if ($ScanScheduleOptions) {
-			if ($ScanScheduleOptions.EnableProcess -eq $True) {
-					$body.data['options'] = $ScanScheduleOptions
-			} else {
-				Throw "ScanScheduleOptions format is invalid -- use New-ICScanScheduleOptions to create an options object"
-			}
+	}
+	if ($ScanScheduleOptions) {
+		if ($ScanScheduleOptions.EnableProcess -eq $True) {
+				$body.data['options'] = $ScanScheduleOptions
+		} else {
+			Throw "ScanScheduleOptions format is invalid -- use New-ICScanScheduleOptions to create an options object"
 		}
-  }
+	}
 	_ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method POST
 }
 
