@@ -108,7 +108,7 @@ function Invoke-ICScan {
 			$taskstatus = Get-ICUserTasks -UserTaskId $UserTask.userTaskId
 			if ($taskstatus.status -eq "Active") {
 					Write-Host "Waiting on Discovery. Progress: $($taskstatus.progress)%"
-			} elseif ($taskstatus.status -eq "Complete") {
+			} elseif ($taskstatus.status -eq "Completed") {
 					$stillactive = $false
 			} else {
 				$taskstatus
