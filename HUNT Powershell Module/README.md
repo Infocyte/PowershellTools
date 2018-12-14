@@ -47,7 +47,7 @@ Data Export Functions:
 Scanning Functions:
 
 	Invoke-ICScan (Input: TargetGroupId)
-	Invoke-ICEnumeration (Input: TargetGroupId, QueryId)
+	Invoke-ICFindHosts (Input: TargetGroupId, QueryId)
   New-ICScanSchedule (Input: TargetGroupId, CronExpression)
   Get-ICScanSchedule (Input: TargetGroupId)
   Remove-ICScanSchedule (Input: TargetGroupId or ScheduleId)

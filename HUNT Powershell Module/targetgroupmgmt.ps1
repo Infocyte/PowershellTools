@@ -2,33 +2,37 @@
 function New-ICTargetGroup {
   param(
     [parameter(Mandatory=$true, Position=0)]
-    [String]
-    $Name
+    [ValidateNotNullOrEmpty()]
+    [String]$Name
   )
 
   $Endpoint = "targets"
   $body = @{
     name = $Name
   }
-  Write-Verbose "Creating new target group: $Name [$HuntServerAddress/api/$Endpoint]"
+  Write-Host "Creating new target group: $Name [$HuntServerAddress/api/$Endpoint]"
   _ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method 'POST'
 }
 
-function Get-ICTargetGroups {
+function Get-ICTargetGroups ([String]$TargetGroupId) {
   $Endpoint = "targets"
   $filter =  @{
     order = @("name", "id")
     limit = $resultlimit
     skip = 0
   }
-  _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$true
+  if ($TargetGroupId) {
+    _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$true | where { $_.id -eq $TargetGroupId}
+  } else {
+    _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$true
+  }
 }
 
 function Remove-ICTargetGroup {
   param(
     [parameter(Mandatory=$true, Position=0)]
-    [String]
-    $TargetGroupId
+    [ValidateNotNullOrEmpty()]
+    [String]$TargetGroupId
   )
 
   $Endpoint = "targets/$TargetGroupId"
@@ -53,74 +57,25 @@ function New-ICCredential {
     username = $Cred.Username
     password = $Cred.GetNetworkCredential().Password
   }
-  Write-Verbose "Adding new Credential to the Credential Manager"
   $body = @{
     data = $data
   }
-	#$body = '{"type":"login","name":"'+$Name+'","username":'+$user+',"password":"'+$pass+'"}'
+  Write-Host "Adding new Credential $Name [$($Cred.Username)] to the Credential Manager"
   _ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method POST
 }
 
-function Get-ICCredentials {
+function Get-ICCredentials ($CredentialId) {
 	Write-Verbose "Getting Credential Objects from Infocyte HUNT: $HuntServerAddress"
   $Endpoint = "credentials"
   $filter =  @{
     limit = $resultlimit
     skip = 0
   }
-  _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter
-}
-
-function New-ICQuery {
-  Param(
-    [parameter(Mandatory=$True)]
-    [String]
-    $TargetGroupId,
-
-    [String]
-    $credentialId = $null,
-
-    [String]
-    $sshCredentialId = $null,
-
-    [ValidateNotNullorEmpty()]
-    [String]
-    $query
-    )
-
-  if (-NOT ($credentialId -AND $sshCredentialId)) {
-    Throw "CredentialId and/or sshCredentialId must be specified"
+  if ($CredentialId) {
+    _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter | where { $_.id -eq $CredentialId }
+  } else {
+    _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter
   }
-	Write-Verbose "Creating new Query in TargetGroup $TargetGroupId ($query) using username $($Cred.Username)"
-  $Endpoint = "queries"
-  $data = @{
-    value = $query
-    targetId = $TargetGroupId
-  }
-  if ($credentialId) {
-    $data['credentialId'] = $CredentialId
-  }
-  if ($sshCredentialId) {
-    $data['sshCredential'] = $sshCredentialId
-  }
-  $body = @{
-    data = $data
-  }
-  _ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method POST
-}
-
-function Get-ICQueries ([String]$TargetGroupId) {
-  $Endpoint = "queries"
-  $filter =  @{
-    limit = $resultlimit
-    skip = 0
-  }
-  if ($TargetGroupId) {
-    $filter['where'] = @{ targetId = $TargetGroupId }
-    Write-Verbose "Getting Queries for Target Group Id: $TargetGroupId"
-  }
-  #Write-Verbose "Getting all Queries from TargetGroup $TargetGroup"
-  _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$true
 }
 
 function Get-ICAddresses ([String]$TargetGroupId, [Switch]$NoLimit) {
@@ -140,8 +95,7 @@ function Get-ICAddresses ([String]$TargetGroupId, [Switch]$NoLimit) {
 function Remove-ICAddresses {
   Param(
     [ValidateNotNullorEmpty()]
-    [String]
-    $TargetGroupId
+    [String]$TargetGroupId
   )
 
 	Write-Warning "Clearing all Addresses from TargetGroup $TargetGroupId"
@@ -163,7 +117,7 @@ function Get-ICScans ([String]$TargetGroupId, $TargetGroupName, [Switch]$NoLimit
     skip = 0
   }
   if ($TargetGroupId) {
-    $tgname = (Get-ICTargetGroups | where { $_.id -eq $TargetGroupId }).name
+    $tgname = (Get-ICTargetGroups -TargetGroupId $TargetGroupId).name
     $filter['where'] = @{ targetList = $tgname }
     Write-Verbose "Getting Scans against Target Group $TargetGroup [$TargetGroupId] from $HuntServerAddress"
   } elseif ($TargetGroupName) {

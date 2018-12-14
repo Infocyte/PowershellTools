@@ -30,24 +30,34 @@ function Get-ICUserActivity ([Switch]$NoLimit){
 }
 
 # Get Infocyte HUNT User Tasks. These are the items in the task dropdown in the UI.
-function Get-ICUserTasks ([Switch]$Active, [Switch]$IncludeArchived, [Switch]$NoLimit){
-	if ($IncludeArchived) {
-		Write-Verbose "Getting All User Tasks from Infocyte HUNT: $HuntServer"
-		$url = ("$HuntServerAddress/api/usertasks")
-	} else {
-		$url = ("$HuntServerAddress/api/usertasks/active")
-	}
+function Get-ICUserTasks ([String]$UserTaskId, [Switch]$Active, [Switch]$IncludeArchived, [Switch]$NoLimit) {
 	$filter =  @{
 		order = "startedOn"
 		limit = $resultlimit
 		skip = 0
 	}
-	if ($Active) {
-		Write-Verbose "Getting Active Tasks from Infocyte HUNT: $HuntServer"
-		$filter['where'] = @{ status = "Active" }
+
+	if ($UserTaskId) {
+		$filter['where'] = @{ id = $UserTaskId }
+		$url = ("$HuntServerAddress/api/usertasks")
 	} else {
-		Write-Verbose "Getting All Tasks from Infocyte HUNT: $HuntServer"
+
+		if ($Active) {
+			Write-Verbose "Getting Active Tasks from Infocyte HUNT: $HuntServer"
+			$filter['where'] = @{ status = "Active" }
+		} else {
+			Write-Verbose "Getting All Tasks from Infocyte HUNT: $HuntServer"
+		}
+
+		if ($IncludeArchived) {
+			Write-Verbose "Getting All User Tasks from Infocyte HUNT: $HuntServer"
+			$url = ("$HuntServerAddress/api/usertasks")
+		} else {
+			$url = ("$HuntServerAddress/api/usertasks/active")
+		}
+
 	}
+
 	_ICGetMethod -url $url -filter $filter -NoLimit:$NoLimit
 }
 
