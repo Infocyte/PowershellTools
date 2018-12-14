@@ -30,17 +30,8 @@ function Get-ICUserActivity ([Switch]$NoLimit) {
 }
 
 # Get Infocyte HUNT User Tasks. These are the items in the task dropdown in the UI.
-function Get-ICUserTasks {
-	[cmdletbinding()]
-	param(
-		[String]$UserTaskId,
-
-		[Switch]$Active,
-
-		[Switch]$IncludeArchived,
-
-		[Switch]$NoLimit
-	)
+function Get-ICUserTasks ([String]$UserTaskId,	[Switch]$Active, [Switch]$IncludeArchived, [Switch]$NoLimit) {
+	
 	$filter =  @{
 		order = "startedOn"
 		limit = $resultlimit
@@ -76,10 +67,9 @@ function Get-ICUserTaskItems {
 
 		[String]$Status,
 
-		[Switch]$IncludeProgressLogs,
-
 		[Switch]$NoLimit
 	)
+
 	$filter =  @{
 		limit = $resultlimit
 		skip = 0
@@ -94,50 +84,24 @@ function Get-ICUserTaskItems {
 
 	Write-Verbose "Getting All User Task Items from Infocyte HUNT: $HuntServer"
 	$url = ("$HuntServerAddress/api/userTaskItems")
-	$Results = _ICGetMethod -url $url -filter $filter -NoLimit:$NoLimit
-
-#{"where":{"and":[{"taskItemId":"001924c2-7d40-4d71-a622-1502744c40ef"}]},"order":["createdOn asc","id"]}
-	if ($IncludeProgressLogs) {
-		$url = ("$HuntServerAddress/api/userTaskItemProgresses")
-		$Results | foreach {
-			$filter =  @{
-				order = "createdOn asc", "id"
-				limit = $resultlimit
-				skip = 0
-				where = @{
-					and = @( @{ taskItemId = $_.id } )
-				}
-			}
-			$TaskItemProgress = _ICGetMethod -url $url -filter $filter
-			$_ | Add-Member -MemberType "NoteProperty" -name "ItemProgress" -value $TaskItemProgress
-		}
-	}
-	$Results
+	_ICGetMethod -url $url -filter $filter -NoLimit:$NoLimit
 }
 
-# Get the scanId of the last scan that was kicked off
-function Get-ICLastScanid {
-	Write-Verbose "Getting last scanId from Infocyte HUNT: $HuntServerAddress"
-	$url = ("$HuntServerAddress/api/Scans")
-	$filter =  @{
-		order = "startedOn desc"
-		limit = 1
-		skip = 0
-	}
-	$body = @{
-		access_token = $Global:ICToken
-		filter = $filter | ConvertTo-JSON
-	}
+function Get-ICUserTaskItemProgress {
+	param(
+		[parameter(Mandatory=$true, Position=0)]
+		[ValidateNotNullOrEmpty()]
+		[String]$taskItemId
+	)
 
-	try {
-		$Objects = Invoke-RestMethod $url -body $body -Method GET -ContentType 'application/json'
-	} catch {
-		Write-Warning "Error: $_"
-		return "ERROR: $($_.Exception.Message)"
+	$url = ("$HuntServerAddress/api/userTaskItemProgresses")
+	$filter =  @{
+		order = "createdOn asc", "id"
+			limit = $resultlimit
+			skip = 0
+			where = @{
+			and = @{ taskItemId = taskItemId }
+		}
 	}
-	if ($Objects) {
-		return $Objects.id
-	} else {
-		return $null
-	}
+	_ICGetMethod -url $url -filter $filter
 }
