@@ -31,7 +31,7 @@ function Get-ICUserActivity ([Switch]$NoLimit) {
 
 # Get Infocyte HUNT User Tasks. These are the items in the task dropdown in the UI.
 function Get-ICUserTasks ([String]$UserTaskId,	[Switch]$Active, [Switch]$IncludeArchived, [Switch]$NoLimit) {
-	
+
 	$filter =  @{
 		order = "startedOn"
 		limit = $resultlimit
@@ -96,12 +96,10 @@ function Get-ICUserTaskItemProgress {
 
 	$url = ("$HuntServerAddress/api/userTaskItemProgresses")
 	$filter =  @{
-		order = "createdOn asc", "id"
-			limit = $resultlimit
-			skip = 0
-			where = @{
-			and = @{ taskItemId = taskItemId }
-		}
+		order = @("createdOn asc", "id")
+		limit = $resultlimit
+		skip = 0
+		where = @{ taskItemId = $taskItemId }
 	}
 	_ICGetMethod -url $url -filter $filter
 }
