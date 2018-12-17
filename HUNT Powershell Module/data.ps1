@@ -1,6 +1,19 @@
 
 # General function for getting various objects (files, processes, memory injects, autostarts, etc.) from HUNT
-function Get-ICObjects ([String]$Type, [String]$TargetGroupId=$null, [String]$BoxId=$null, [String]$ScanId=$null, [HashTable]$where=@{}, [Switch]$NoLimit) {
+function Get-ICObjects {
+  [cmdletbinding()]
+  param(
+    [parameter(Mandatory=$true)]
+    [ValidateNotNullOrEmpty()]
+    [String]$Type,
+
+    [String]$TargetGroupId,
+    [String]$BoxId,
+    [String]$ScanId,
+    [HashTable]$where=@{},
+    [Switch]$NoLimit
+  )
+
   $ObjTypes = @(
     "Processes"
     "Modules"
@@ -9,8 +22,11 @@ function Get-ICObjects ([String]$Type, [String]$TargetGroupId=$null, [String]$Bo
     "Artifacts"
     "Autostarts"
     "Hosts"
-    # "Accounts" TO DO
-    # "Scripts" TO DO
+    "Connections"
+    "Applications"
+    "Vulnerabilities"
+    "Accounts"
+    "Scripts"
   )
   if (-NOT $Type) {
     Write-Warning "Choose an object type to retrieve using -Type:"
@@ -23,8 +39,13 @@ function Get-ICObjects ([String]$Type, [String]$TargetGroupId=$null, [String]$Bo
         "Drivers" { $Endpoint = 'IntegrationDrivers'   }
         "Memory" { $Endpoint = 'IntegrationMemScans' }
         "Artifacts" { $Endpoint = 'IntegrationArtifacts'  }
-        "Autostarts" { $Endpoint = 'IntegrationAutostarts'    }
+        "Autostarts" { $Endpoint = 'IntegrationAutostarts' }
         "Hosts" { $Endpoint = 'IntegrationHosts'  }
+        "Accounts" { Write-Warning "This type is not yet supported by the Integration APIs. Use Get-ICAccounts" }
+        "Scripts" { Write-Warning "This type is not yet supported by the Integration APIs. Use Get-ICScripts" }
+        "Connections" { Write-Warning "This type is not yet supported by the Integration APIs. Use Get-ICConnections" }
+        "Applications" { Write-Warning "This type is not yet supported by the Integration APIs. Use Get-ICApplications" }
+        "Vulnerabilities" { Write-Warning "This type is not yet supported by the Integration APIs. Use Get-ICVulnerabilities" }
         Default { Write-Warning "Choose an object type to retrieve using -Type:";
                   Write-Warning "$ObjTypes";
                   throw "$Type is not an object type in HUNT."
@@ -35,10 +56,16 @@ function Get-ICObjects ([String]$Type, [String]$TargetGroupId=$null, [String]$Bo
     order = "hostCompletedOn desc"
     limit = $resultlimit
     skip = 0
+    where = @{ and = @() }
   }
-  if ($TargetGroupId) { $where['targetId'] = $TargetGroupId }
-  if ($scanId) { $where['scanId'] = $scanId }
-  if ($BoxId) { $where['boxId'] = $BoxId }
+
+  if ($where) {
+    $filter['where'] = $where
+  } else {
+    if ($scanId) { $filter.where['and'] += @{ scanId = $scanId } }
+    elseif ($BoxId) { $filter.where['and'] += @{ boxId = $BoxId } }
+    elseif ($TargetGroupId) { $filter.where['and'] += @{ targetId = $TargetGroupId } }
+  }
 
   _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
 }
@@ -51,18 +78,58 @@ function Get-ICConnections ([String]$BoxId, [HashTable]$where, [Switch]$All, [Sw
     skip = 0
   }
   if (-NOT $where) {
-    $where = @{
+    $filter['where'] = @{
       and = @()
     }
-    if ($BoxId) { $where['and'] += @{ boxId = $BoxId } }
-    if (-NOT $All) { $where['and'] += @{ state = "ESTABLISHED"} }
+    if ($BoxId) { $filter.where['and'] += @{ boxId = $BoxId } }
+    if (-NOT $All) { $filter.where['and'] += @{ state = "ESTABLISHED"} }
+  } else {
+    $filter['where'] = $where
   }
-  if ($where.count -gt 0) { $filter['where'] = $where }
+
+  _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
+}
+
+# Get Account objects
+function Get-ICAccounts ([String]$BoxId, [HashTable]$where, [Switch]$NoLimit) {
+  $Endpoint = "BoxAccountInstances"
+  $filter =  @{
+    limit = $resultlimit
+    skip = 0
+  }
+  if (-NOT $where) {
+    $filter['where'] = @{
+      and = @()
+    }
+    if ($BoxId) { $filter.where['and'] += @{ boxId = $BoxId } }
+  } else {
+    $filter['where'] = $where
+  }
+
+  _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
+}
+
+# Get Script objects
+function Get-ICScripts ([String]$BoxId, [HashTable]$where, [Switch]$NoLimit) {
+  $Endpoint = "BoxScriptInstances"
+  $filter =  @{
+    limit = $resultlimit
+    skip = 0
+  }
+  if (-NOT $where) {
+    $filter['where'] = @{
+      and = @()
+    }
+    if ($BoxId) { $filter.where['and'] += @{ boxId = $BoxId } }
+  } else {
+    $filter['where'] = $where
+  }
+
   _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
 }
 
 
-function Get-ICApplications ($BoxId, [HashTable]$where, [Switch]$NoLimit) {
+function Get-ICApplications ([String]$BoxId, [HashTable]$where, [Switch]$NoLimit) {
   $Endpoint = "BoxApplicationInstances"
   $filter =  @{
     limit = $resultlimit
@@ -81,11 +148,8 @@ function Get-ICVulnerabilities ($BoxId, [HashTable]$where, [Switch]$NoLimit) {
   # Get Applications
   $apps = Get-ICApplications -BoxId $BoxId -NoLimit:$NoLimit | where { $_.name -notmatch "KB|Update" }
   Write-Verbose "Found $($apps.count) Installed Apps."
-  $Endpoint = "ApplicationAdvisories"
-  $filter =  @{
-    limit = $resultlimit
-    skip = 0
-  }
+
+
   $apps | % {
     $app = $_
     $Endpoint = "ApplicationAdvisories"
@@ -163,4 +227,39 @@ function Get-ICFileDetail {
 	$object | Add-Member -Type NoteProperty -Name 'avpositives' -Value $_.avResults.positives
 	$object | Add-Member -Type NoteProperty -Name 'avtotal' -Value $_.avResults.total
 	return $object
+}
+
+# Get Account objects
+function Get-ICAlerts {
+  [cmdletbinding()]
+  param(
+    [String]$BoxId,
+    [Switch]$NoLimit
+  )
+
+  $where = @{
+    and = @(
+      @{ or = @(
+        @{ threatName = "Bad" },
+        @{ threatName = "Blacklist" },
+        @{ flagName = "Verified Bad" },
+        @{ flagName = "Unauthorized" })
+      }
+    )
+  }
+  if ($BoxId) { $where['and'] += @{ boxId = $BoxId } }
+
+  Get-ICObjects -Type Processes -where $where
+  Get-ICObjects -Type Modules -where $where
+  Get-ICObjects -Type Drivers -where $where
+  Get-ICObjects -Type Memory -where $where
+  Get-ICObjects -Type Artifacts -where $where
+  Get-ICObjects -Type Autostarts -where $where
+  # Get-ICObjects -Type Scripts -where $where
+
+  $Objects
+}
+
+function Get-ICReports ([String]$ReportId, [Switch]$NoLimit) {
+
 }

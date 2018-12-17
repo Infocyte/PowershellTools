@@ -10,10 +10,10 @@ function _ICGetMethod ([String]$url, [HashTable]$filter, [Switch]$NoLimit) {
 		access_token = $Global:ICToken
 	}
   if ($filter) {
-    $body['filter'] = $filter | ConvertTo-JSON -Depth 4 -Compress
+    $body['filter'] = $filter | ConvertTo-JSON -Depth 8 -Compress
   }
   Write-Verbose "Requesting data from $url (Limited to $resultlimit unless using -NoLimit)"
-  Write-Verbose "$($body | ConvertTo-JSON -Depth 4 -Compress)"
+  Write-Verbose "$($body | ConvertTo-JSON -Depth 8 -Compress)"
 	try {
 		$Objects = Invoke-RestMethod $url -body $body -Method GET -ContentType 'application/json'
 	} catch {
@@ -32,7 +32,7 @@ function _ICGetMethod ([String]$url, [HashTable]$filter, [Switch]$NoLimit) {
 		$skip += $resultlimit
 		$filter['skip'] = $skip
 		$body.remove('filter') | Out-Null
-		$body.Add('filter', ($filter | ConvertTo-JSON -Depth 4 -Compress))
+		$body.Add('filter', ($filter | ConvertTo-JSON -Depth 8 -Compress))
     Write-Progress -Activity "Getting Data from Hunt Server API" -status "Requesting data from $url [$skip]"
 		try {
 			$moreobjects = Invoke-RestMethod $url -body $body -Method GET -ContentType 'application/json'
@@ -56,7 +56,7 @@ function _ICRestMethod ([String]$url, $body=$null, [String]$method) {
     Authorization = $Global:ICToken
   }
   Write-verbose "Sending $method command to $url"
-  Write-verbose "Body = $($body | ConvertTo-JSON -Compress -Depth 4)"
+  Write-verbose "Body = $($body | ConvertTo-JSON -Compress -Depth 8)"
 	try {
 		$Result = Invoke-RestMethod $url -headers $headers -body ($body|ConvertTo-JSON -Compress -Depth 4) -Method $method -ContentType 'application/json'
 	} catch {
