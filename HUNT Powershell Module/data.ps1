@@ -260,6 +260,26 @@ function Get-ICAlerts {
   $Objects
 }
 
-function Get-ICReports ([String]$ReportId, [Switch]$NoLimit) {
+function Get-ICReports {
+  [cmdletbinding()]
+  param(
+    [String]$ReportId,
+    [Switch]$NoLimit
+  )
 
+  if ($ReportId) {
+    $Endpoint = "Reports/$ReportId"
+  } else {
+    $Endpoint = "Reports"
+    Throw "Not implimented yet, provide ReportId"
+  }
+
+
+  $filter =  @{
+    order = @("createdOn DESC","id")
+    limit = $resultlimit
+    skip = 0
+  }
+
+  _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
 }
