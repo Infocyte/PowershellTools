@@ -130,6 +130,7 @@ function Get-ICScripts ([String]$BoxId, [HashTable]$where, [Switch]$NoLimit) {
 
 
 function Get-ICApplications ([String]$BoxId, [HashTable]$where, [Switch]$NoLimit) {
+
   $Endpoint = "BoxApplicationInstances"
   $filter =  @{
     limit = $resultlimit
@@ -140,78 +141,63 @@ function Get-ICApplications ([String]$BoxId, [HashTable]$where, [Switch]$NoLimit
     if ($BoxId) { $where['boxId'] = $BoxId }
   }
   if ($where.count -gt 0) { $filter['where'] = $where }
-  _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
+  $apps = _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
+  $apps | where { $_.name -notmatch "KB|Update for" } | Sort-Object hostname, applicationId -unique
 }
 
-function Get-ICVulnerabilities ($BoxId, [HashTable]$where, [Switch]$NoLimit) {
-  $Vulnerabilities = @()
-  # Get Applications
-  $apps = Get-ICApplications -BoxId $BoxId -NoLimit:$NoLimit | where { $_.name -notmatch "KB|Update" }
-  Write-Verbose "Found $($apps.count) Installed Apps."
+function Get-ICVulnerabilities {
+  [cmdletbinding()]
+  param(
+    [Switch]$NoLimit
+  )
 
-
-  $apps | % {
-    $app = $_
-    $Endpoint = "ApplicationAdvisories"
-    $filter =  @{
-      where = @{ applicationId = $_.applicationId }
-    	limit = $resultlimit
-    	skip = 0
-    }
-    $appvulns = @()
-    $appvulns += _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$true
-    if ($appvulns) {
-      Write-Verbose "Recieved $($appvulns.count) App Vulns for $($app.name)."
-      $filter =  @{
-        limit = $resultlimit
-        skip = 0
-      }
-      $appvulns | Sort-Object id -unique | % {
-        $va = $_
-        Write-Verbose "Vulnerable App: $($va.ApplicationName) cveId: $($va.cveId) App id: $($app.id) VulnApp id: $($va.id)"
-        $vuln = $app.PSObject.Copy()
-        $vuln.id = [guid]::newguid().guid
-        $vuln | Add-Member -MemberType "NoteProperty" -name "cveId" -value $va.cveId
-  			$vuln | Add-Member -MemberType "NoteProperty" -name "baseScoreV2" -value $va.baseScoreV2
-  			$vuln | Add-Member -MemberType "NoteProperty" -name "baseScoreV3" -value $va.baseScoreV3
-  			$vuln | Add-Member -MemberType "NoteProperty" -name "published" -value $va.published
-  			$vuln | Add-Member -MemberType "NoteProperty" -name "modified" -value $va.modified
-
-        if ($va.cveId) {
-          $Endpoint = "Cves/$($va.cveId)"
-				  $cve = _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$true
-          if ($cve) {
-            $vuln | Add-Member -MemberType "NoteProperty" -name "rules" -value $cve.rules
-  					$vuln | Add-Member -MemberType "NoteProperty" -name "cwes" -value $cve.cwes
-  					$vuln | Add-Member -MemberType "NoteProperty" -name "reference" -value $cve.reference.url
-  					$vuln | Add-Member -MemberType "NoteProperty" -name "description" -value $cve.description
-            if ([bool]($cve.cveimpact.PSobject.Properties.name -match "baseMetricV3")) {
-              $vuln | Add-Member -MemberType "NoteProperty" -name "cvsstype" -value 3.0
-              $vuln | Add-Member -MemberType "NoteProperty" -name "severity" -value $cve.impact.baseMetricV3.severity
-              $vuln | Add-Member -MemberType "NoteProperty" -name "impactScore" -value $cve.impact.baseMetricV3.impactScore
-              $vuln | Add-Member -MemberType "NoteProperty" -name "exploitabilityScore" -value $cve.impact.baseMetricV3.exploitabilityScore
-              $vuln | Add-Member -MemberType "NoteProperty" -name "attackVector" -value $cve.impact.baseMetricV3.cvssv3.attackVector
-              $vuln | Add-Member -MemberType "NoteProperty" -name "attackComplexity" -value $cve.impact.baseMetricV3.cvssv3.attackComplexity
-              $vuln | Add-Member -MemberType "NoteProperty" -name "authentication" -value $cve.impact.baseMetricV3.cvssv3.authentication
-            } else {
-              $vuln | Add-Member -MemberType "NoteProperty" -name "cvsstype" -value 2.0
-              $vuln | Add-Member -MemberType "NoteProperty" -name "severity" -value $cve.impact.baseMetricV2.severity
-              $vuln | Add-Member -MemberType "NoteProperty" -name "impactScore" -value $cve.impact.baseMetricV2.impactScore
-              $vuln | Add-Member -MemberType "NoteProperty" -name "exploitabilityScore" -value $cve.impact.baseMetricV2.exploitabilityScore
-              $vuln | Add-Member -MemberType "NoteProperty" -name "attackVector" -value $cve.impact.baseMetricV2.cvssv2.accessVector
-              $vuln | Add-Member -MemberType "NoteProperty" -name "attackComplexity" -value $cve.impact.baseMetricV2.cvssv2.accessComplexity
-              $vuln | Add-Member -MemberType "NoteProperty" -name "authentication" -value $cve.impact.baseMetricV2.cvssv2.authentication
-            }
-
-  				}
-        }
-        $Vulnerabilities += $vuln
-        $vuln = $null
-      }
-    }
+  $Endpoint = "ApplicationAdvisories"
+  $filter =  @{
+    limit = $resultlimit
+    skip = 0
   }
-  Write-Host "DONE: Exporting $($Vulnerabilities.count) Vulnerabilities"
-  $Vulnerabilities
+  $appvulns = _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit | sort-object applicationId, cveId -unique
+
+  if ($appvulns) {
+    Write-Verbose "Found $($appvulns.count) App Vulns. Enriching details for export..."
+    $appvulns | % {
+      $vuln = $_
+      Write-Verbose "Vulnerable App: $($vuln.ApplicationName) cveId: $($vuln.cveId) App id: $($vuln.applicationId)"
+
+      if ($vuln.cveId) {
+        $Endpoint = "Cves/$($vuln.cveId)"
+        $filter =  @{
+          limit = $resultlimit
+          skip = 0
+        }
+			  $cve = _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$true
+        if ($cve) {
+          $vuln | Add-Member -MemberType "NoteProperty" -name "rules" -value $cve.rules
+					$vuln | Add-Member -MemberType "NoteProperty" -name "cwes" -value $cve.cwes
+					$vuln | Add-Member -MemberType "NoteProperty" -name "reference" -value $cve.reference.url
+          if ([bool]($cve.cveimpact.PSobject.Properties.name -match "baseMetricV3")) {
+            $vuln | Add-Member -MemberType "NoteProperty" -name "cvsstype" -value 3.0
+            $vuln | Add-Member -MemberType "NoteProperty" -name "severity" -value $cve.impact.baseMetricV3.severity
+            $vuln | Add-Member -MemberType "NoteProperty" -name "impactScore" -value $cve.impact.baseMetricV3.impactScore
+            $vuln | Add-Member -MemberType "NoteProperty" -name "exploitabilityScore" -value $cve.impact.baseMetricV3.exploitabilityScore
+            $vuln | Add-Member -MemberType "NoteProperty" -name "attackVector" -value $cve.impact.baseMetricV3.cvssv3.attackVector
+            $vuln | Add-Member -MemberType "NoteProperty" -name "attackComplexity" -value $cve.impact.baseMetricV3.cvssv3.attackComplexity
+            $vuln | Add-Member -MemberType "NoteProperty" -name "authentication" -value $cve.impact.baseMetricV3.cvssv3.authentication
+          } else {
+            $vuln | Add-Member -MemberType "NoteProperty" -name "cvsstype" -value 2.0
+            $vuln | Add-Member -MemberType "NoteProperty" -name "severity" -value $cve.impact.baseMetricV2.severity
+            $vuln | Add-Member -MemberType "NoteProperty" -name "impactScore" -value $cve.impact.baseMetricV2.impactScore
+            $vuln | Add-Member -MemberType "NoteProperty" -name "exploitabilityScore" -value $cve.impact.baseMetricV2.exploitabilityScore
+            $vuln | Add-Member -MemberType "NoteProperty" -name "attackVector" -value $cve.impact.baseMetricV2.cvssv2.accessVector
+            $vuln | Add-Member -MemberType "NoteProperty" -name "attackComplexity" -value $cve.impact.baseMetricV2.cvssv2.accessComplexity
+            $vuln | Add-Member -MemberType "NoteProperty" -name "authentication" -value $cve.impact.baseMetricV2.cvssv2.authentication
+          }
+				}
+      }
+    }
+    Write-Host "DONE: Exporting $($appvulns.count) Vulnerabilities"
+    $appvulns
+  }
 }
 
 # Get Full FileReport on an object by sha1
@@ -234,6 +220,7 @@ function Get-ICAlerts {
   [cmdletbinding()]
   param(
     [String]$BoxId,
+    [String[]]$flagNames,
     [Switch]$NoLimit
   )
 
@@ -242,22 +229,24 @@ function Get-ICAlerts {
       @{ or = @(
         @{ threatName = "Bad" },
         @{ threatName = "Blacklist" },
-        @{ flagName = "Verified Bad" },
-        @{ flagName = "Unauthorized" })
+        @{ flagName = "Verified Bad" })
       }
     )
   }
+  if ($flagNames) {
+    $flagNames | where { $_ -ne $Null -OR $_ -ne "" } | % {
+      $where['and']['or'] += @{ flagName = $_ }
+    }
+  }
   if ($BoxId) { $where['and'] += @{ boxId = $BoxId } }
 
-  Get-ICObjects -Type Processes -where $where
-  Get-ICObjects -Type Modules -where $where
-  Get-ICObjects -Type Drivers -where $where
-  Get-ICObjects -Type Memory -where $where
-  Get-ICObjects -Type Artifacts -where $where
-  Get-ICObjects -Type Autostarts -where $where
+  Get-ICObjects -Type Processes -where $where | where { $_.flagName -ne "Verified Good" }
+  Get-ICObjects -Type Modules -where $where | where { $_.flagName -ne "Verified Good" }
+  Get-ICObjects -Type Drivers -where $where | where { $_.flagName -ne "Verified Good" }
+  Get-ICObjects -Type Memory -where $where | where { $_.flagName -ne "Verified Good" }
+  Get-ICObjects -Type Artifacts -where $where | where { $_.flagName -ne "Verified Good" }
+  Get-ICObjects -Type Autostarts -where $where | where { $_.flagName -ne "Verified Good" }
   # Get-ICObjects -Type Scripts -where $where
-
-  $Objects
 }
 
 function Get-ICReports {
@@ -267,18 +256,17 @@ function Get-ICReports {
     [Switch]$NoLimit
   )
 
-  if ($ReportId) {
-    $Endpoint = "Reports/$ReportId"
-  } else {
-    $Endpoint = "Reports"
-    Throw "Not implimented yet, provide ReportId"
-  }
-
-
   $filter =  @{
     order = @("createdOn DESC","id")
     limit = $resultlimit
     skip = 0
+  }
+
+  if ($ReportId) {
+    $Endpoint = "Reports/$ReportId"
+  } else {
+    $Endpoint = "Reports"
+    $filter['fields'] = @("id","name","createdOn","type","hostCount")
   }
 
   _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
