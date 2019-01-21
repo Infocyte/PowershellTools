@@ -20,12 +20,12 @@
 
     .EXAMPLE
         $Netcreds = Get-Credentials
-        PS C:\> .\Test-InfocyteCredentials.ps1 -Target 192.168.1.5 -Credential $Netcreds
+        PS C:\> .\Infocyte-Test.ps1 -Target 192.168.1.5 -Credential $Netcreds
 
     .EXAMPLE
         $Netcreds = Get-Credentials
 		PS C:\> $Proxycreds = Get-Credentials
-        PS C:\> .\Test-InfocyteCredentials.ps1 -Target 192.168.1.5 -Credential $Netcreds -ProxyAddress "http://192.168.1.2:8080" -ProxyCredential $Proxycreds
+        	PS C:\> .\Test-InfocyteCredentials.ps1 -Target 192.168.1.5 -Credential $Netcreds -ProxyAddress "http://192.168.1.2:8080" -ProxyCredential $Proxycreds
 
     .NOTES
 		Tests we will run:
