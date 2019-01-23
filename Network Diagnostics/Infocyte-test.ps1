@@ -19,13 +19,15 @@
         (Optional) Proxy credentials (PSCredential Object)
 
     .EXAMPLE
-        $Netcreds = Get-Credentials
-        PS C:\> .\Test-InfocyteCredentials.ps1 -Target 192.168.1.5 -Credential $Netcreds
+        Powershell Commands:
+				$Netcreds = Get-Credential
+        .\Test-InfocyteCredentials.ps1 -Target 192.168.1.5 -Credential $Netcreds
 
     .EXAMPLE
-        $Netcreds = Get-Credentials
-		PS C:\> $Proxycreds = Get-Credentials
-        PS C:\> .\Test-InfocyteCredentials.ps1 -Target 192.168.1.5 -Credential $Netcreds -ProxyAddress "http://192.168.1.2:8080" -ProxyCredential $Proxycreds
+        Powershell Commands:
+				$Netcreds = Get-Credential
+				$Proxycreds = Get-Credential
+        .\Test-InfocyteCredentials.ps1 -Target 192.168.1.5 -Credential $Netcreds -ProxyAddress "http://192.168.1.2:8080" -ProxyCredential $Proxycreds
 
     .NOTES
 		Tests we will run:
@@ -75,16 +77,19 @@ Param(
 )
 
 #requires -version 2.0
-$Admin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] “Administrator”)
+$IPRegexPattern = "\b(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}\b"
+$Admin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
 If (-NOT $Admin) {
 	Write-Warning "NOTE: Your shell is not running as Administrator (But you shouldn't need it for this script)."
 }
 
 # $PSScriptRoot
-# [ValidatePattern("\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}")]
+# [ValidatePattern($IPRegexPattern)]
 # FUNCTIONS
 
-Function Get-DNSEntry ($target) {
+Function Get-DNSEntry  {
+	[CmdletBinding()]
+	Param([String]$target)
 
 	try {
 		Write-Verbose "Resolving $target"
@@ -92,11 +97,20 @@ Function Get-DNSEntry ($target) {
 	} catch {
 		$ErrorMessage = $_.Exception.Message
 		$FailedItem = $_.Exception.ItemName
-		Write-Warning "[ERROR] Failed DNS Lookup against $target - No such host/IP is known - Error Item: $FailedItem, Message: $Message"
-		Write-Warning "Using DNS $(nslookup $target 2> $null)"
-		return
+		nslookup = nslookup $target 2> $null
+		if ($target -notmatch $IPRegexPattern) {
+			Write-Warning "[ERROR] Failed DNS lookup. No such host/IP [$target] is known - Error Item: $FailedItem, Message: $Message"
+			Write-Verbose "Trying nslookup for troubleshooting:"
+			Write-Verbose $nslookup
+			return $null
+		} else {
+			Write-Warning "[ERROR] Failed DNS Lookup against $target - Error Item: $FailedItem, Message: $Message"
+			Write-Verbose "Trying nslookup for troubleshooting:"
+			Write-Verbose $nslookup
+			return $false
+		}
 	}
-	if ($target -match "\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}") {
+	if ($target -match $IPRegexPattern) {
 		$IPAddress = $target
 	} else {
 		if (($temp.AddressList | Where-Object { $_.AddressFamily -eq 'InterNetwork' }) -is [System.Net.IPAddress]) {
@@ -113,7 +127,7 @@ Function Get-DNSEntry ($target) {
 	New-Object PSObject -Property $Result
 }
 
-function Test-Port ($target, $port) {
+function Test-Port ([String]$target, [int]$port) {
 
     $tcpclient = New-Object Net.Sockets.TcpClient
     try
@@ -124,11 +138,9 @@ function Test-Port ($target, $port) {
     if($tcpclient.Connected)
     {
         $tcpclient.Close()
-		Write-Verbose "[SUCCESS] Port $port on $target is open"
 		$True
     }
 	else {
-		Write-Warning "[FAILURE] Port $port on $target is closed"
 		$False
     }
 }
@@ -137,7 +149,6 @@ function Test-Connectivity {
 	[CmdletBinding()]
 	Param(
 		[Parameter(Position = 0, Mandatory = $True, ValueFromPipeline=$False)]
-		[ValidatePattern("\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}")]
 		[String]
 		$IP,
 
@@ -153,6 +164,11 @@ function Test-Connectivity {
 	)
 
 	BEGIN {
+		if ($target -notmatch $IPRegexPattern) {
+			Write-Warning "WARNING: Not a legal IP Address"
+			return $null
+		}
+
 		$portdict = @{
 			22 = "SSH (TCP 22)"
 			53 = "DNS (TCP 53)"
@@ -186,11 +202,11 @@ function Test-Connectivity {
 				if($tcpclient.Connected)
 				{
 					$tcpclient.Close()
-					Write-Verbose "[SUCCESS] Port $port on $target is open"
+					Write-Verbose "[SUCCESS] Port $port on $target is Open"
 					$True
 				}
 				else {
-					Write-Warning "[FAILURE] Port $port on $target is closed"
+					Write-Warning "[FAILURE] Port $port on $target is Closed or Filtered"
 					$False
 				}
 		}
@@ -296,8 +312,9 @@ Function Test-RemoteWMI {
 	#(Get-CimInstance -ClassName Win32_Process -Property Name, CommandLine, ExecutablePath)[6] | select Name, CommandLine, ExecutablePath | fl
 }
 
+# Test HTTP Proxy Authentication (Basic, NTLM, Digest, Negotiate/Kerberos)
 Function New-ProxyWebClient {
-	# Test HTTP Proxy Authentication (Basic, NTLM, Digest, Negotiate/Kerberos)
+	[CmdletBinding()]
 	Param(
 			[Parameter(Position = 0, Mandatory = $True)]
 			[String]
@@ -374,7 +391,7 @@ Function New-ProxyWebClient {
 		$FQUsername = $Username
 	}
 	$TestNum = 0
-	$TestWebsite = 'http://infocyte.com'
+	$TestWebsite = 'http://www.infocyte.com'
 	if (-NOT $PSScriptRoot) {
 		$PSScriptRoot = Split-Path $MyInvocation.MyCommand.Path -Parent
 	}
@@ -393,7 +410,7 @@ Function New-ProxyWebClient {
 	if ($ProxyAddress) {
 		if ($ProxyAddress -match "http") {
 			# "http://<myproxy-ip>:8012"
-		} elseif ($ProxyAddress -like "\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}") {
+		} elseif ($ProxyAddress -like $IPRegexPattern) {
 			$ProxyAddress = "http://$ProxyIP"
 		} else {
 			Write-Warning "ProxyAddress ($ProxyAddress) may be in the wrong format.  Should be http://myproxyaddress.com or http://192.168.1.80:8080"
@@ -421,7 +438,7 @@ Function New-ProxyWebClient {
 	if ($DNSEntry) {
 		Write-Host "SUCCESS: $($DNSEntry.Hostname) => $($DNSEntry.IP)"
 	} else {
-		Write-Warning "FAIL: DNS Resolution of www.google.com failed - Your internet may be down"
+		Write-Warning "FAIL: DNS Resolution of www.google.com failed - Your internet might be down"
 	}
 
 	try {
@@ -430,7 +447,7 @@ Function New-ProxyWebClient {
 	} catch {
 		$ErrorMessage = $_.Exception.Message
 		$FailedItem = $_.Exception.ItemName
-		Write-Warning "FAIL: Ping (ICMP) to www.google.com - Error Item: $FailedItem, Message: $Message"
+		Write-Warning "FAIL: Ping (ICMP) to www.google.com - Your internet might be down - Error Item: $FailedItem, Message: $Message"
 	}
 
 
@@ -578,31 +595,40 @@ Function New-ProxyWebClient {
         }
     }
 	Write-Host ""
-    $PortResults | ForEach-Object {
+  $PortResults | ForEach-Object {
 		$result = $_
 		if (-NOT $result.Access) {
 			Switch ($_.Port){
 				22  {
-						Write-Warning "FAIL: No Access to $($result.Name) on $IP - Will affect SSH Execution and Deployment against a Unix-based Hosts"
+						Write-Warning "FAIL: No Access to $($result.Name) on $IP - Will affect SSH Execution and Deployment against a Linux-based Hosts"
 					}
 
 				135 {
-						Write-Warning "FAIL: No Access to $($result.Name) on $IP - Will affect WMI Execution and Deployment against a Windows-based Hosts"
+						Write-Warning "FAIL: No Access to $($result.Name) on $IP - Will affect WMI (RPC) and Remote Scheduled Task (enmap) Execution and Deployment against a Windows-based Hosts"
 					}
 				139 {
 						If (-NOT ($PortResults | Where-Object { $_.Port -eq 445 }).Access) {
-							Write-Warning "FAIL: No Access to $($result.Name) on $IP - May affect RPC Execution and Deployment against a Windows-based Hosts"
+							Write-Warning "FAIL: No Access to $($result.Name) on $IP - May affect Transport and Deployment against a Windows-based Hosts"
 						}
 					}
 				445 {
 						If (-NOT ($PortResults | Where-Object { $_.Port -eq 139 }).Access) {
-							Write-Warning "FAIL: No Access to $($result.Name) on $IP - May affect RPC Execution and Deployment against a Windows-based Hosts"
+							Write-Warning "FAIL: No Access to $($result.Name) on $IP - May affect Transport and Deployment against a Windows-based Hosts"
 						}
 					}
-
 				5985 {
 						Write-Warning "FAIL: No Access to $($result.Name) on $IP - May affect PSRemoting Execution and Deployment against a Windows-based Hosts"
 					 }
+			  1024 {
+						If (-NOT ($PortResults | Where-Object { $_.Port -eq 1025 }).Access) {
+							Write-Warning "FAIL: No Access to $($result.Name) on $IP - Closed Dynamic Range Ports will affect Transport and Deployment against a Legacy Windows-based Hosts [Windows 2003/XP]"
+						}
+					}
+			 	49152 {
+						If (-NOT ($PortResults | Where-Object { $_.Port -eq 39153 }).Access) {
+							Write-Warning "FAIL: No Access to $($result.Name) on $IP - Closed Dynamic Range Ports will affect Transport and Deployment against a Windows-based Hosts [Windows 2008/7+]"
+						}
+					}
 				default { }
 			}
 		}
@@ -628,14 +654,14 @@ Function New-ProxyWebClient {
 	if ($res -match "does not have RSOP data") {
 		Write-Warning "$res"
 		Write-Warning "Fallback: Attempting to gather RSoP for current user"
-		GPResult.exe /H InfocyteTest_RSoP_localhost.html /F
+		$res = GPResult.exe /H InfocyteTest_RSoP_localhost.html /F
 	}
 	Write-Host "Getting Resultant Set of Policy (RSoP) for $Hostname - output to file .\InfocyteTest_RSoP_$Hostname.txt"
 	$res = Gpresult /S $Hostname /U $FQUsername /P ($Creds.GetNetworkCredential().Password) /USER $Username /v > InfocyteTest_RSoP_$Hostname.txt
 	if ($res -match "does not have RSOP data") {
 		Write-Warning "$res"
 		Write-Warning "Fallback: Attempting to gather RSoP for current user"
-		Gpresult /S $Hostname /U $FQUsername /P ($Creds.GetNetworkCredential().Password) /v > InfocyteTest_RSoP_$Hostname.txt
+		$res = Gpresult /S $Hostname /U $FQUsername /P ($Creds.GetNetworkCredential().Password) /v > InfocyteTest_RSoP_$Hostname.txt
 	}
 	#endregion Permissions Test
 
@@ -703,7 +729,7 @@ Function New-ProxyWebClient {
 	# Test Remote Schtasks
 	$TestNum += 1
 	Write-Host -ForegroundColor Cyan "`n[TEST $TestNum] Testing Remote Schtasks Execution..."
-	if (($PortResults | Where-Object { $_.Port -eq 139}).Access -OR ($PortResults | Where-Object { $_.Port -eq 445}).Access) {
+	if (($PortResults | Where-Object { $_.Port -eq 135}).Access) {
 
         $a = SCHTASKS /Create /S $IP /U $FQUsername /P ($Creds.GetNetworkCredential().Password) /TN test /TR 'c:\windows\system32\cmd.exe /c Net Time' /SC ONCE /ST 23:59 /RU SYSTEM /F
         if ($a -match "SUCCESS") {
@@ -768,7 +794,7 @@ Function New-ProxyWebClient {
 
 	# Test Endpoint Return Path to HUNT Server
 	$TestNum += 1
-	Write-Host -ForegroundColor Cyan "`n[TEST $TestNum] Testing remote endpoint TCP443 return path to HUNT server..."
+	Write-Host -ForegroundColor Cyan "`n[TEST $TestNum] Testing target's TCP443 Return Path to HUNT server..."
 
 	$RemoteScript = '
 	#Infocyte Test
@@ -796,7 +822,7 @@ Function New-ProxyWebClient {
 			Remove-PSDrive test
 
 	} else {
-		Write-Warning "No connectivity to WMI ports - skipping Remote Endpoint Return Path test"
+		Write-Warning "No connectivity to WMI ports - skipping target's TCP443 Endpoint Return Path test"
 	}
 	<#
 		if (($PortResults | Where-Object { $_.Port -eq 139}).Access -OR ($PortResults | Where-Object { $_.Port -eq 445}).Access) {
