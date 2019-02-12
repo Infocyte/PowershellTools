@@ -50,16 +50,10 @@ New-Module -name install_huntagent -scriptblock {
 		if ($RegKey) { $arguments += " --key $APIKey" }
 
 		# Execute!
-		if ($interactive) {
-
-		} else {
-
-		}
 		& $agentDestination $arguments
 	}
 Set-Alias installagent -Value Install-HuntAgent | Out-Null
 Export-ModuleMember -Alias 'installagent' -Function 'Install-HuntAgent' | Out-Null
 }
 
-client.CachePolicy = New System.Net.Cache.RequestCachePolicy(System.Net.Cache.RequestCacheLevel.NoCacheNoStore)
 # [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12; (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; installagent alpo1
