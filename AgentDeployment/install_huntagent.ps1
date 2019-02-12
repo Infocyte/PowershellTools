@@ -11,13 +11,12 @@ New-Module -name install_huntagent -scriptblock {
 
 	Function Install-HuntAgent() {
 		param(
-			[Parameter(Position = 0, Mandatory = $True)]
+			[Parameter(Position = 0)]
 			[String]$InstanceName,
 
-			[Parameter(Position = 1, Mandatory = $False)]
+			[Parameter(Position = 1)]
 			[String]$RegKey,
 
-			[Parameter(Mandatory = $False)]
 			[Switch]$Interactive
 		)
 
