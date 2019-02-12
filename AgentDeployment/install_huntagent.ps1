@@ -20,7 +20,10 @@ New-Module -name install_huntagent -scriptblock {
 			[Switch]$Interactive
 		)
 
+		$agentDestination = "$($env:TEMP)\agent.windows.exe"
 		$LogPath = "$($env:TEMP)\huntagentinstall.log"
+		$agentURL = "https://s3.us-east-2.amazonaws.com/infocyte-support/executables/agent.windows.exe"
+		$hunturl = "$InstanceName.infocyte.com"
 
 		# Make script silent unless run interactive
 		if (-NOT $Interactive) { $ErrorActionPreference = "silentlycontinue" }
@@ -46,10 +49,6 @@ New-Module -name install_huntagent -scriptblock {
 
 		# Downloading Agent
 		[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-		$agentURL = "https://s3.us-east-2.amazonaws.com/infocyte-support/executables/agent.windows.exe"
-		$agentDestination = "$($env:TEMP)\agent.windows.exe"
-		$url = "$InstanceName.infocyte.com"
-
 		$wc = New-Object Net.WebClient
 		$wc.UseDefaultCredentials = $true
 		$wc.Encoding = [System.Text.Encoding]::UTF8
@@ -74,13 +73,18 @@ New-Module -name install_huntagent -scriptblock {
 		}
 
 		# Setup exe arguments
-		$arguments = "--url $url --install"
+		$arguments = "--url $hunturl --install"
 		if (-NOT $interactive) { $arguments += " --quiet" }
 		if ($RegKey) { $arguments += " --key $APIKey" }
 
 		"$(Get-Date) [Information] Installing Agent: Downloading agent.windows.exe from $agentURL [sha1: $sha1] and executing with commandline: $($agentDestination.Substring($agentDestination.LastIndexOf('\')+1)) $arguments" >> $LogPath
 		# Execute!
-		& $agentDestination $arguments
+		try {
+			& $agentDestination $arguments
+		} catch {
+
+		}
+
 	}
 Set-Alias installagent -Value Install-HuntAgent | Out-Null
 Export-ModuleMember -Alias 'installagent' -Function 'Install-HuntAgent' | Out-Null
