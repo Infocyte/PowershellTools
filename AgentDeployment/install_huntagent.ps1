@@ -37,7 +37,12 @@ New-Module -name install_huntagent -scriptblock {
 		$agentURL = "https://s3.us-east-2.amazonaws.com/infocyte-support/executables/agent.windows.exe"
 		$agentDestination = "$($env:TEMP)\agent.windows.exe"
 		$url = "$InstanceName.infocyte.com"
-		(new-object Net.WebClient).DownloadFile($agentURL, $agentDestination) > $null
+
+		$wc = New-Object Net.WebClient
+		$wc.UseDefaultCredentials = $true
+		$wc.Encoding = [System.Text.Encoding]::UTF8
+		# $wc.CachePolicy = New-Object System.Net.Cache.HttpRequestCachePolicy([System.Net.Cache.HttpRequestCacheLevel]::NoCacheNoStore) # For Testing:
+		$wc.DownloadFile($agentURL, $agentDestination) > $null
 
 		# Setup exe arguments
 		$arguments = "--url $url --install"
@@ -51,7 +56,10 @@ New-Module -name install_huntagent -scriptblock {
 
 		}
 		& $agentDestination $arguments
-	} | Out-Null
+	}
 Set-Alias installagent -Value Install-HuntAgent | Out-Null
 Export-ModuleMember -Alias 'installagent' -Function 'Install-HuntAgent' | Out-Null
 }
+
+client.CachePolicy = New System.Net.Cache.RequestCachePolicy(System.Net.Cache.RequestCacheLevel.NoCacheNoStore)
+# [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12; (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; installagent alpo1
