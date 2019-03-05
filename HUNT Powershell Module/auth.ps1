@@ -22,10 +22,14 @@ function _DisableSSLVerification {
 
 #Get Login Token (required)
 function New-ICToken {
+	[cmdletbinding()]
 	param(
+		[parameter(Mandatory=$true)]
+		[ValidateNotNullOrEmpty()]
 		[String]
 		$HuntServer = "https://localhost:443",
 
+		[parameter(Mandatory=$true)]
 		[System.Management.Automation.PSCredential]
 		$Credential
 	)
@@ -74,10 +78,14 @@ function New-ICToken {
 }
 
 function Set-ICToken {
-	Param(
+	[cmdletbinding()]
+	param(
+		[parameter(Mandatory=$true)]
+		[ValidateNotNullOrEmpty()]
 		[String]$HuntServer = "https://localhost:443",
 
-		[ValidateNotNullorEmpty]
+		[parameter(Mandatory=$true)]
+		[ValidateNotNullorEmpty()]
 		[String]$Token
 	)
 
