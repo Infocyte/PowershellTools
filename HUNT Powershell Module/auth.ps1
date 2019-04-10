@@ -20,7 +20,7 @@ function _DisableSSLVerification {
     [TrustEverything]::SetCallback()
 }
 
-#Get Login Token (required)
+#Get Login Token (required) -- NOTE: Depreciated in the SaaS version
 function New-ICToken {
 	[cmdletbinding()]
 	param(
@@ -77,6 +77,8 @@ function New-ICToken {
 	}
 }
 
+
+# Generate an API token in the web console's profile or admin section.
 function Set-ICToken {
 	[cmdletbinding()]
 	param(
