@@ -10,6 +10,8 @@ New-Module -name install_huntagent -scriptblock {
 
 	# Example:
 	# [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12; (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; installagent alpo1 asdfhrendsa
+	
+	# Logs are stored here: "$($env:TEMP)\huntagentinstall.log"
 
 	Function Install-HuntAgent() {
 		param(
