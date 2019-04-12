@@ -17,5 +17,11 @@ The arguments are after the command *installagent*:
 Example:  
 ```[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12; (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; installagent myhuntinstance asdfasdf```
 
+If you want to troubleshoot or check out what is happening, run in interactive mode or check the log file:
+Add `-Interactive` to the end of the command.
+
+Log can be read here:
+Get-Content "$($env:TEMP)\huntagentinstall.log"
+
 ---
 
