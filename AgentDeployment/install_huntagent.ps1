@@ -1,9 +1,11 @@
 New-Module -name install_huntagent -scriptblock {
-	# Definately Not Malware
 	# Infocyte HUNT scripted installation option. If unfamiliar with this script, contact your IT or Security team.
 	# www.infocyte.com
 
-	# To execute this script as a one liner on a windows host with powershell 2.0+, run this command replacing instancename and key with your hunt instance <mandatory> and registration key [optional]
+	# WARNING: Single line scripted installers like this use similiar techniques to modern staged malware.
+	# As a result, this script will likely trigger behavioral detection products
+
+	# To execute this script as a one liner on a windows host with powershell 3.0+, run this command replacing instancename and key with your hunt instance <mandatory> and registration key [optional]
 	# [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12; (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; installagent <instancename> [regkey]
 
 	# Example:
@@ -64,7 +66,7 @@ New-Module -name install_huntagent -scriptblock {
 		try {
 			$SHA1CryptoProvider = new-object -TypeName system.security.cryptography.SHA1CryptoServiceProvider
 			$inputBytes = [System.IO.File]::ReadAllBytes($agentDestination);
-			$Hash = [System.BitConverter]::ToString($Global:CryptoProvider.SHA1CryptoProvider.ComputeHash($inputBytes))
+			$Hash = [System.BitConverter]::ToString($SHA1CryptoProvider.ComputeHash($inputBytes))
 			$sha1 = $Hash.Replace('-','').ToUpper()
 		} catch {
 			if ($Interactive) { Write-Warning "Hash Error. $_" }
@@ -73,16 +75,21 @@ New-Module -name install_huntagent -scriptblock {
 		}
 
 		# Setup exe arguments
-		$arguments = "--url $hunturl --install"
-		if (-NOT $interactive) { $arguments += " --quiet" }
-		if ($RegKey) { $arguments += " --key $APIKey" }
+		#$arguments = "--url $hunturl --install"
+		#if (-NOT $interactive) { $arguments += " --quiet" }
+		#if ($RegKey) { $arguments += " --key $APIKey" }
+
+		$arguments = @("--install", "--url $hunturl")
+		if ($RegKey) { $arguments += "--key $APIKey" }
+		if (-NOT $interactive) { $arguments += "--quiet" }
 
 		"$(Get-Date) [Information] Installing Agent: Downloading agent.windows.exe from $agentURL [sha1: $sha1] and executing with commandline: $($agentDestination.Substring($agentDestination.LastIndexOf('\')+1)) $arguments" >> $LogPath
 		# Execute!
 		try {
-			& $agentDestination $arguments
+			Start-Process -NoNewWindow -FilePath $agentDestination -ArgumentList $arguments -ErrorAction Stop
+			#& $agentDestination $arguments
 		} catch {
-
+			"$(Get-Date) [Error] Installation Error: Could not start agent.windows.exe. [$_]" >> $LogPath
 		}
 
 	}

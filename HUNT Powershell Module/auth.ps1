@@ -20,12 +20,16 @@ function _DisableSSLVerification {
     [TrustEverything]::SetCallback()
 }
 
-#Get Login Token (required)
+#Get Login Token (required) -- NOTE: Depreciated in the SaaS version
 function New-ICToken {
+	[cmdletbinding()]
 	param(
+		[parameter(Mandatory=$true)]
+		[ValidateNotNullOrEmpty()]
 		[String]
 		$HuntServer = "https://localhost:443",
 
+		[parameter(Mandatory=$true)]
 		[System.Management.Automation.PSCredential]
 		$Credential
 	)
@@ -73,11 +77,17 @@ function New-ICToken {
 	}
 }
 
+
+# Generate an API token in the web console's profile or admin section.
 function Set-ICToken {
-	Param(
+	[cmdletbinding()]
+	param(
+		[parameter(Mandatory=$true)]
+		[ValidateNotNullOrEmpty()]
 		[String]$HuntServer = "https://localhost:443",
 
-		[ValidateNotNullorEmpty]
+		[parameter(Mandatory=$true)]
+		[ValidateNotNullorEmpty()]
 		[String]$Token
 	)
 
