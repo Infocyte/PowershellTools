@@ -77,10 +77,10 @@ New-Module -name install_huntagent -scriptblock {
 		# Setup exe arguments
 		#$arguments = "--url $hunturl --install"
 		#if (-NOT $interactive) { $arguments += " --quiet" }
-		#if ($RegKey) { $arguments += " --key $APIKey" }
+		#if ($RegKey) { $arguments += " --key $RegKey" }
 
 		$arguments = @("--install", "--url $hunturl")
-		if ($RegKey) { $arguments += "--key $APIKey" }
+		if ($RegKey) { $arguments += "--key $RegKey" }
 		if (-NOT $interactive) { $arguments += "--quiet" }
 
 		"$(Get-Date) [Information] Installing Agent: Downloading agent.windows.exe from $agentURL [sha1: $sha1] and executing with commandline: $($agentDestination.Substring($agentDestination.LastIndexOf('\')+1)) $arguments" >> $LogPath
