@@ -3,9 +3,9 @@ New-Module -name install_huntagent -scriptblock {
 	# www.infocyte.com
 
 	# WARNING: Single line scripted installers like this use similiar techniques to modern staged malware.
-	# As a result, this script will likely trigger behavioral detection products
+	# As a result, this script will likely trigger behavioral detection products and may need to be whitelisted.
 
-	# To execute this script as a one liner on a windows host with powershell 3.0+, run this command replacing instancename and key with your hunt instance <mandatory> and registration key [optional]
+	# To execute this script as a one liner on a windows host with powershell 3.0+ (.NET 4.5+), run this command replacing instancename and key with your hunt instance <mandatory> and registration key [optional]. NOTE: Instancename is the cname from the URL, not the FULL url https://instancename.infocyte.com). This script will append the url for you during install.
 	# [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12; (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; installagent <instancename> [regkey]
 
 	# Example:
@@ -27,7 +27,7 @@ New-Module -name install_huntagent -scriptblock {
 		$agentDestination = "$($env:TEMP)\agent.windows.exe"
 		$LogPath = "$($env:TEMP)\huntagentinstall.log"
 		$agentURL = "https://s3.us-east-2.amazonaws.com/infocyte-support/executables/agent.windows.exe"
-		$hunturl = "$InstanceName.infocyte.com"
+		$hunturl = "https://$InstanceName.infocyte.com"
 
 		# Make script silent unless run interactive
 		if (-NOT $Interactive) { $ErrorActionPreference = "silentlycontinue" }
