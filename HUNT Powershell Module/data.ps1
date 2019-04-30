@@ -119,7 +119,7 @@ function Get-ICConnections ([String]$BoxId, [HashTable]$where, [Switch]$All, [Sw
 
 # Get Account objects
 function Get-ICAccounts ([String]$BoxId, [HashTable]$where, [Switch]$NoLimit) {
-  $Endpoint = "BoxAccountInstanceByHost"
+  $Endpoint = "BoxAccountInstancesByHost"
   $filter =  @{
     limit = $resultlimit
     skip = 0
@@ -154,7 +154,6 @@ function Get-ICScripts ([String]$BoxId, [HashTable]$where, [Switch]$NoLimit) {
 
   _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
 }
-
 
 function Get-ICApplications ([String]$BoxId, [HashTable]$where, [Switch]$NoLimit) {
 
@@ -256,34 +255,19 @@ function Get-ICFileDetail {
 function Get-ICAlerts {
   [cmdletbinding()]
   param(
-    [String]$BoxId,
-    [String[]]$flagNames,
+    [Switch]$IncludeArchived,
     [Switch]$NoLimit
   )
 
-  $where = @{
-    and = @(
-      @{ or = @(
-        @{ threatName = "Bad" },
-        @{ threatName = "Blacklist" },
-        @{ flagName = "Verified Bad" })
-      }
-    )
-  }
-  if ($flagNames) {
-    $flagNames | where { $_ -ne $Null -OR $_ -ne "" } | % {
-      $where['and']['or'] += @{ flagName = $_ }
-    }
-  }
-  if ($BoxId) { $where['and'] += @{ boxId = $BoxId } }
+  $Endpoint = "Alerts"
 
-  Get-ICObjects -Type Processes -where $where | where { $_.flagName -ne "Verified Good" }
-  Get-ICObjects -Type Modules -where $where | where { $_.flagName -ne "Verified Good" }
-  Get-ICObjects -Type Drivers -where $where | where { $_.flagName -ne "Verified Good" }
-  Get-ICObjects -Type Memory -where $where | where { $_.flagName -ne "Verified Good" }
-  Get-ICObjects -Type Artifacts -where $where | where { $_.flagName -ne "Verified Good" }
-  Get-ICObjects -Type Autostarts -where $where | where { $_.flagName -ne "Verified Good" }
-  # Get-ICObjects -Type Scripts -where $where
+  $filter =  @{
+    limit = $resultlimit
+    skip = 0
+    where = @{ archived = $FALSE }
+  }
+  if ($IncludeArchived) { $filter.Remove('where') }
+  _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
 }
 
 function Get-ICReports {
