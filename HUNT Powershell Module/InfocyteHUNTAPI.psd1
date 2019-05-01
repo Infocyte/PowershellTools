@@ -76,6 +76,7 @@ FunctionsToExport = @(
   "Get-ICScripts",
   "Get-ICApplications",
   "Get-ICVulnerabilities",
+  "Get-ICActivityTrace",
   "Get-ICFileDetail",
   "New-ICToken",
   "Set-ICToken",

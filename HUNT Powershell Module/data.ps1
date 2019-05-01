@@ -292,3 +292,48 @@ function Get-ICReports {
 
   _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
 }
+
+function Get-ICActivityTrace {
+  [cmdletbinding()]
+  param(
+    [String]$AccountId,
+    [String]$SHA1,
+    [String]$HostId,
+    [DateTime]$StartTime,
+    [DateTime]$EndTime,
+    [Switch]$Enriched,
+    [Switch]$NoLimit
+  )
+
+  if (-NOT $StartTime) { $StartTime = (Get-Date).AddDays(-30) }
+  if (-NOT $EndTime) { $EndTime = Get-Date }
+
+  $Endpoint = "activity"
+  $filter =  @{
+    limit = $resultlimit
+    skip = 0
+    where = @{
+      eventTime = @{
+        gt = (Get-Date $StartTime -format "o")
+        lt = (Get-Date $EndTime -format "o")
+      }
+    }
+  }
+
+  if ($SHA1) {
+    $filter['where']['fileRepId'] = $SHA1
+  }
+  elseif ($AccountId) {
+    $filter['where']['accountId'] = $AccountId
+  }
+  elseif ($HostId) {
+    $filter['where']['hostId'] = $HostId
+  }
+
+  if ($enriched) {
+
+  } else {
+    _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
+  }
+
+}
