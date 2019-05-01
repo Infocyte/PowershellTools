@@ -7,10 +7,10 @@ if ($PSVersionTable.PSVersion.Major -lt 5) {
   Write-Warning "Powershell Version not supported. Install version 5.x or higher"
 } else {
   Write-Host "Checking PSVersion [Minimum Supported: 5.0]: PASSED [$PS]!`n"
-  Write-Host "Pass your Hunt Server credentials into New-ICToken to connect to an instance of HUNT. This will store your login token and server into a global variable for use by the other commands"
+  Write-Host "Pass your Hunt Server credentials into Set-ICToken to connect to an instance of HUNT. This will store your login token and server into a global variable for use by the other commands"
   Write-Host "`n"
   Write-Host "Authentication Functions:"
-  Write-Host -ForegroundColor Cyan "`tNew-ICToken, Set-ICToken`n"
+  Write-Host -ForegroundColor Cyan "`tNew-ICToken (depreciated / On-Prem only), Set-ICToken`n"
   Write-Host "Target Group Management Functions:"
   Write-Host -ForegroundColor Cyan "`tNew-ICTargetGroup, Get-ICTargetGroups, Remove-ICTargetGroup, New-ICCredential, Get-ICCredentials, New-ICQuery, Get-ICQueries, Get-ICAddresses, Remove-ICAddresses`n"
   Write-Host "HUNT Server Status Functions:"
@@ -35,7 +35,7 @@ if ($PSVersionTable.PSVersion.Major -lt 5) {
   Write-Host "- Time Boxes are Last 7, 30, and 90 Day filters for all data within range"
   Write-Host "- Results are capped at $resultlimit results unless you use -NoLimit on functions that support it`n"
   Write-Host "Example:"
-  Write-Host -ForegroundColor Cyan 'PS> New-ICToken -HuntServer "https://myserver.infocyte.com"'
+  Write-Host -ForegroundColor Cyan 'PS> Set-ICToken -HuntServer "https://myserver.infocyte.com" -Token ASDFASDASFASDASF'
   Write-Host -ForegroundColor Cyan 'PS> $Box = Get-ICBoxes -Last30 | where { $_.TargetGroup -eq "Brooklyn Office"}'
   Write-Host -ForegroundColor Cyan 'PS> Get-ICObjects -Type Processes -BoxId $Box.Id'
 

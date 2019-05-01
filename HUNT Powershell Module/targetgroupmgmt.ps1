@@ -86,7 +86,7 @@ function Get-ICAddresses ([String]$TargetGroupId, [Switch]$NoLimit) {
 		skip = 0
 	}
   if ($TargetGroupId) {
-    $filter['where'] = @{ targetid = $TargetGroupId }
+    $filter['where'] = @{ targetId = $TargetGroupId }
     Write-Verbose "Getting all addresses from TargetGroup $TargetGroupId"
   }
   _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit

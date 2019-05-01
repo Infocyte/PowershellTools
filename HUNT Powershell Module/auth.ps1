@@ -20,12 +20,16 @@ function _DisableSSLVerification {
     [TrustEverything]::SetCallback()
 }
 
-#Get Login Token (required)
+#Get Login Token (required) -- NOTE: Depreciated in the SaaS version
 function New-ICToken {
+	[cmdletbinding()]
 	param(
+		[parameter(Mandatory=$true)]
+		[ValidateNotNullOrEmpty()]
 		[String]
 		$HuntServer = "https://localhost:443",
 
+		[parameter(Mandatory=$true)]
 		[System.Management.Automation.PSCredential]
 		$Credential
 	)
@@ -73,18 +77,37 @@ function New-ICToken {
 	}
 }
 
+
+# Generate an API token in the web console's profile or admin section.
 function Set-ICToken {
-	Param(
+	[cmdletbinding()]
+	param(
+		[parameter(Mandatory=$true)]
+		[ValidateNotNullOrEmpty()]
 		[String]$HuntServer = "https://localhost:443",
 
-		[ValidateNotNullorEmpty]
+		[parameter(Mandatory=$true)]
+		[ValidateNotNullorEmpty()]
 		[String]$Token
 	)
 
+	[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+	_DisableSSLVerification
+
+	if ($HuntServer -notlike "https://*") {
+		$Global:HuntServerAddress = "https://" + $HuntServer
+	} else {
+		$Global:HuntServerAddress = $HuntServer
+	}
+
+	# Set Token to global variable
+	if ($Token.length -eq 64) {
+			$Global:ICToken = $Token
+	} else {
+		Write-Warning "That token won't work. Must be a 64 character string generated within your profile or admin panel within Infocyte HUNT's web console"
+		return
+	}
 	Write-Host "Setting Auth Token for $HuntServer to $Token"
 	Write-Verbose "Token and Hunt Server Address are stored in global variables for use in all IC cmdlets"
 
-	# Set Token to global variable
-	$Global:ICToken = $Token
-	$Global:HuntServerAddress = $HuntServer
 }

@@ -5,15 +5,16 @@ Tested on Powershell Version: 5.0
 Import the module:
 > PS> Import-Module .\InfocyteHUNTAPI.psd1
 
-Pass your Hunt Server credentials into New-ICToken to connect to your HUNT server
+Create an API token in the Web Console within your profile or admin panel.
+Use Set-ICToken to connect to your HUNT server and set your API token.
 Example:
-> PS> New-ICToken -HuntServer "https://myserver.infocyte.com"
+> PS> Set-ICToken -HuntServer "https://myserver.infocyte.com" -Token ASASDFASDFSASDF12123
 
 This will store your login token and server into a global variable for use by the other commands
 
 Authentication Functions:
 
-    New-ICToken (Input: HuntServer, Credential)
+    New-ICToken (Input: HuntServer, Credential) <-- Depreciated in SaaS version, still used with on-prem
     Set-ICToken (Input: HuntServer, Token)
 
 Target Group Management Functions:
