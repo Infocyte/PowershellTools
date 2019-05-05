@@ -14,7 +14,7 @@ if ($PSVersionTable.PSVersion.Major -lt 5) {
   Write-Host "Target Group Management Functions:"
   Write-Host -ForegroundColor Cyan "`tNew-ICTargetGroup, Get-ICTargetGroups, Remove-ICTargetGroup, New-ICCredential, Get-ICCredentials, New-ICQuery, Get-ICQueries, Get-ICAddresses, Remove-ICAddresses`n"
   Write-Host "HUNT Server Status Functions:"
-  Write-Host -ForegroundColor Cyan "`tGet-ICUserActivity, Get-ICJobs, Get-ICUserTasks, Get-ICUserTaskItems, Get-ICUserTaskItemProgress`n"
+  Write-Host -ForegroundColor Cyan "`tGet-ICUserActivity, Get-ICUserTasks, Get-ICUserTaskItems, Get-ICUserTaskItemProgress`n"
   Write-Host "Data Export Functions:"
   Write-Host -ForegroundColor Cyan "`tGet-ICBoxes, Get-ICScans, Get-ICObjects, Get-ICConnections, Get-ICScripts, Get-ICAccounts, Get-ICApplications, Get-ICVulnerabilities, Get-ICAlerts, Get-ICActivityTrace, Get-ICFileDetail`n"
   Write-Host "Scanning Functions:"

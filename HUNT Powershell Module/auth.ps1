@@ -92,7 +92,6 @@ function Set-ICToken {
 	)
 
 	[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-	_DisableSSLVerification
 
 	if ($HuntServer -notlike "https://*") {
 		$Global:HuntServerAddress = "https://" + $HuntServer

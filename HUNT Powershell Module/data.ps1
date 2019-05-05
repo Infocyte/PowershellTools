@@ -77,24 +77,32 @@ function Get-ICObjects {
                 }
     }
   }
-  if ($Endpoint) {
-    $filter =  @{
-      order = "hostCompletedOn desc"
-      limit = $resultlimit
-      skip = 0
-      where = @{ and = @() }
-    }
-
-    if ($where) {
+  $filter =  @{
+    order = "hostCompletedOn desc"
+    limit = $resultlimit
+    skip = 0
+    where = @{ and = @() }
+  }
+  if ($where.count -gt 0) {
+    if ($where.keys -contains "and") {
       $filter['where'] = $where
     } else {
-      if ($scanId) { $filter.where['and'] += @{ scanId = $scanId } }
-      elseif ($BoxId) { $filter.where['and'] += @{ boxId = $BoxId } }
-      elseif ($TargetGroupId) { $filter.where['and'] += @{ targetId = $TargetGroupId } }
+      $where | % {
+        $filter['where']['and'] += $_
+      }
     }
-
-    _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
+    if ($BoxId -AND ($filter['where']['and'].keys -notcontains 'boxId')) {
+      $filter['where']['and'] += @{ boxId = $BoxId }
+    }
+  } else {
+    if ($BoxId) { $filter['where']['and'] += @{ boxId = $BoxId } }
   }
+
+  if ($scanId) { $filter.where['and'] += @{ scanId = $scanId } }
+  elseif ($BoxId) { $filter.where['and'] += @{ boxId = $BoxId } }
+  elseif ($TargetGroupId) { $filter.where['and'] += @{ targetId = $TargetGroupId } }
+
+  _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
 }
 
 # Get Connection objects
@@ -103,16 +111,26 @@ function Get-ICConnections ([String]$BoxId, [HashTable]$where, [Switch]$All, [Sw
   $filter =  @{
     limit = $resultlimit
     skip = 0
+    where = @{ and = @() }
   }
-  if (-NOT $where) {
-    $filter['where'] = @{
-      and = @()
+
+  if ($where.count -gt 0) {
+    if ($where.keys -contains "and") {
+      $filter['where'] = $where
+    } else {
+      $where | % {
+        $filter['where']['and'] += $_
+      }
     }
-    if ($BoxId) { $filter.where['and'] += @{ boxId = $BoxId } }
-    if (-NOT $All) { $filter.where['and'] += @{ state = "ESTABLISHED"} }
+    if ($BoxId -AND ($filter['where']['and'].keys -notcontains 'boxId')) {
+      $filter['where']['and'] += @{ boxId = $BoxId }
+    }
+
   } else {
-    $filter['where'] = $where
+    if ($BoxId) { $filter['where']['and'] += @{ boxId = $BoxId } }
   }
+
+  if (-NOT $All) { $filter.where['and'] += @{ state = "ESTABLISHED"} }
 
   _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
 }
@@ -123,15 +141,25 @@ function Get-ICAccounts ([String]$BoxId, [HashTable]$where, [Switch]$NoLimit) {
   $filter =  @{
     limit = $resultlimit
     skip = 0
+    where = @{ and = @() }
   }
-  if (-NOT $where) {
-    $filter['where'] = @{
-      and = @()
+
+  if ($where.count -gt 0) {
+    if ($where.keys -contains "and") {
+      $filter['where'] = $where
+    } else {
+      $where | % {
+        $filter['where']['and'] += $_
+      }
     }
-    if ($BoxId) { $filter.where['and'] += @{ boxId = $BoxId } }
+    if ($BoxId -AND ($filter['where']['and'].keys -notcontains 'boxId')) {
+      $filter['where']['and'] += @{ boxId = $BoxId }
+    }
+
   } else {
-    $filter['where'] = $where
+    if ($BoxId) { $filter['where']['and'] += @{ boxId = $BoxId } }
   }
+
 
   _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
 }
@@ -139,17 +167,28 @@ function Get-ICAccounts ([String]$BoxId, [HashTable]$where, [Switch]$NoLimit) {
 # Get Script objects
 function Get-ICScripts ([String]$BoxId, [HashTable]$where, [Switch]$NoLimit) {
   $Endpoint = "BoxScriptInstances"
+
   $filter =  @{
     limit = $resultlimit
+    order = "scannedOn desc"
     skip = 0
+    where = @{ and = @() }
   }
-  if (-NOT $where) {
-    $filter['where'] = @{
-      and = @()
+
+  if ($where.count -gt 0) {
+    if ($where.keys -contains "and") {
+      $filter['where'] = $where
+    } else {
+      $where | % {
+        $filter['where']['and'] += $_
+      }
     }
-    if ($BoxId) { $filter.where['and'] += @{ boxId = $BoxId } }
+    if ($BoxId -AND ($filter['where']['and'].keys -notcontains 'boxId')) {
+      $filter['where']['and'] += @{ boxId = $BoxId }
+    }
+
   } else {
-    $filter['where'] = $where
+    if ($BoxId) { $filter['where']['and'] += @{ boxId = $BoxId } }
   }
 
   _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
@@ -160,15 +199,32 @@ function Get-ICApplications ([String]$BoxId, [HashTable]$where, [Switch]$NoLimit
   $Endpoint = "BoxApplicationInstances"
   $filter =  @{
     limit = $resultlimit
+    order = "scannedOn desc"
     skip = 0
+    where = @{ and = @() }
   }
-  if (-NOT $where) {
-    $where = @{}
-    if ($BoxId) { $where['boxId'] = $BoxId }
+
+  if ($where.count -gt 0) {
+    if ($where.keys -contains "and") {
+      $filter['where'] = $where
+    } else {
+      $where | % {
+        $filter['where']['and'] += $_
+      }
+    }
+    if ($BoxId -AND ($filter['where']['and'].keys -notcontains 'boxId')) {
+      $filter['where']['and'] += @{ boxId = $BoxId }
+    }
+
+  } else {
+    if ($BoxId) { $filter['where']['and'] += @{ boxId = $BoxId } }
   }
-  if ($where.count -gt 0) { $filter['where'] = $where }
+
+  $filter['where']['and'] += @{ name = @{ nilike = "KB" }}
+  $filter['where']['and'] += @{ name = @{ nilike = "Update for" }}
+
   $apps = _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
-  $apps | where { $_.name -notmatch "KB|Update for" } | Sort-Object hostname, applicationId -unique
+  $apps | Sort-Object hostname, applicationId -unique
 }
 
 function Get-ICVulnerabilities {
@@ -312,22 +368,23 @@ function Get-ICActivityTrace {
   $filter =  @{
     limit = $resultlimit
     skip = 0
+    order = @("eventTime desc")
     where = @{
-      eventTime = @{
-        gt = (Get-Date $StartTime -format "o")
-        lt = (Get-Date $EndTime -format "o")
-      }
+      and = @(
+        @{ eventTime = @{ gt = (Get-Date $StartTime -Format "yyyy-MM-dd HH:mm:ss") } },
+        @{ eventTime = @{ lt = (Get-Date $EndTime -Format "yyyy-MM-dd HH:mm:ss") } }
+      )
     }
   }
 
   if ($SHA1) {
-    $filter['where']['fileRepId'] = $SHA1
+    $filter['where']['and'] += @{ fileRepId = $SHA1 }
   }
   elseif ($AccountId) {
-    $filter['where']['accountId'] = $AccountId
+    $filter['where']['and'] += @{ accountId = $AccountId }
   }
   elseif ($HostId) {
-    $filter['where']['hostId'] = $HostId
+    $filter['where']['and'] += @{ hostId = $HostId }
   }
 
   if ($enriched) {

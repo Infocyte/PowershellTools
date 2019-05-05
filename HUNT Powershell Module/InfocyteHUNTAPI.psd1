@@ -91,7 +91,6 @@ FunctionsToExport = @(
   "Remove-ICAddresses",
   "Get-ICScans",
   "Get-ICUserActivity",
-  "Get-ICJobs",
   "Get-ICUserTasks",
   "Get-ICBoxes",
   "Get-ICFlagColorCodes",
