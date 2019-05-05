@@ -129,7 +129,7 @@ function Get-ICScans ([String]$TargetGroupId, $TargetGroupName, [Switch]$NoLimit
   _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
 }
 
-function Get-ICBoxes ([Switch]$Last90, [Switch]$Last7, [Switch]$Last30, [Switch]$IncludeDeleted, [String]$targetGroupId, [Switch]$NoLimit) {
+function Get-ICBoxes ([Switch]$Last90, [Switch]$Last7, [Switch]$Last30, [Switch]$IncludeDeleted, [Switch]$Global, [String]$targetGroupId, [Switch]$NoLimit) {
   $Endpoint = "Boxes"
   $filter =  @{
     limit = $resultlimit
@@ -151,9 +151,9 @@ function Get-ICBoxes ([Switch]$Last90, [Switch]$Last7, [Switch]$Last30, [Switch]
   if ($targetGroupId) {
     $filter.where['and'] += @{ targetId = $targetGroupId }
   }
-  #elseif ($where['name'] -AND (-NOT $targetGroupId)) {
-  #  $filter.where['and'] += @{ targetId = $null }
-  #}
+  elseif ($Global) {
+    $filter.where['and'] += @{ targetId = $null }
+  }
 
   $boxes = _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
   $TargetGroups = Get-ICTargetGroups

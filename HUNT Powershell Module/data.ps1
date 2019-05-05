@@ -4,7 +4,20 @@ function Get-ICObjects {
   [cmdletbinding()]
   param(
     [parameter(Mandatory=$true)]
-    [ValidateNotNullOrEmpty()]
+    [ValidateSet(
+      "Processes",
+      "Modules",
+      "Drivers",
+      "Memory",
+      "Artifacts",
+      "Autostarts",
+      "Hosts",
+      "Connections",
+      "Applications",
+      "Vulnerabilities",
+      "Accounts",
+      "Scripts"
+    )]
     [String]$Type,
 
     [String]$TargetGroupId,
@@ -14,95 +27,74 @@ function Get-ICObjects {
     [Switch]$NoLimit
   )
 
-  $ObjTypes = @(
-    "Processes"
-    "Modules"
-    "Drivers"
-    "Memory"
-    "Artifacts"
-    "Autostarts"
-    "Hosts"
-    "Connections"
-    "Applications"
-    "Vulnerabilities"
-    "Accounts"
-    "Scripts"
-  )
-  if (-NOT $Type) {
-    Write-Warning "Choose an object type to retrieve using -Type:"
-    Write-Warning "$ObjTypes"
-    return
-  } else {
-    switch ( $Type ) {
-        "Processes" { $Endpoint = 'IntegrationProcesses'    }
-        "Modules" { $Endpoint = 'IntegrationModules'    }
-        "Drivers" { $Endpoint = 'IntegrationDrivers'   }
-        "Memory" { $Endpoint = 'IntegrationMemScans' }
-        "Artifacts" { $Endpoint = 'IntegrationArtifacts'  }
-        "Autostarts" { $Endpoint = 'IntegrationAutostarts' }
-        "Hosts" { $Endpoint = 'IntegrationHosts'  }
-        "Accounts" { # Write-Warning "This type is not yet supported by the Integration APIs. Use Get-ICAccounts"
-                      if ($where -AND $BoxId) { Get-ICAccounts -BoxId $BoxId -where $where -NoLimit:$NoLimit }
-                      elseif ($where) { Get-ICAccounts -where $where -NoLimit:$NoLimit }
-                      elseif ($BoxId) { Get-ICAccounts -BoxId $BoxId -NoLimit:$NoLimit}
-                      elseif ($ScanId) { Write-Warning "This type does not yet support ScanId. Use BoxId." }
-                    }
-        "Scripts" { # Write-Warning "This type is not yet supported by the Integration APIs. Use Get-ICScripts"
-                      if ($where -AND $BoxId) { Get-ICScripts -BoxId $BoxId -where $where -NoLimit:$NoLimit }
-                      elseif ($where) { Get-ICScripts -where $where -NoLimit:$NoLimit }
-                      elseif ($BoxId) { Get-ICScripts -BoxId $BoxId -NoLimit:$NoLimit}
+  switch ( $Type ) {
+    "Processes" { $Endpoint = 'IntegrationProcesses'    }
+    "Modules" { $Endpoint = 'IntegrationModules'    }
+    "Drivers" { $Endpoint = 'IntegrationDrivers'   }
+    "Memory" { $Endpoint = 'IntegrationMemScans' }
+    "Artifacts" { $Endpoint = 'IntegrationArtifacts'  }
+    "Autostarts" { $Endpoint = 'IntegrationAutostarts' }
+    "Hosts" { $Endpoint = 'IntegrationHosts'  }
+    "Accounts" { # Write-Warning "This type is not yet supported by the Integration APIs. Use Get-ICAccounts"
+                  if ($where -AND $BoxId) { Get-ICAccounts -BoxId $BoxId -where $where -NoLimit:$NoLimit }
+                  elseif ($where) { Get-ICAccounts -where $where -NoLimit:$NoLimit }
+                  elseif ($BoxId) { Get-ICAccounts -BoxId $BoxId -NoLimit:$NoLimit}
+                  elseif ($ScanId) { Write-Warning "This type does not yet support ScanId. Use BoxId." }
+                }
+    "Scripts" { # Write-Warning "This type is not yet supported by the Integration APIs. Use Get-ICScripts"
+                  if ($where -AND $BoxId) { Get-ICScripts -BoxId $BoxId -where $where -NoLimit:$NoLimit }
+                  elseif ($where) { Get-ICScripts -where $where -NoLimit:$NoLimit }
+                  elseif ($BoxId) { Get-ICScripts -BoxId $BoxId -NoLimit:$NoLimit}
+                  elseif ($ScanId) { Write-Warning "This type does not yet support ScanId. Use BoxId." }
+              }
+    "Connections" { # Write-Warning "This type is not yet supported by the Integration APIs. Use Get-ICConnections"
+                    if ($where -AND $BoxId) { Get-ICConnections -BoxId $BoxId -where $where -NoLimit:$NoLimit }
+                    elseif ($where) { Get-ICConnections -where $where -NoLimit:$NoLimit }
+                    elseif ($BoxId) { Get-ICConnections -BoxId $BoxId -NoLimit:$NoLimit}
+                    elseif ($ScanId) { Write-Warning "This type does not yet support ScanId. Use BoxId." }
+                  }
+    "Applications" { # Write-Warning "This type is not yet supported by the Integration APIs. Use Get-ICApplications"
+                      if ($where -AND $BoxId) { Get-ICApplications -BoxId $BoxId -where $where -NoLimit:$NoLimit }
+                      elseif ($where) { Get-ICApplications -where $where -NoLimit:$NoLimit }
+                      elseif ($BoxId) { Get-ICApplications -BoxId $BoxId -NoLimit:$NoLimit}
                       elseif ($ScanId) { Write-Warning "This type does not yet support ScanId. Use BoxId." }
                   }
-        "Connections" { # Write-Warning "This type is not yet supported by the Integration APIs. Use Get-ICConnections"
-                        if ($where -AND $BoxId) { Get-ICConnections -BoxId $BoxId -where $where -NoLimit:$NoLimit }
-                        elseif ($where) { Get-ICConnections -where $where -NoLimit:$NoLimit }
-                        elseif ($BoxId) { Get-ICConnections -BoxId $BoxId -NoLimit:$NoLimit}
+    "Vulnerabilities" { # Write-Warning "This type is not yet supported by the Integration APIs. Use Get-ICVulnerabilities"
+                        if ($where -AND $BoxId) { Get-ICVulnerabilities -BoxId $BoxId -where $where -NoLimit:$NoLimit }
+                        elseif ($where) { Get-ICVulnerabilities -where $where -NoLimit:$NoLimit }
+                        elseif ($BoxId) { Get-ICVulnerabilities -BoxId $BoxId -NoLimit:$NoLimit}
                         elseif ($ScanId) { Write-Warning "This type does not yet support ScanId. Use BoxId." }
                       }
-        "Applications" { # Write-Warning "This type is not yet supported by the Integration APIs. Use Get-ICApplications"
-                          if ($where -AND $BoxId) { Get-ICApplications -BoxId $BoxId -where $where -NoLimit:$NoLimit }
-                          elseif ($where) { Get-ICApplications -where $where -NoLimit:$NoLimit }
-                          elseif ($BoxId) { Get-ICApplications -BoxId $BoxId -NoLimit:$NoLimit}
-                          elseif ($ScanId) { Write-Warning "This type does not yet support ScanId. Use BoxId." }
-                      }
-        "Vulnerabilities" { # Write-Warning "This type is not yet supported by the Integration APIs. Use Get-ICVulnerabilities"
-                            if ($where -AND $BoxId) { Get-ICVulnerabilities -BoxId $BoxId -where $where -NoLimit:$NoLimit }
-                            elseif ($where) { Get-ICVulnerabilities -where $where -NoLimit:$NoLimit }
-                            elseif ($BoxId) { Get-ICVulnerabilities -BoxId $BoxId -NoLimit:$NoLimit}
-                            elseif ($ScanId) { Write-Warning "This type does not yet support ScanId. Use BoxId." }
-                          }
-        Default { Write-Warning "Choose an object type to retrieve using -Type:";
-                  Write-Warning "$ObjTypes";
-                  throw "$Type is not an object type in HUNT."
-                }
+    Default { }
+  }
+  if ($Endpoint) {
+    $filter =  @{
+      order = "hostCompletedOn desc"
+      limit = $resultlimit
+      skip = 0
+      where = @{ and = @() }
     }
-  }
-  $filter =  @{
-    order = "hostCompletedOn desc"
-    limit = $resultlimit
-    skip = 0
-    where = @{ and = @() }
-  }
-  if ($where.count -gt 0) {
-    if ($where.keys -contains "and") {
-      $filter['where'] = $where
-    } else {
-      $where | % {
-        $filter['where']['and'] += $_
+    if ($where.count -gt 0) {
+      if ($where.keys -contains "and") {
+        $filter['where'] = $where
+      } else {
+        $where | % {
+          $filter['where']['and'] += $_
+        }
       }
+      if ($BoxId -AND ($filter['where']['and'].keys -notcontains 'boxId')) {
+        $filter['where']['and'] += @{ boxId = $BoxId }
+      }
+    } else {
+      if ($BoxId) { $filter['where']['and'] += @{ boxId = $BoxId } }
     }
-    if ($BoxId -AND ($filter['where']['and'].keys -notcontains 'boxId')) {
-      $filter['where']['and'] += @{ boxId = $BoxId }
-    }
-  } else {
-    if ($BoxId) { $filter['where']['and'] += @{ boxId = $BoxId } }
+
+    if ($scanId) { $filter.where['and'] += @{ scanId = $scanId } }
+    elseif ($BoxId) { $filter.where['and'] += @{ boxId = $BoxId } }
+    elseif ($TargetGroupId) { $filter.where['and'] += @{ targetId = $TargetGroupId } }
+
+    _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
   }
-
-  if ($scanId) { $filter.where['and'] += @{ scanId = $scanId } }
-  elseif ($BoxId) { $filter.where['and'] += @{ boxId = $BoxId } }
-  elseif ($TargetGroupId) { $filter.where['and'] += @{ targetId = $TargetGroupId } }
-
-  _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
 }
 
 # Get Connection objects
@@ -220,8 +212,8 @@ function Get-ICApplications ([String]$BoxId, [HashTable]$where, [Switch]$NoLimit
     if ($BoxId) { $filter['where']['and'] += @{ boxId = $BoxId } }
   }
 
-  $filter['where']['and'] += @{ name = @{ nilike = "KB" }}
-  $filter['where']['and'] += @{ name = @{ nilike = "Update for" }}
+  $filter['where']['and'] += @{ name = @{ nilike = "*KB/d*" }}
+  $filter['where']['and'] += @{ name = @{ nilike = "*Update for*" }}
 
   $apps = _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
   $apps | Sort-Object hostname, applicationId -unique
