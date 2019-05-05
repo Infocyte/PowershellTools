@@ -138,12 +138,22 @@ function Get-ICBoxes ([Switch]$Last90, [Switch]$Last7, [Switch]$Last30, [Switch]
   }
 
 
-  if ($Last90) { $filter.where['and'] += @{ name = "Last 90 days" }
-  elseif ($Last30) { $filter.where['and'] += @{ name = "Last 30 days" }
-  elseif ($Last7) { $filter.where['and'] += @{ name = "Last 7 days" }
+  if ($Last90) {
+    $filter.where['and'] += @{ name = "Last 90 days" }
+  }
+  elseif ($Last30) {
+    $filter.where['and'] += @{ name = "Last 30 days" }
+  }
+  elseif ($Last7) {
+    $filter.where['and'] += @{ name = "Last 7 days" }
+  }
 
-  if ($targetGroupId) { $filter.where['and'] += @{ targetId = $targetGroupId }
-  elseif ($where['name'] -AND (-NOT $targetGroupId)) { $filter.where['and'] += @{ targetId = $null }
+  if ($targetGroupId) {
+    $filter.where['and'] += @{ targetId = $targetGroupId }
+  }
+  #elseif ($where['name'] -AND (-NOT $targetGroupId)) {
+  #  $filter.where['and'] += @{ targetId = $null }
+  #}
 
   $boxes = _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
   $TargetGroups = Get-ICTargetGroups
