@@ -261,6 +261,7 @@ function Get-ICAlerts {
   [cmdletbinding()]
   param(
     [Switch]$IncludeArchived,
+    [HashTable]$Where,
     [Switch]$NoLimit
   )
 
@@ -269,9 +270,19 @@ function Get-ICAlerts {
   $filter =  @{
     limit = $resultlimit
     skip = 0
-    where = @{ archived = $FALSE }
+    where = @{
+      and = @()
+    }
   }
-  if ($IncludeArchived) { $filter.Remove('where') }
+  if (-NOT $IncludeArchived) {
+    $filter.where['and'] += @{ archived = $FALSE }
+  }
+  if ($where.count -gt 0) {
+    $where | % {
+      $filter['where']['and'] += $_
+    }
+  }
+  
   _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
 }
 

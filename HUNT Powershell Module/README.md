@@ -32,7 +32,6 @@ Target Group Management Functions:
 HUNT Server Status Functions:
 
     Get-ICScans
-    Get-ICJobs
     Get-ICUserTasks
     Get-ICLastScanId
 

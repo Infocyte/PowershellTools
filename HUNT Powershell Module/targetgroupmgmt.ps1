@@ -78,15 +78,24 @@ function Get-ICCredentials ($CredentialId) {
   }
 }
 
-function Get-ICAddresses ([String]$TargetGroupId, [Switch]$NoLimit) {
+function Get-ICAddresses ([String]$TargetGroupId, [HashTable]$Where, [Switch]$NoLimit) {
   $Endpoint = "Addresses"
 	$filter =  @{
 		order = "lastAccessedOn"
 		limit = $resultlimit
 		skip = 0
+    where = @{
+      and = @()
+    }
 	}
+  if ($where.count -gt 0) {
+    $where | % {
+      $filter['where']['and'] += $_
+    }
+  }
+
   if ($TargetGroupId) {
-    $filter['where'] = @{ targetId = $TargetGroupId }
+    $filter['where']['and'] += @{ targetId = $TargetGroupId }
     Write-Verbose "Getting all addresses from TargetGroup $TargetGroupId"
   }
   _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
@@ -109,19 +118,28 @@ function Remove-ICAddresses {
 	_ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method DELETE
 }
 
-function Get-ICScans ([String]$TargetGroupId, $TargetGroupName, [Switch]$NoLimit) {
+function Get-ICScans ([String]$TargetGroupId, $TargetGroupName, [HashTable]$Where, [Switch]$NoLimit) {
   $Endpoint = "IntegrationScans"
   $filter =  @{
     order = "scanCompletedOn desc"
     limit = $resultlimit
     skip = 0
+    where = @{
+      and = @()
+    }
   }
+  if ($where.count -gt 0) {
+    $where | % {
+      $filter['where']['and'] += $_
+    }
+  }
+
   if ($TargetGroupId) {
     $tgname = (Get-ICTargetGroups -TargetGroupId $TargetGroupId).name
-    $filter['where'] = @{ targetList = $tgname }
+    $filter['where']['and'] += @{ targetList = $tgname }
     Write-Verbose "Getting Scans against Target Group $TargetGroup [$TargetGroupId] from $HuntServerAddress"
   } elseif ($TargetGroupName) {
-      $filter['where'] = @{ targetList = $TargetGroupName }
+      $filter['where']['and'] += @{ targetList = $TargetGroupName }
       Write-Verbose "Getting Scans against $TargetGroupName from $HuntServerAddress"
   } else {
     Write-Verbose "Getting Scans from $HuntServerAddress"
