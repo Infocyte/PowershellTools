@@ -85,12 +85,14 @@ FunctionsToExport = @(
   "Remove-ICTargetGroup",
   "New-ICCredential",
   "Get-ICCredentials",
+  "Remove-ICCredential",
   "New-ICQuery",
   "Get-ICQueries",
+  "Remove-ICQuery",
   "Get-ICAddresses",
   "Remove-ICAddresses",
   "Get-ICScans",
-  "Get-ICUserActivity",
+  "Get-ICUserAuditLogs",
   "Get-ICUserTasks",
   "Get-ICBoxes",
   "Get-ICFlagColorCodes",
@@ -103,7 +105,6 @@ FunctionsToExport = @(
   "Get-ICScanSchedule",
   "Remove-ICScanSchedule",
   "Get-ICUserTaskItems",
-  "Get-ICUserTaskItemProgress",
   "Get-ICReports"
 )
 

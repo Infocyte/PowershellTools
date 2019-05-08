@@ -25,8 +25,8 @@ function Get-ICJobs ([Switch]$All, [HashTable]$Where, [Switch]$NoLimit) {
 	_ICGetMethod -url $url -filter $filter -NoLimit:$NoLimit
 }
 
-# Get Infocyte HUNT Jobs (Active jobs or all jobs)
-function Get-ICUserActivity ([Switch]$NoLimit) {
+# Get Infocyte HUNT User Audit Logs
+function Get-ICUserAuditLogs ([Switch]$NoLimit, [HashTable]$Where) {
 	$url = ("$HuntServerAddress/api/useractivities")
 	$filter =  @{
 		order = "createdOn"
@@ -39,7 +39,7 @@ function Get-ICUserActivity ([Switch]$NoLimit) {
 			$filter['where']['and'] += $_
 		}
 	}
-		Write-Verbose "Getting User Activity from Infocyte HUNT: $HuntServer"
+		Write-Verbose "Getting User Activity Logs from Infocyte HUNT: $HuntServer"
 	_ICGetMethod -url $url -filter $filter -NoLimit:$NoLimit
 }
 
@@ -86,7 +86,7 @@ function Get-ICUserTaskItems {
 		[ValidateNotNullOrEmpty()]
 		[String]$UserTaskId,
 
-		[Switch]$Detailed,
+		[Switch]$IncludeProgress,
 
 		[HashTable]$Where,
 
@@ -96,6 +96,7 @@ function Get-ICUserTaskItems {
 	$filter =  @{
 		limit = $resultlimit
 		skip = 0
+		order = "updatedOn"
 		where = @{
 			and = @( @{ userTaskId = $UserTaskId } )
 		}
@@ -108,8 +109,14 @@ function Get-ICUserTaskItems {
 
 	Write-Verbose "Getting All User Task Items from Infocyte HUNT: $HuntServer"
 	$url = ("$HuntServerAddress/api/userTaskItems")
-	if ($Detailed) {
-		# TODO
+	if ($IncludeProgress) {
+		$items = _ICGetMethod -url $url -filter $filter -NoLimit:$NoLimit
+		$items | foreach {
+			$progress = @()
+			Get-ICUserTaskItemProgress -taskItemId $_.id | foreach { $progress += "$($_.createdOn) $($_.text)" }
+			$_ | Add-Member -MemberType "NoteProperty" -name "progress" -value $progress
+		}
+		$items
 	} else {
 		_ICGetMethod -url $url -filter $filter -NoLimit:$NoLimit
 	}
@@ -126,7 +133,7 @@ function Get-ICUserTaskItemProgress {
 
 	$url = ("$HuntServerAddress/api/userTaskItemProgresses")
 	$filter =  @{
-		order = @("createdOn asc", "id")
+		order = @("createdOn desc", "id")
 		limit = $resultlimit
 		skip = 0
 		where = @{

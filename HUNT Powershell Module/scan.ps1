@@ -52,6 +52,18 @@ function Get-ICQueries ([String]$TargetGroupId) {
   _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$true
 }
 
+function Remove-ICQuery {
+  param(
+    [parameter(Mandatory=$true, Position=0)]
+    [ValidateNotNullOrEmpty()]
+    [String]$QueryId
+  )
+
+  $Endpoint = "queries/$QueryId"
+  Write-Warning "Removing query [$HuntServerAddress/api/$Endpoint]."
+  _ICRestMethod -url $HuntServerAddress/api/$Endpoint -method 'DELETE'
+}
+
 function Invoke-ICFindHosts {
 	[cmdletbinding()]
 	param(
@@ -111,7 +123,6 @@ function Invoke-ICScan {
 			} elseif ($taskstatus.status -eq "Completed") {
 					$stillactive = $false
 			} else {
-				$taskstatus
 				Throw "Something went wrong in enumeration. Last Status: $($taskstatus.status)"
 			}
 		}
@@ -133,17 +144,16 @@ function Invoke-ICScanByTarget {
 		[PSObject]$ScanOptions,
 
 		[String]$TargetGroupId,
-		[String]$TargetGroupName = "Default",
+		[String]$TargetGroupName = "OnDemand",
 
 		[String]$CredentialId,
 		[String]$CredentialName = "DefaultCredential",
-
-		[String]$QueryName = "OnDemandScan"
+    [PSCredential]$Credentials
 	)
 
 	# Select Target targetgroup
 	if ($TargetGroupId) {
-		$TargetGroup = Get-ICTargetGroups -TargetGroupId -$TargetGroupId
+		$TargetGroup = Get-ICTargetGroups -TargetGroupId $TargetGroupId
 		if (-NOT $TargetGroup) {
 					Throw "TargetGroup with id $TargetGroupid does not exist!"
 		}
@@ -152,10 +162,9 @@ function Invoke-ICScanByTarget {
 		if ($TargetGroups.name -contains $TargetGroupName) {
 				$TargetGroup = $TargetGroups | where {$_.name -eq $TargetGroupName}
 		} else {
-			Write-Warning "TargetGroup with id $TargetGroupid does not exist! Creating a new one"
-			New-ICTargetGroup -name $TargetGroupName
-			Start-Sleep 2
-			$TargetGroup = Get-ICTargetGroups | where { $_.name -eq $TargetGroupName}
+			Write-Warning "TargetGroup with name $TargetGroupName does not exist. Creating a new one"
+			$TargetGroup = New-ICTargetGroup -name $TargetGroupName
+			Start-Sleep 1
 		}
 	}
 
@@ -165,7 +174,14 @@ function Invoke-ICScanByTarget {
 		if (-NOT $Credential) {
 			Throw "Credential with id $credentialId does not exist!"
 		}
-	} else {
+	}
+  elseif ($Credential) {
+    $CredentialName = (New-Guid).guid
+    $Credential = New-Credential -name $CredentialName -cred $Credentials
+    $tempcred = $True
+  }
+  else {
+    # Use Default Credential
 		$Credentials = Get-ICCredentials
 		if ($Credentials.name -contains $CredentialName) {
 				$Credential = $Credentials | where {$_.name -eq $CredentialName}
@@ -175,19 +191,15 @@ function Invoke-ICScanByTarget {
 	}
 
 	# Create Query
-	$Queries = Get-ICQueries -TargetGroupId $TargetGroup.id
-	if ($Queries.name -contains $QueryName) {
-		$Query = $Queries | where { $_.name -eq $QueryName }
-		Remove-ICQuery -QueryId $Query.id
-	}
-	New-ICQuery -TargetGroupId $TargetGroup.id -Name $QueryName -CredentialId $Credential.id -Query $target
+  $queryName = (New-Guid).guid
+	$query = New-ICQuery -TargetGroupId $TargetGroup.id -Name $QueryName -CredentialId $Credential.id -Query $target
 
 	#Perform discovery
 	Write-Host "Performing discovery on $($TargetGroup.name)"
 	$stillactive = $true
 	$UserTask = Invoke-ICFindHosts -TargetGroupId $TargetGroup.Id -QueryId $Query.id
 	While ($stillactive) {
-		Start-Sleep 10
+		Start-Sleep 5
 		$taskstatus = Get-ICUserTasks -UserTaskId $UserTask.userTaskId
 		if ($taskstatus.status -eq "Active") {
 				Write-Host "Waiting on Discovery. Progress: $($taskstatus.progress)%"
@@ -195,7 +207,8 @@ function Invoke-ICScanByTarget {
 				$stillactive = $false
 				Write-Host "Discovery Complete!"
 		} else {
-			$taskstatus
+      Remove-ICQuery -QueryId $Query.id
+      if ($tempcred) { Remove-ICCredential $Credential.id}
 			Throw "Something went wrong in enumeration. Last Status: $($taskstatus.status)"
 		}
 	}
@@ -215,6 +228,8 @@ function Invoke-ICScanByTarget {
 		$body['options'] = $ScanOptions
 	}
 	_ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method POST
+  Remove-ICQuery -QueryId $Query.id
+  if ($tempcred) { Remove-ICCredential $Credential.id}
 }
 
 function New-ICScanOptions {

@@ -41,6 +41,7 @@ function Remove-ICTargetGroup {
   _ICRestMethod -url $HuntServerAddress/api/$Endpoint -method 'DELETE'
 }
 
+
 function New-ICCredential {
   Param(
     [parameter(Mandatory=$True, Position=0)]
@@ -77,6 +78,20 @@ function Get-ICCredentials ($CredentialId) {
     _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter
   }
 }
+
+function Remove-ICCredential {
+  param(
+    [parameter(Mandatory=$true, Position=0)]
+    [ValidateNotNullOrEmpty()]
+    [String]$CredentialId
+  )
+
+  $Endpoint = "credentials/$CredentialId"
+  Write-Warning "Removing credential [$HuntServerAddress/api/$Endpoint]."
+  _ICRestMethod -url $HuntServerAddress/api/$Endpoint -method 'DELETE'
+
+}
+
 
 function Get-ICAddresses ([String]$TargetGroupId, [HashTable]$Where, [Switch]$NoLimit) {
   $Endpoint = "Addresses"
@@ -117,6 +132,7 @@ function Remove-ICAddresses {
   }
 	_ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method DELETE
 }
+
 
 function Get-ICScans ([String]$TargetGroupId, $TargetGroupName, [HashTable]$Where, [Switch]$NoLimit) {
   $Endpoint = "IntegrationScans"
