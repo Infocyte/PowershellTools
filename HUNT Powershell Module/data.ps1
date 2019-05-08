@@ -23,7 +23,7 @@ function Get-ICObjects {
     [String]$TargetGroupId,
     [String]$BoxId,
     [String]$ScanId,
-    [HashTable]$where=@{},
+    [HashTable]$where,
     [Switch]$NoLimit
   )
 
@@ -36,34 +36,24 @@ function Get-ICObjects {
     "Autostarts" { $Endpoint = 'IntegrationAutostarts' }
     "Hosts" { $Endpoint = 'IntegrationHosts'  }
     "Accounts" { # Write-Warning "This type is not yet supported by the Integration APIs. Use Get-ICAccounts"
-                  if ($where -AND $BoxId) { Get-ICAccounts -BoxId $BoxId -where $where -NoLimit:$NoLimit }
-                  elseif ($where) { Get-ICAccounts -where $where -NoLimit:$NoLimit }
-                  elseif ($BoxId) { Get-ICAccounts -BoxId $BoxId -NoLimit:$NoLimit}
-                  elseif ($ScanId) { Write-Warning "This type does not yet support ScanId. Use BoxId." }
+                  if ($ScanId) { Write-Warning "This type does not yet support ScanId. Use BoxId." }
+                  else { Get-ICAccounts -BoxId $BoxId -where $where -NoLimit:$NoLimit }
                 }
     "Scripts" { # Write-Warning "This type is not yet supported by the Integration APIs. Use Get-ICScripts"
-                  if ($where -AND $BoxId) { Get-ICScripts -BoxId $BoxId -where $where -NoLimit:$NoLimit }
-                  elseif ($where) { Get-ICScripts -where $where -NoLimit:$NoLimit }
-                  elseif ($BoxId) { Get-ICScripts -BoxId $BoxId -NoLimit:$NoLimit}
-                  elseif ($ScanId) { Write-Warning "This type does not yet support ScanId. Use BoxId." }
+                  if ($ScanId) { Write-Warning "This type does not yet support ScanId. Use BoxId." }
+                  else { Get-ICScripts -BoxId $BoxId -where $where -NoLimit:$NoLimit }
               }
     "Connections" { # Write-Warning "This type is not yet supported by the Integration APIs. Use Get-ICConnections"
-                    if ($where -AND $BoxId) { Get-ICConnections -BoxId $BoxId -where $where -NoLimit:$NoLimit }
-                    elseif ($where) { Get-ICConnections -where $where -NoLimit:$NoLimit }
-                    elseif ($BoxId) { Get-ICConnections -BoxId $BoxId -NoLimit:$NoLimit}
-                    elseif ($ScanId) { Write-Warning "This type does not yet support ScanId. Use BoxId." }
+                    if ($ScanId) { Write-Warning "This type does not yet support ScanId. Use BoxId." }
+                    else { Get-ICConnections -BoxId $BoxId -where $where -NoLimit:$NoLimit }
                   }
     "Applications" { # Write-Warning "This type is not yet supported by the Integration APIs. Use Get-ICApplications"
-                      if ($where -AND $BoxId) { Get-ICApplications -BoxId $BoxId -where $where -NoLimit:$NoLimit }
-                      elseif ($where) { Get-ICApplications -where $where -NoLimit:$NoLimit }
-                      elseif ($BoxId) { Get-ICApplications -BoxId $BoxId -NoLimit:$NoLimit}
-                      elseif ($ScanId) { Write-Warning "This type does not yet support ScanId. Use BoxId." }
+                      if ($ScanId) { Write-Warning "This type does not yet support ScanId. Use BoxId." }
+                      else { Get-ICApplications -BoxId $BoxId -where $where -NoLimit:$NoLimit }
                   }
     "Vulnerabilities" { # Write-Warning "This type is not yet supported by the Integration APIs. Use Get-ICVulnerabilities"
-                        if ($where -AND $BoxId) { Get-ICVulnerabilities -BoxId $BoxId -where $where -NoLimit:$NoLimit }
-                        elseif ($where) { Get-ICVulnerabilities -where $where -NoLimit:$NoLimit }
-                        elseif ($BoxId) { Get-ICVulnerabilities -BoxId $BoxId -NoLimit:$NoLimit}
-                        elseif ($ScanId) { Write-Warning "This type does not yet support ScanId. Use BoxId." }
+                        if ($ScanId) { Write-Warning "This type does not yet support ScanId. Use BoxId." }
+                        else { Get-ICVulnerabilities -BoxId $BoxId -where $where -NoLimit:$NoLimit }
                       }
     Default { }
   }
@@ -74,19 +64,14 @@ function Get-ICObjects {
       skip = 0
       where = @{ and = @() }
     }
+
+    if ($BoxId) {
+      $filter['where']['and'] += @{ boxId = $BoxId }
+    }
     if ($where.count -gt 0) {
-      if ($where.keys -contains "and") {
-        $filter['where'] = $where
-      } else {
-        $where | % {
-          $filter['where']['and'] += $_
-        }
+      $where | % {
+        $filter['where']['and'] += $_
       }
-      if ($BoxId -AND ($filter['where']['and'].keys -notcontains 'boxId')) {
-        $filter['where']['and'] += @{ boxId = $BoxId }
-      }
-    } else {
-      if ($BoxId) { $filter['where']['and'] += @{ boxId = $BoxId } }
     }
 
     if ($scanId) { $filter.where['and'] += @{ scanId = $scanId } }
@@ -105,24 +90,16 @@ function Get-ICConnections ([String]$BoxId, [HashTable]$where, [Switch]$All, [Sw
     skip = 0
     where = @{ and = @() }
   }
-
-  if ($where.count -gt 0) {
-    if ($where.keys -contains "and") {
-      $filter['where'] = $where
-    } else {
-      $where | % {
-        $filter['where']['and'] += $_
-      }
-    }
-    if ($BoxId -AND ($filter['where']['and'].keys -notcontains 'boxId')) {
-      $filter['where']['and'] += @{ boxId = $BoxId }
-    }
-
-  } else {
-    if ($BoxId) { $filter['where']['and'] += @{ boxId = $BoxId } }
+  if ($BoxId) {
+    $filter['where']['and'] += @{ boxId = $BoxId }
   }
-
-  if (-NOT $All) { $filter.where['and'] += @{ state = "ESTABLISHED"} }
+  if ($where.count -gt 0) {
+    $where | % {
+      $filter['where']['and'] += $_
+    }
+  } else {
+    if (-NOT $All) { $filter.where['and'] += @{ state = "ESTABLISHED"} }
+  }
 
   _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
 }
@@ -135,21 +112,13 @@ function Get-ICAccounts ([String]$BoxId, [HashTable]$where, [Switch]$NoLimit) {
     skip = 0
     where = @{ and = @() }
   }
-
+  if ($BoxId) {
+    $filter['where']['and'] += @{ boxId = $BoxId }
+  }
   if ($where.count -gt 0) {
-    if ($where.keys -contains "and") {
-      $filter['where'] = $where
-    } else {
-      $where | % {
-        $filter['where']['and'] += $_
-      }
+    $where | % {
+      $filter['where']['and'] += $_
     }
-    if ($BoxId -AND ($filter['where']['and'].keys -notcontains 'boxId')) {
-      $filter['where']['and'] += @{ boxId = $BoxId }
-    }
-
-  } else {
-    if ($BoxId) { $filter['where']['and'] += @{ boxId = $BoxId } }
   }
 
 
@@ -167,56 +136,47 @@ function Get-ICScripts ([String]$BoxId, [HashTable]$where, [Switch]$NoLimit) {
     where = @{ and = @() }
   }
 
+  if ($BoxId) {
+    $filter['where']['and'] += @{ boxId = $BoxId }
+  }
   if ($where.count -gt 0) {
-    if ($where.keys -contains "and") {
-      $filter['where'] = $where
-    } else {
-      $where | % {
-        $filter['where']['and'] += $_
-      }
+    $where | % {
+      $filter['where']['and'] += $_
     }
-    if ($BoxId -AND ($filter['where']['and'].keys -notcontains 'boxId')) {
-      $filter['where']['and'] += @{ boxId = $BoxId }
-    }
-
-  } else {
-    if ($BoxId) { $filter['where']['and'] += @{ boxId = $BoxId } }
   }
 
   _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
 }
 
-function Get-ICApplications ([String]$BoxId, [HashTable]$where, [Switch]$NoLimit) {
+function Get-ICApplications {
+  [cmdletbinding()]
+  param(
+    [String]$BoxId,
+    [HashTable]$where,
+    [Switch]$NoLimit
+  )
 
   $Endpoint = "BoxApplicationInstances"
   $filter =  @{
     limit = $resultlimit
-    order = "scannedOn desc"
     skip = 0
     where = @{ and = @() }
   }
 
+  if ($BoxId) {
+    $filter['where']['and'] += @{ boxId = $BoxId }
+  }
   if ($where.count -gt 0) {
-    if ($where.keys -contains "and") {
-      $filter['where'] = $where
-    } else {
-      $where | % {
-        $filter['where']['and'] += $_
-      }
+    $where | % {
+      $filter['where']['and'] += $_
     }
-    if ($BoxId -AND ($filter['where']['and'].keys -notcontains 'boxId')) {
-      $filter['where']['and'] += @{ boxId = $BoxId }
-    }
-
-  } else {
-    if ($BoxId) { $filter['where']['and'] += @{ boxId = $BoxId } }
   }
 
-  $filter['where']['and'] += @{ name = @{ nilike = "*KB/d*" }}
-  $filter['where']['and'] += @{ name = @{ nilike = "*Update for*" }}
+  $filter['where']['and'] += @{ name = @{ nilike = "%KB/d%" }}
+  $filter['where']['and'] += @{ name = @{ nilike = "Update for%" }}
 
   $apps = _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
-  $apps | Sort-Object hostname, applicationId -unique
+  $apps | Sort-Object hostname, applicationId -unique | Sort-Object scannedOn
 }
 
 function Get-ICVulnerabilities {
@@ -227,10 +187,7 @@ function Get-ICVulnerabilities {
     [Switch]$NoLimit
   )
 
-  if ($where -AND $BoxId) { $apps = Get-ICApplications -BoxId $BoxId -where $where -NoLimit:$NoLimit }
-  elseif ($where) { $apps = Get-ICApplications -where $where -NoLimit:$NoLimit }
-  elseif ($BoxId) { $apps = Get-ICApplications -BoxId $BoxId -NoLimit:$NoLimit }
-  else { $apps = Get-ICApplications -NoLimit:$NoLimit }
+  $apps = Get-ICApplications -BoxId $BoxId -where $where -NoLimit:$NoLimit
 
   $Endpoint = "ApplicationAdvisories"
   $filter =  @{
@@ -350,10 +307,11 @@ function Get-ICActivityTrace {
     [DateTime]$StartTime,
     [DateTime]$EndTime,
     [Switch]$Enriched,
+    [HashTable]$Where,
     [Switch]$NoLimit
   )
 
-  if (-NOT $StartTime) { $StartTime = (Get-Date).AddDays(-30) }
+  if (-NOT $StartTime) { $StartTime = (Get-Date).AddDays(-7) }
   if (-NOT $EndTime) { $EndTime = Get-Date }
 
   $Endpoint = "activity"
@@ -363,8 +321,13 @@ function Get-ICActivityTrace {
     order = @("eventTime desc")
     where = @{
       and = @(
-        @{ eventTime = @{ gt = (Get-Date $StartTime -Format "yyyy-MM-dd HH:mm:ss") } },
-        @{ eventTime = @{ lt = (Get-Date $EndTime -Format "yyyy-MM-dd HH:mm:ss") } }
+        @{ eventTime = @{
+          between = @(
+            (Get-Date $StartTime -Format "yyyy-MM-dd HH:mm:ss"),
+            (Get-Date $EndTime -Format "yyyy-MM-dd HH:mm:ss")
+            )
+          }
+        }
       )
     }
   }
@@ -377,6 +340,12 @@ function Get-ICActivityTrace {
   }
   elseif ($HostId) {
     $filter['where']['and'] += @{ hostId = $HostId }
+  }
+
+  if ($where.count -gt 0) {
+    $where | % {
+      $filter['where']['and'] += $_
+    }
   }
 
   if ($enriched) {
