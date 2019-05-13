@@ -1,5 +1,6 @@
 
 # HElPER FUNCTIONS
+$Depth = 10
 
 # Used with most Infocyte Get methods. Takes a filter object (hashtable) and adds authentication and passes it as the body for URI encoded parameters. NoLimit will iterate 1000 results at a time to the end of the data set.
 function _ICGetMethod ([String]$url, [HashTable]$filter, [Switch]$NoLimit) {
@@ -10,10 +11,10 @@ function _ICGetMethod ([String]$url, [HashTable]$filter, [Switch]$NoLimit) {
 		access_token = $Global:ICToken
 	}
   if ($filter) {
-    $body['filter'] = $filter | ConvertTo-JSON -Depth 8 -Compress
+    $body['filter'] = $filter | ConvertTo-JSON -Depth $Depth -Compress
   }
   Write-Verbose "Requesting data from $url (Limited to $resultlimit unless using -NoLimit)"
-  Write-Verbose "$($body | ConvertTo-JSON -Depth 8 -Compress)"
+  Write-Verbose "$($body | ConvertTo-JSON -Depth $Depth -Compress)"
 	try {
 		$Objects = Invoke-RestMethod $url -body $body -Method GET -ContentType 'application/json'
 	} catch {
@@ -32,7 +33,7 @@ function _ICGetMethod ([String]$url, [HashTable]$filter, [Switch]$NoLimit) {
 		$skip += $resultlimit
 		$filter['skip'] = $skip
 		$body.remove('filter') | Out-Null
-		$body.Add('filter', ($filter | ConvertTo-JSON -Depth 8 -Compress))
+		$body.Add('filter', ($filter | ConvertTo-JSON -Depth $Depth -Compress))
     Write-Progress -Activity "Getting Data from Hunt Server API" -status "Requesting data from $url [$skip]"
 		try {
 			$moreobjects = Invoke-RestMethod $url -body $body -Method GET -ContentType 'application/json'
@@ -56,9 +57,9 @@ function _ICRestMethod ([String]$url, $body=$null, [String]$method) {
     Authorization = $Global:ICToken
   }
   Write-verbose "Sending $method command to $url"
-  Write-verbose "Body = $($body | ConvertTo-JSON -Compress -Depth 8)"
+  Write-verbose "Body = $($body | ConvertTo-JSON -Compress -Depth 10)"
 	try {
-		$Result = Invoke-RestMethod $url -headers $headers -body ($body|ConvertTo-JSON -Compress -Depth 4) -Method $method -ContentType 'application/json'
+		$Result = Invoke-RestMethod $url -headers $headers -body ($body|ConvertTo-JSON -Compress -Depth $Depth) -Method $method -ContentType 'application/json'
 	} catch {
 		Write-Warning "Error: $_"
 		return "ERROR: $($_.Exception.Message)"

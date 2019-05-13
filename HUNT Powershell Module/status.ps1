@@ -1,3 +1,4 @@
+
 # Status and Progress APIs
 
 # Get Infocyte HUNT Jobs (Active jobs or all jobs)
@@ -11,8 +12,8 @@ function Get-ICJobs ([Switch]$All, [HashTable]$Where, [Switch]$NoLimit) {
 	}
 
 	if ($where.count -gt 0) {
-		$where | % {
-			$filter['where']['and'] += $_
+		$where.GetEnumerator() | % {
+			$filter['where']['and'] += @{ $($_.key) = $($_.value) }
 		}
 	}
 
@@ -20,7 +21,7 @@ function Get-ICJobs ([Switch]$All, [HashTable]$Where, [Switch]$NoLimit) {
 		Write-Verbose "Getting All Jobs from Infocyte HUNT: $HuntServer"
 	} else {
 		Write-Verbose "Getting Active Jobs from Infocyte HUNT: $HuntServer"
-		$filter['and']['where'] = @{ state = "active" }
+		$filter['where']['and'] = @{ state = "active" }
 	}
 	_ICGetMethod -url $url -filter $filter -NoLimit:$NoLimit
 }
@@ -35,8 +36,8 @@ function Get-ICUserAuditLogs ([Switch]$NoLimit, [HashTable]$Where) {
 		where = @{ and = @() }
 	}
 	if ($where.count -gt 0) {
-		$where | % {
-			$filter['where']['and'] += $_
+		$where.GetEnumerator() | % {
+			$filter['where']['and'] += @{ $($_.key) = $($_.value) }
 		}
 	}
 		Write-Verbose "Getting User Activity Logs from Infocyte HUNT: $HuntServer"
@@ -61,8 +62,8 @@ function Get-ICUserTasks {
 		where = @{ and = @() }
 	}
 	if ($where.count -gt 0) {
-		$where | % {
-			$filter['where']['and'] += $_
+		$where.GetEnumerator() | % {
+			$filter['where']['and'] += @{ $($_.key) = $($_.value) }
 		}
 	}
 
@@ -108,8 +109,8 @@ function Get-ICUserTaskItems {
 		}
 	}
 	if ($where.count -gt 0) {
-		$where | % {
-			$filter['where']['and'] += $_
+		$where.GetEnumerator() | % {
+			$filter['where']['and'] += @{ $($_.key) = $($_.value) }
 		}
 	}
 
@@ -149,8 +150,8 @@ function Get-ICUserTaskItemProgress {
 		}
 	}
 	if ($where.count -gt 0) {
-		$where | % {
-			$filter['where']['and'] += $_
+		$where.GetEnumerator() | % {
+			$filter['where']['and'] += @{ $($_.key) = $($_.value) }
 		}
 	}
 	_ICGetMethod -url $url -filter $filter -NoLimit:$NoLimit

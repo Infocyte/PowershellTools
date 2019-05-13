@@ -104,8 +104,8 @@ function Get-ICAddresses ([String]$TargetGroupId, [HashTable]$Where, [Switch]$No
     }
 	}
   if ($where.count -gt 0) {
-    $where | % {
-      $filter['where']['and'] += $_
+    $where.GetEnumerator() | % {
+      $filter['where']['and'] += @{ $($_.key) = $($_.value) }
     }
   }
 

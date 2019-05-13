@@ -69,8 +69,8 @@ function Get-ICObjects {
       $filter['where']['and'] += @{ boxId = $BoxId }
     }
     if ($where.count -gt 0) {
-      $where | % {
-        $filter['where']['and'] += $_
+      $where.GetEnumerator() | % {
+        $filter['where']['and'] += @{ $($_.key) = $($_.value) }
       }
     }
 
@@ -94,8 +94,8 @@ function Get-ICConnections ([String]$BoxId, [HashTable]$where, [Switch]$All, [Sw
     $filter['where']['and'] += @{ boxId = $BoxId }
   }
   if ($where.count -gt 0) {
-    $where | % {
-      $filter['where']['and'] += $_
+    $where.GetEnumerator() | % {
+      $filter['where']['and'] += @{ $($_.key) = $($_.value) }
     }
   } else {
     if (-NOT $All) { $filter.where['and'] += @{ state = "ESTABLISHED"} }
@@ -116,8 +116,8 @@ function Get-ICAccounts ([String]$BoxId, [HashTable]$where, [Switch]$NoLimit) {
     $filter['where']['and'] += @{ boxId = $BoxId }
   }
   if ($where.count -gt 0) {
-    $where | % {
-      $filter['where']['and'] += $_
+    $where.GetEnumerator() | % {
+      $filter['where']['and'] += @{ $($_.key) = $($_.value) }
     }
   }
 
@@ -140,8 +140,8 @@ function Get-ICScripts ([String]$BoxId, [HashTable]$where, [Switch]$NoLimit) {
     $filter['where']['and'] += @{ boxId = $BoxId }
   }
   if ($where.count -gt 0) {
-    $where | % {
-      $filter['where']['and'] += $_
+    $where.GetEnumerator() | % {
+      $filter['where']['and'] += @{ $($_.key) = $($_.value) }
     }
   }
 
@@ -167,8 +167,8 @@ function Get-ICApplications {
     $filter['where']['and'] += @{ boxId = $BoxId }
   }
   if ($where.count -gt 0) {
-    $where | % {
-      $filter['where']['and'] += $_
+    $where.GetEnumerator() | % {
+      $filter['where']['and'] += @{ $($_.key) = $($_.value) }
     }
   }
 
@@ -177,6 +177,11 @@ function Get-ICApplications {
 
   $apps = _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
   $apps | Sort-Object hostname, applicationId -unique | Sort-Object scannedOn
+}
+
+function _create_hashtable ([HashTable]$table) {
+
+
 }
 
 function Get-ICVulnerabilities {
@@ -277,8 +282,8 @@ function Get-ICAlerts {
     $filter.where['and'] += @{ archived = $FALSE }
   }
   if ($where.count -gt 0) {
-    $where | % {
-      $filter['where']['and'] += $_
+    $where.GetEnumerator() | % {
+      $filter['where']['and'] += @{ $($_.key) = $($_.value) }
     }
   }
 
@@ -353,8 +358,8 @@ function Get-ICActivityTrace {
   }
 
   if ($where.count -gt 0) {
-    $where | % {
-      $filter['where']['and'] += $_
+    $where.GetEnumerator() | % {
+      $filter['where']['and'] += @{ $($_.key) = $($_.value) }
     }
   }
 
