@@ -44,10 +44,18 @@ function Get-ICUserAuditLogs ([Switch]$NoLimit, [HashTable]$Where) {
 }
 
 # Get Infocyte HUNT User Tasks. These are the items in the task dropdown in the UI.
-function Get-ICUserTasks ([String]$UserTaskId, [Switch]$Active,	[Switch]$All, [HashTable]$Where, [Switch]$NoLimit) {
+function Get-ICUserTasks {
+	[cmdletbinding()]
+	param(
+		[String]$UserTaskId,
+		[Switch]$Active,
+		[Switch]$All,
+		[HashTable]$Where,
+		[Switch]$NoLimit
+	)
 
 	$filter =  @{
-		order = "startedOn"
+		order = "endedOn"
 		limit = $resultlimit
 		skip = 0
 		where = @{ and = @() }
@@ -70,10 +78,8 @@ function Get-ICUserTasks ([String]$UserTaskId, [Switch]$Active,	[Switch]$All, [H
 		}
 	}
 	if ($Active) {
-		Write-Verbose "Getting All Tasks from Infocyte HUNT: $HuntServer"
-	} else {
-		Write-Verbose "Getting Active Tasks from Infocyte HUNT: $HuntServer"
-		$filter['where'] = @{ status = "Active" }
+		Write-Verbose "Getting Running Tasks from Infocyte HUNT: $HuntServer"
+		$filter['where']['and'] += @{ status = "Active" }
 	}
 
 	_ICGetMethod -url $url -filter $filter -NoLimit:$NoLimit
@@ -112,9 +118,11 @@ function Get-ICUserTaskItems {
 	if ($IncludeProgress) {
 		$items = _ICGetMethod -url $url -filter $filter -NoLimit:$NoLimit
 		$items | foreach {
-			$progress = @()
-			Get-ICUserTaskItemProgress -taskItemId $_.id | foreach { $progress += "$($_.createdOn) $($_.text)" }
-			$_ | Add-Member -MemberType "NoteProperty" -name "progress" -value $progress
+			if ($_.id) {
+				$progress = @()
+				Get-ICUserTaskItemProgress -taskItemId $_.id | foreach { $progress += "$($_.createdOn) $($_.text)" }
+				$_ | Add-Member -MemberType "NoteProperty" -name "progress" -value $progress
+			}
 		}
 		$items
 	} else {

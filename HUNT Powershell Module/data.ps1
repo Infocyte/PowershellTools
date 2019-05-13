@@ -250,10 +250,9 @@ function Get-ICFileDetail {
 
 	Write-Verbose "Requesting FileReport on file with SHA1: $sha1"
 	$Endpoint = "FileReps/$sha1"
-  $object = _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter
-	$object | Add-Member -Type NoteProperty -Name 'avpositives' -Value $_.avResults.positives
-	$object | Add-Member -Type NoteProperty -Name 'avtotal' -Value $_.avResults.total
-	return $object
+  _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter
+	#$object | Add-Member -Type NoteProperty -Name 'avpositives' -Value $_.avResults.positives
+	#$object | Add-Member -Type NoteProperty -Name 'avtotal' -Value $_.avResults.total
 }
 
 # Get Account objects
@@ -282,7 +281,7 @@ function Get-ICAlerts {
       $filter['where']['and'] += $_
     }
   }
-  
+
   _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
 }
 
