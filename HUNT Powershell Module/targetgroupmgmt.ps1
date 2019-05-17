@@ -183,7 +183,7 @@ function Get-ICBoxes ([Switch]$Last90, [Switch]$Last7, [Switch]$Last30, [Switch]
   }
 
   if ($targetGroupId) {
-    $filter.where['and'] += @{ targetId = $targetGroupId }
+    $filter.where['and'] += @{ targetId = "$($targetGroupId)" }
   }
   elseif ($Global) {
     $filter.where['and'] += @{ targetId = $null }
