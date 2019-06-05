@@ -88,9 +88,14 @@ function Set-ICToken {
 
 		[parameter(Mandatory=$true)]
 		[ValidateNotNullorEmpty()]
-		[String]$Token
+		[String]$Token,
+
+		[Switch]$DisableSSLVerification
 	)
 
+	if ($DisableSSLVerification) {
+		_DisableSSLVerification
+	}
 	[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 	if ($HuntServer -notlike "https://*") {

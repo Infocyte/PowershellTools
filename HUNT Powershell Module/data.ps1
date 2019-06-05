@@ -269,7 +269,7 @@ function Get-ICAlerts {
     [Switch]$NoLimit
   )
 
-  $Endpoint = "Alerts"
+  $Endpoint = "AlertDetails"
 
   $filter =  @{
     limit = $resultlimit
