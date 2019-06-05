@@ -75,7 +75,7 @@ Param(
 )
 
 #requires -version 2.0
-$Admin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] “Administrator”)
+$Admin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
 If (-NOT $Admin) {
 	Write-Warning "NOTE: Your shell is not running as Administrator (But you shouldn't need it for this script)."
 }
