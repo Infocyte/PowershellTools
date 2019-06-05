@@ -29,6 +29,10 @@ function _ICGetMethod ([String]$url, [HashTable]$filter, [Switch]$NoLimit) {
 	}
 
   if ($NoLimit -AND $Objects.count -eq $resultlimit) { $more = $true } else { $more = $false }
+  if ($Objects.count -gte $Globallimit) {
+    $more = $FALSE
+    Write-Warning "Reached Global Limit ($GlobalLimit) -- Try refining your query with a where filter. Performance on the database seriously degrades when trying to pull more than 100k objects"
+  }
 	While ($more) {
 		$skip += $resultlimit
 		$filter['skip'] = $skip
