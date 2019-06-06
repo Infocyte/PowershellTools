@@ -219,9 +219,10 @@ function Get-ICVulnerabilities {
   if ($apps -AND $appvulns) {
     $appids = $apps.applicationid | sort-object -unique
     $appvulns = $appvulns | where { $appids -contains $_.applicationId }
+    $apps = $apps | where { $appvulns.applicationId -contains $_.applicationId }
 
     Write-Verbose "Found $($appids.count) applications and $($appvulns.count) associated advisories. Enriching details for export..."
-    $appvulns | where { $appids -contains $_.applicationId } | % {
+    $appvulns | % {
       $vuln = $_
       Write-Verbose "Vulnerable App: $($vuln.ApplicationName) cveId: $($vuln.cveId) App id: $($vuln.applicationId)"
 
@@ -256,8 +257,11 @@ function Get-ICVulnerabilities {
 				}
       }
     }
-    Write-Host "DONE: Exporting $($appvulns.count) Vulnerabilities"
-    $appvulns
+    $applicationvulnerabilities = Join-Object -Left $apps -Right $appvulns -LeftJoinProperty 'applicationid' -RightJoinProperty 'applicationid' -Type OnlyIfInBoth
+    #-RightProperties cveId, description, baseScoreV2, baseScoreV3, published, modified
+
+    Write-Host "DONE: Exporting $($applicationvulnerabilities.count) Vulnerabilities"
+    Write-Output $applicationvulnerabilities
   }
 }
 
