@@ -75,7 +75,7 @@ function Get-ICObjects {
     }
 
     if ($scanId) { $filter.where['and'] += @{ scanId = $scanId } }
-    elseif ($BoxId) { $filter.where['and'] += @{ boxId = $BoxId } }
+    #elseif ($BoxId) { $filter.where['and'] += @{ boxId = $BoxId } }
     elseif ($TargetGroupId) { $filter.where['and'] += @{ targetId = $TargetGroupId } }
 
     _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
@@ -93,7 +93,7 @@ function Get-ICConnections ([String]$BoxId, [HashTable]$where, [Switch]$All, [Sw
   if ($BoxId) {
     $filter['where']['and'] += @{ boxId = $BoxId }
   } else {
-    $BoxId = Get-ICBoxes -Last90 -Global
+    $BoxId = (Get-ICBoxes -Last90 -Global).id
     $filter['where']['and'] += @{ boxId = $BoxId }
   }
   if ($where.count -gt 0) {
@@ -118,7 +118,7 @@ function Get-ICAccounts ([String]$BoxId, [HashTable]$where, [Switch]$NoLimit) {
   if ($BoxId) {
     $filter['where']['and'] += @{ boxId = $BoxId }
   } else {
-    $BoxId = Get-ICBoxes -Last90 -Global
+    $BoxId = (Get-ICBoxes -Last90 -Global).id
     $filter['where']['and'] += @{ boxId = $BoxId }
   }
   if ($where.count -gt 0) {
@@ -145,7 +145,7 @@ function Get-ICScripts ([String]$BoxId, [HashTable]$where, [Switch]$NoLimit) {
   if ($BoxId) {
     $filter['where']['and'] += @{ boxId = $BoxId }
   } else {
-    $BoxId = Get-ICBoxes -Last90 -Global
+    $BoxId = (Get-ICBoxes -Last90 -Global).id
     $filter['where']['and'] += @{ boxId = $BoxId }
   }
   if ($where.count -gt 0) {
@@ -175,7 +175,7 @@ function Get-ICApplications {
   if ($BoxId) {
     $filter['where']['and'] += @{ boxId = $BoxId }
   } else {
-    $BoxId = Get-ICBoxes -Last90 -Global
+    $BoxId = (Get-ICBoxes -Last90 -Global).id
     $filter['where']['and'] += @{ boxId = $BoxId }
   }
   if ($where.count -gt 0) {
@@ -205,7 +205,7 @@ function Get-ICVulnerabilities {
   )
 
   if (-NOT $BoxId) {
-    $BoxId = Get-ICBoxes -Last90 -Global
+    $BoxId = (Get-ICBoxes -Last90 -Global).id
   }
   $apps = Get-ICApplications -BoxId $BoxId -where $where -NoLimit:$NoLimit
 
