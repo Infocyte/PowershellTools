@@ -66,7 +66,7 @@ function Get-ICObjects {
     }
 
     if ($BoxId) {
-      $filter['where']['and'] += @{ boxId = $BoxId }
+      Write-Warning "boxid filtering will not work with the current Integration APIs for files (supports TargetGroupId or ScanId)"
     }
     if ($where.count -gt 0) {
       $where.GetEnumerator() | % {
@@ -92,6 +92,9 @@ function Get-ICConnections ([String]$BoxId, [HashTable]$where, [Switch]$All, [Sw
   }
   if ($BoxId) {
     $filter['where']['and'] += @{ boxId = $BoxId }
+  } else {
+    $BoxId = Get-ICBoxes -Last90 -Global
+    $filter['where']['and'] += @{ boxId = $BoxId }
   }
   if ($where.count -gt 0) {
     $where.GetEnumerator() | % {
@@ -113,6 +116,9 @@ function Get-ICAccounts ([String]$BoxId, [HashTable]$where, [Switch]$NoLimit) {
     where = @{ and = @() }
   }
   if ($BoxId) {
+    $filter['where']['and'] += @{ boxId = $BoxId }
+  } else {
+    $BoxId = Get-ICBoxes -Last90 -Global
     $filter['where']['and'] += @{ boxId = $BoxId }
   }
   if ($where.count -gt 0) {
@@ -137,6 +143,9 @@ function Get-ICScripts ([String]$BoxId, [HashTable]$where, [Switch]$NoLimit) {
   }
 
   if ($BoxId) {
+    $filter['where']['and'] += @{ boxId = $BoxId }
+  } else {
+    $BoxId = Get-ICBoxes -Last90 -Global
     $filter['where']['and'] += @{ boxId = $BoxId }
   }
   if ($where.count -gt 0) {
@@ -165,6 +174,9 @@ function Get-ICApplications {
 
   if ($BoxId) {
     $filter['where']['and'] += @{ boxId = $BoxId }
+  } else {
+    $BoxId = Get-ICBoxes -Last90 -Global
+    $filter['where']['and'] += @{ boxId = $BoxId }
   }
   if ($where.count -gt 0) {
     $where.GetEnumerator() | % {
@@ -192,6 +204,9 @@ function Get-ICVulnerabilities {
     [Switch]$NoLimit
   )
 
+  if (-NOT $BoxId) {
+    $BoxId = Get-ICBoxes -Last90 -Global
+  }
   $apps = Get-ICApplications -BoxId $BoxId -where $where -NoLimit:$NoLimit
 
   $Endpoint = "ApplicationAdvisories"
@@ -249,6 +264,7 @@ function Get-ICVulnerabilities {
 # Get Full FileReport on an object by sha1
 function Get-ICFileDetail {
   Param(
+    [parameter(Mandatory=$true)]
     [ValidateNotNullorEmpty()]
     [String]$sha1
   )
