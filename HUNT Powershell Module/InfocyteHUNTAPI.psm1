@@ -1,5 +1,6 @@
 # Variables
 $resultlimit = 1000 # limits the number of results that come back. 1000 is max supported by Infocyte API. Use NoLimit flag on functions to iterate 1000 at a time for all results.
+$Globallimit = 100000
 
 Write-Host "Importing Infocyte HUNT API Powershell Module"
 $PS = $PSVersionTable.PSVersion.tostring()
