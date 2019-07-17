@@ -15,8 +15,12 @@ The arguments are after the command *installagent*:
 **1st Arg [Manadatory]:** `instancecname`  
 **2nd Arg [Mandatory]:** `apikey`
 
-Example:  
+Examples:  
 ```[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12; (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/manualscan/survey.ps1") | iex; survey myhuntinstance asdfasdf```
+
+If running command from cmd.exe or batch scripts, you will need to escape the pipe (|) with ^ like this:
+```C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -nologo -win 1 -executionpolicy bypass -nop -command { [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12; (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/manualscan/survey.ps1") ^| iex; survey instancecname apikey }```
+
 
 If you want to troubleshoot or check out what is happening, run in interactive mode or check the log file:
 Add `-Interactive` to the end of the command.
