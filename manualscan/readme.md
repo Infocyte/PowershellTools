@@ -5,7 +5,7 @@
 
 The following command or script will initiate a survey of a sytem. Run it on any windows system and it will download the survey, execute it, and upload the results to your HUNT instance for processing. 
 
-IMPORTANT: You DO NOT need to download this script. Yoy can leave it here unless you want to host it yourself.
+IMPORTANT: You DO NOT need to download this script. You can leave it here unless you want to host it yourself or run it locally as part of a scheduled task.
 
 To execute this script as a one liner on a windows host with powershell 2.0+, run this command replacing `instancecname` and `apikey` with your hunt instance <mandatory> and API key. NOTE: Instance name is your cname from the URL, not the FULL url https://instancecname.infocyte.com). This script will append the rest of the url for you.
 
