@@ -28,6 +28,7 @@ New-Module -name survey -scriptblock {
 			$Objects = Invoke-RestMethod $url -body $body -Method GET -ContentType 'application/json' -Proxy $Global:Proxy -ProxyCredential $Global:ProxyCredential
 		} catch {
 			if ($Interactive) { Write-Warning "Error: $_" }
+			"$(Get-Date) [Error] REST Error: $($_.Exception.Message)" >> $LogPath
 			return "ERROR: $($_.Exception.Message)"
 		}
 		if ($Objects) {
@@ -51,7 +52,8 @@ New-Module -name survey -scriptblock {
 			try {
 				$moreobjects = Invoke-RestMethod $url -body $body -Method GET -ContentType 'application/json' -Proxy $Global:Proxy -ProxyCredential $Global:ProxyCredential
 			} catch {
-				Write-Warning "Error: $_"
+				If ($Interactive) { Write-Warning "Error: $_" }
+				"$(Get-Date) [Error] REST Error: $($_.Exception.Message)" >> $LogPath
 				return "ERROR: $($_.Exception.Message)"
 			}
 			if ($moreobjects.count -gt 0) {
@@ -75,6 +77,7 @@ New-Module -name survey -scriptblock {
 			$Result = Invoke-RestMethod $url -headers $headers -body ($body|ConvertTo-JSON -Compress -Depth $Depth) -Method $method -ContentType 'application/json' -Proxy $Global:Proxy -ProxyCredential $Global:ProxyCredential
 		} catch {
 			if ($Interactive) { Write-Warning "Error: $_" }
+			"$(Get-Date) [Error] REST Error: $($_.Exception.Message)" >> $LogPath
 			throw "ERROR: $($_.Exception.Message)"
 		}
 		if ($Result) {
@@ -202,7 +205,8 @@ New-Module -name survey -scriptblock {
 	  		try {
 					$objects = Invoke-RestMethod $HuntServerAddress/api/survey -Headers $headers -Method POST -InFile $FilePath -ContentType "application/octet-stream" -Proxy $Global:Proxy -ProxyCredential $Global:ProxyCredential
 	  		} catch {
-	  			Write-Warning "Error: $_"
+	  			if ($Interactive) { Write-Warning "Error: $_" }
+					"$(Get-Date) [Error] Upload Error: $($_.Exception.Message)" >> $LogPath
 	  			throw "ERROR: $($_.Exception.Message)"
 	  		}
 	  		#$objects
@@ -235,6 +239,7 @@ New-Module -name survey -scriptblock {
 					$TargetGroupId = ($targetGroups | where { $_.name -eq $TargetGroupName}).id
 		  	} else {
 		  			if ($Interactive) { Write-Host "$TargetGroupName does not exist. Creating new Target Group '$TargetGroupName'" }
+						"$(Get-Date) [Status] $TargetGroupName does not exist. Creating new Target Group '$TargetGroupName'" >> $LogPath
 		  			New-ICTargetGroup -Name $TargetGroupName
 						Start-Sleep 1
 						$TargetGroups = Get-ICTargetGroups
@@ -252,13 +257,20 @@ New-Module -name survey -scriptblock {
 					targetId = $TargetGroupId;
 					startedOn = $StartTime
 				}
-				$newscan = _ICRestMethod -url $HuntServerAddress/api/scans -body $body -Method 'POST' -Proxy $Global:Proxy -ProxyCredential $Global:ProxyCredential
+				try {
+					$newscan = _ICRestMethod -url $HuntServerAddress/api/scans -body $body -Method 'POST' -Proxy $Global:Proxy -ProxyCredential $Global:ProxyCredential
+				} catch {
+					if ($Interactive) { Write-Warning "Error: $_" }
+					"$(Get-Date) [Error] ScanId Creation Error: $($_.Exception.Message)" >> $LogPath
+					throw "ERROR: $($_.Exception.Message)"
+				}
 				Start-Sleep 1
 				$ScanId = $newscan.id
 			}
 
 
 			if ($Interactive) { Write-Host "Importing Survey Results into $TargetGroupName-$ScanName [ScanId: $ScanId] [TargetGroupId: $TargetGroupId]" }
+			"Importing Survey Results into $TargetGroupName-$ScanName [ScanId: $ScanId] [TargetGroupId: $TargetGroupId]" >> $LogPath
 	  }
 
 	  PROCESS {
