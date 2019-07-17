@@ -16,7 +16,7 @@ function _ICGetMethod ([String]$url, [HashTable]$filter, [Switch]$NoLimit) {
   Write-Verbose "Requesting data from $url (Limited to $resultlimit unless using -NoLimit)"
   Write-Verbose "$($body | ConvertTo-JSON -Depth $Depth -Compress)"
 	try {
-		$Objects = Invoke-RestMethod $url -body $body -Method GET -ContentType 'application/json'
+		$Objects = Invoke-RestMethod $url -body $body -Method GET -ContentType 'application/json' -Proxy $Global:Proxy -ProxyCredential $Global:ProxyCredential
 	} catch {
 		Write-Warning "Error: $_"
 		return "ERROR: $($_.Exception.Message)"
@@ -40,7 +40,7 @@ function _ICGetMethod ([String]$url, [HashTable]$filter, [Switch]$NoLimit) {
 		$body.Add('filter', ($filter | ConvertTo-JSON -Depth $Depth -Compress))
     Write-Progress -Activity "Getting Data from Hunt Server API" -status "Requesting data from $url [$skip]"
 		try {
-			$moreobjects = Invoke-RestMethod $url -body $body -Method GET -ContentType 'application/json'
+			$moreobjects = Invoke-RestMethod $url -body $body -Method GET -ContentType 'application/json' -Proxy $Global:Proxy -ProxyCredential $Global:ProxyCredential
 		} catch {
 			Write-Warning "Error: $_"
 			return "ERROR: $($_.Exception.Message)"
@@ -63,7 +63,7 @@ function _ICRestMethod ([String]$url, $body=$null, [String]$method) {
   Write-verbose "Sending $method command to $url"
   Write-verbose "Body = $($body | ConvertTo-JSON -Compress -Depth 10)"
 	try {
-		$Result = Invoke-RestMethod $url -headers $headers -body ($body|ConvertTo-JSON -Compress -Depth $Depth) -Method $method -ContentType 'application/json'
+		$Result = Invoke-RestMethod $url -headers $headers -body ($body|ConvertTo-JSON -Compress -Depth $Depth) -Method $method -ContentType 'application/json' -Proxy $Global:Proxy -ProxyCredential $Global:ProxyCredential
 	} catch {
 		Write-Warning "Error: $_"
 		return "ERROR: $($_.Exception.Message)"
@@ -570,4 +570,38 @@ function Join-Object
             }
         }
     }
+}
+
+
+Function IsPrivateNetwork( [String]$IP)
+{
+    If ($IP.Contains("/"))
+    {
+        $Temp = $IP.Split("/")
+        $IP = $Temp[0]
+    }
+    try {
+      $IPAddress = [Net.IPAddress]::Parse($IP)
+      $BinaryIP = [String]::Join('.', $( $IPAddress.GetAddressBytes() | % { [Convert]::ToString($_, 2).PadLeft(8, '0') } ))
+    } catch {
+      Write-Warning "Error on parsing IP"
+      return $null
+    }
+
+    $Private = $False
+
+    Switch -RegEx ($BinaryIP)
+    {
+        "^1111" { $Class = "E"; $SubnetBitMap = "1111" }
+        "^1110" { $Class = "D"; $SubnetBitMap = "1110" }
+        "^110"  { $Class = "C"
+                    If ($BinaryIP -Match "^11000000.10101000") { $Private = $True }
+                }
+        "^10"   { $Class = "B"
+                    If ($BinaryIP -Match "^10101100.0001") { $Private = $True } }
+        "^0"    { $Class = "A"
+                    If ($BinaryIP -Match "^00001010") { $Private = $True }
+                }
+    }
+    return $Private
 }

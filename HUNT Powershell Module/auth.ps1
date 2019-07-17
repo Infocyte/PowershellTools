@@ -90,6 +90,10 @@ function Set-ICToken {
 		[ValidateNotNullorEmpty()]
 		[String]$Token,
 
+		[String]$Proxy,
+		[String]$ProxyUser,
+		[String]$ProxyPass,
+
 		[Switch]$DisableSSLVerification
 	)
 
@@ -112,6 +116,14 @@ function Set-ICToken {
 		return
 	}
 	Write-Host "Setting Auth Token for $HuntServer to $Token"
-	Write-Verbose "Token and Hunt Server Address are stored in global variables for use in all IC cmdlets"
+
+	if ($Proxy) {
+			$Global:Proxy = $Proxy
+			if ($ProxyUser -AND $ProxyPass) {
+				$pw = ConvertTo-SecureString $ProxyPass -AsPlainText -Force
+				$Global:ProxyCredential = New-Object System.Management.Automation.PSCredential ($ProxyUser, $pw)
+			}
+	}
+	Write-Verbose "Token, Hunt Server Address, and Proxy settings are stored in global variables for use in all IC cmdlets"
 
 }
