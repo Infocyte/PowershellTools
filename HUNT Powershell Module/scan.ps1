@@ -446,7 +446,9 @@ function Import-ICSurvey {
 	  			Write-Host "$TargetGroupName does not exist. Creating new Target Group '$TargetGroupName'"
 	  			New-ICTargetGroup -Name $TargetGroupName
 					Start-Sleep 1
-					$TargetGroupId = ($targetGroups | where { $_.name -eq $TargetGroupName}).id
+          Start-Sleep 1
+          $TargetGroups = Get-ICTargetGroups
+          $TargetGroupId = ($targetGroups | where { $_.name -eq $TargetGroupName}).id
 	  	}
 		}
 
