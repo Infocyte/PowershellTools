@@ -68,6 +68,7 @@ PowerShellVersion = '5.0'
 FunctionsToExport = @(
   "Invoke-ICFindHosts",
   "Invoke-ICScan",
+  "Invoke-ICScanTarget",
   "Import-ICSurvey",
   "Get-ICObjects",
   "Get-ICAlerts",

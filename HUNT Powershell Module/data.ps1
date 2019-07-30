@@ -188,7 +188,7 @@ function Get-ICApplications {
   $filter['where']['and'] += @{ name = @{ nilike = "Update for%" }}
 
   $apps = _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
-  $apps | Sort-Object hostname, applicationId -unique | Sort-Object scannedOn
+  $apps | Sort-Object hostname, applicationId -unique | Sort-Object scannedOn -Descending
 }
 
 function _create_hashtable ([HashTable]$table) {

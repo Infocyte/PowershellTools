@@ -134,102 +134,94 @@ function Invoke-ICScan {
 	_ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method POST
 }
 
-function Invoke-ICScanByTarget {
+function Invoke-ICScanTarget {
 	[cmdletbinding()]
 	param(
 		[parameter(Mandatory=$true)]
 		[ValidateNotNullOrEmpty()]
 		[String]$target,
 
-		[PSObject]$ScanOptions,
-
 		[String]$TargetGroupId,
 		[String]$TargetGroupName = "OnDemand",
 
 		[String]$CredentialId,
 		[String]$CredentialName = "DefaultCredential",
-    [PSCredential]$Credentials
+
+    [String]$sshCredentialId,
+		[String]$sshCredentialName,
+
+    [PSObject]$ScanOptions
 	)
+
+  $body = @{
+    target = $target
+  }
 
 	# Select Target targetgroup
 	if ($TargetGroupId) {
 		$TargetGroup = Get-ICTargetGroups -TargetGroupId $TargetGroupId
 		if (-NOT $TargetGroup) {
 					Throw "TargetGroup with id $TargetGroupid does not exist!"
-		}
-	} else {
-		$TargetGroups = Get-ICTargetGroups
-		if ($TargetGroups.name -contains $TargetGroupName) {
-				$TargetGroup = $TargetGroups | where {$_.name -eq $TargetGroupName}
 		} else {
-			Write-Warning "TargetGroup with name $TargetGroupName does not exist. Creating a new one"
-			$TargetGroup = New-ICTargetGroup -name $TargetGroupName
-			Start-Sleep 1
-		}
-	}
+      $body['targetGroup'] = @{id = $targetGroupId}
+    }
+	} else {
+    Write-Verbose "Using Target Group Name [$TargetGroupName] -- will be created if it does not exist."
+    $body['targetGroup'] = @{name = $TargetGroupName}
+  }
 
 	# Select Credential
 	if ($CredentialId) {
 		$Credential = Get-ICCredentials -CredentialId $credentialId
 		if (-NOT $Credential) {
 			Throw "Credential with id $credentialId does not exist!"
-		}
-	}
-  elseif ($Credential) {
-    $CredentialName = (New-Guid).guid
-    $Credential = New-Credential -name $CredentialName -cred $Credentials
-    $tempcred = $True
+		} else {
+      $body['credential'] = @{ id = $credentialId }
+    }
+	} else {
+    # Use Credentialname
+    $Credential =  Get-ICCredentials | where { $_.name -eq $CredentialName }
+		if (-NOT $CredentialName) {
+			Throw "Credential with name [$CredentialName] does not exist! Please create it or specify a different credential (referenced by id or name)"
+      $body['credential'] = @{ name = $CredentialName }
+  	}
   }
-  else {
-    # Use Default Credential
-		$Credentials = Get-ICCredentials
-		if ($Credentials.name -contains $CredentialName) {
-				$Credential = $Credentials | where {$_.name -eq $CredentialName}
-		} else {
-			Throw "Credential with name $CredentialName does not exist! You must specify a valid credentialId, CredentialName or ensure the DefaultCredential is set in the UI"
-		}
-	}
 
-	# Create Query
-  $queryName = (New-Guid).guid
-	$query = New-ICQuery -TargetGroupId $TargetGroup.id -Name $QueryName -CredentialId $Credential.id -Query $target
+  # Select Credential
+  if ($sshCredentialId) {
+      $body['sshcredential'] = @{ id = $credentialId }
+  } elseif ($sshCredentialName) {
+      $body['sshcredential'] = @{ name = $sshCredentialName }
+  }
 
-	#Perform discovery
-	Write-Host "Performing discovery on $($TargetGroup.name)"
-	$stillactive = $true
-	$UserTask = Invoke-ICFindHosts -TargetGroupId $TargetGroup.Id -QueryId $Query.id
-	While ($stillactive) {
-		Start-Sleep 5
-		$taskstatus = Get-ICUserTasks -UserTaskId $UserTask.userTaskId
-		if ($taskstatus.status -eq "Active") {
-				Write-Host "Waiting on Discovery. Progress: $($taskstatus.progress)%"
-		} elseif ($taskstatus.status -eq "Complete") {
-				$stillactive = $false
-				Write-Host "Discovery Complete!"
-		} else {
-      Remove-ICQuery -QueryId $Query.id
-      if ($tempcred) { Remove-ICCredential $Credential.id}
-			Throw "Something went wrong in enumeration. Last Status: $($taskstatus.status)"
-		}
-	}
-
-	# Initiating Scan
-	$Endpoint = "targets/$($TargetGroup.Id)/scan"
-	Write-Verbose "Starting Scan of TargetGroup $($TargetGroup.name)"
-  $body = @{
-		where = @{
-			or = @(
-				@{ hostname = @{ regexp = $target } },
-				@{ ip = @{ regexp = $target } }
-			)
-		}
-	}
-	if ($ScanOptions) {
+  if ($ScanOptions) {
 		$body['options'] = $ScanOptions
 	}
+  <#
+  EXAMPLE PAYLOAD
+  {
+    target: 'w12-01-infected.ca.galactica.int', // required
+    targetGroup: { // optional
+      id: null,
+      name: '',
+      scanAllAccessibleHosts: false
+    },
+    credential: { // required id or name
+      id: null,
+      name: 'service'
+    },
+    sshCredential: { // optional
+      id: null,
+      name: null
+    },
+    options: {}
+  }
+  #>
+
+	# Initiating Scan
+	$Endpoint = "targets/scan"
+	Write-Verbose "Starting Scan of target $($target)"
 	_ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method POST
-  Remove-ICQuery -QueryId $Query.id
-  if ($tempcred) { Remove-ICCredential $Credential.id}
 }
 
 function New-ICScanOptions {
