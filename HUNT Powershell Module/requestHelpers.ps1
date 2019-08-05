@@ -1,6 +1,8 @@
 
 # HElPER FUNCTIONS
 $Depth = 10
+$resultlimit = 1000 # limits the number of results that come back. 1000 is max supported by Infocyte API. Use NoLimit flag on functions to iterate 1000 at a time for all results.
+$Globallimit = 100000
 
 # Used with most Infocyte Get methods. Takes a filter object (hashtable) and adds authentication and passes it as the body for URI encoded parameters. NoLimit will iterate 1000 results at a time to the end of the data set.
 function _ICGetMethod ([String]$url, [HashTable]$filter, [Switch]$NoLimit) {
@@ -604,4 +606,9 @@ Function IsPrivateNetwork( [String]$IP)
                 }
     }
     return $Private
+}
+
+
+function _Get-ICTimeStampUTC {
+  return (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
 }
