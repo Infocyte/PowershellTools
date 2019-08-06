@@ -103,3 +103,23 @@ function Remove-ICFlag {
   $Endpoint = "flags/$FlagId"
   _ICRestMethod -url $HuntServerAddress/api/$Endpoint -method DELETE
 }
+
+function Add-ICComment {
+  Param(
+    [parameter(Position=0, Mandatory=$true)]
+    [ValidateNotNullorEmpty()]
+    [String]$Id,
+
+    [parameter(Position=1, Mandatory=$true)]
+    [ValidateNotNullorEmpty()]
+    [String]$Text
+  )
+
+  $Endpoint = "userComments"
+	Write-Host "Adding new comment to item with id $id"
+  $body = @{
+    relatedId = $Id
+    value = $Text
+  }
+	_ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method POST
+}
