@@ -23,7 +23,7 @@ Author = 'Chris Gerritz'
 CompanyName = 'Infocyte, Inc.'
 
 # Copyright statement for this module
-Copyright = '(c) 2018 Infocyte, Inc. All rights reserved.'
+Copyright = '(c) 2019 Infocyte, Inc. All rights reserved.'
 
 # Description of the functionality provided by this module
 Description = 'Functions and Cmdlets to interface with the Infocyte HUNT API'

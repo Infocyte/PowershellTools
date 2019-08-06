@@ -349,10 +349,6 @@ function Remove-ICScanSchedule {
 	_ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method DELETE
 }
 
-function _Get-ICTimeStampUTC {
-  return (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
-}
-
 function Import-ICSurvey {
   # example script to upload a survey file to HUNT (2.10+)
   # Script to upload manual .bz2 file to hunt server.
