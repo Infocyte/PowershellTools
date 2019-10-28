@@ -382,7 +382,10 @@ function Import-ICSurvey {
 		$TargetGroupId,
 
   	[String]
-  	$TargetGroupName = "OfflineScans"
+  	$TargetGroupName = "OfflineScans",
+	
+  	[String]
+  	$ControllerGroupName = "OfflineGroup"	
   )
 
   BEGIN {
@@ -432,7 +435,16 @@ function Import-ICSurvey {
 				$TargetGroupId = ($targetGroups | where { $_.name -eq $TargetGroupName}).id
 	  	} else {
 	  			Write-Host "$TargetGroupName does not exist. Creating new Target Group '$TargetGroupName'"
-	  			New-ICTargetGroup -Name $TargetGroupName
+			  	$ControllerGroups = Get-ICControllerGroups		
+			  	if ($ControllerGroups.name -contains $ControllerGroupName) {	
+			  		Write-Host "$ControllerGroupName Exists."
+						$ControllerGroupId = ($ControllerGroups | where { $_.name -eq $ControllerGroupName}).id
+						New-ICTargetGroup -Name $TargetGroupName -ControllerGroupId $ControllerGroupId
+				} else {
+						Write-Host "$ControllerGroupName does not exist. Creating new Controller Group $ControllerGroupName"
+						$ControllerGroupId = (New-ICControllerGroup -Name $ControllerGroupName).id
+						New-ICTargetGroup -Name $TargetGroupName -ControllerGroupId $ControllerGroupId
+					}	
 					Start-Sleep 1
           Start-Sleep 1
           $TargetGroups = Get-ICTargetGroups

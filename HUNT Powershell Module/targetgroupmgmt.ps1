@@ -3,12 +3,16 @@ function New-ICTargetGroup {
   param(
     [parameter(Mandatory=$true, Position=0)]
     [ValidateNotNullOrEmpty()]
-    [String]$Name
+    [String]$Name,
+	[parameter(Mandatory=$true, Position=0)]
+    [ValidateNotNullOrEmpty()]
+    [String]$ControllerGroupId
   )
 
   $Endpoint = "targets"
   $body = @{
     name = $Name
+	controllerGroupId = $ControllerGroupId
   }
   Write-Host "Creating new target group: $Name [$HuntServerAddress/api/$Endpoint]"
   _ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method 'POST'
@@ -23,7 +27,7 @@ function New-ICControllerGroup {
 
   $Endpoint = "controllergroups"
   $body = @{
-    name = $Name
+    name = $Name;
   }
   Write-Host "Creating new Controller Group: $Name [$HuntServerAddress/api/$Endpoint]"
   _ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method 'POST'
@@ -78,7 +82,7 @@ function Remove-ICControllerGroup {
     [String]$ControllerGroupId
   )
 
-  $Endpoint = "targets/$ControllerGroupId"
+  $Endpoint = "controllergroups/$ControllerGroupId"
   Write-Warning "Removing Controller Group [$HuntServerAddress/api/$Endpoint]."
  # Write-Warning "This will remove access to all scan data within this target group and is only reversible for the next 7 days"
   _ICRestMethod -url $HuntServerAddress/api/$Endpoint -method 'DELETE'
