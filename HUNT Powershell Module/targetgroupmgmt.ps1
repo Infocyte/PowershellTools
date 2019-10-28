@@ -14,6 +14,21 @@ function New-ICTargetGroup {
   _ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method 'POST'
 }
 
+function New-ICControllerGroup {
+  param(
+    [parameter(Mandatory=$true, Position=0)]
+    [ValidateNotNullOrEmpty()]
+    [String]$Name
+  )
+
+  $Endpoint = "controllergroups"
+  $body = @{
+    name = $Name
+  }
+  Write-Host "Creating new Controller Group: $Name [$HuntServerAddress/api/$Endpoint]"
+  _ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method 'POST'
+}
+
 function Get-ICTargetGroups ([String]$TargetGroupId) {
   $Endpoint = "targets"
   $filter =  @{
@@ -28,6 +43,21 @@ function Get-ICTargetGroups ([String]$TargetGroupId) {
   }
 }
 
+function Get-ICControllerGroups ([String]$ControllerGroupId) {
+  $Endpoint = "controllergroups"
+  $filter =  @{
+    order = @("name", "id")
+    limit = $resultlimit
+    skip = 0
+  }
+  if ($TargetGroupId) {
+    _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$true | where { $_.id -eq $ControllerGroupId}
+  } else {
+    _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$true
+  }
+}
+
+
 function Remove-ICTargetGroup {
   param(
     [parameter(Mandatory=$true, Position=0)]
@@ -38,6 +68,19 @@ function Remove-ICTargetGroup {
   $Endpoint = "targets/$TargetGroupId"
   Write-Warning "Removing target group [$HuntServerAddress/api/$Endpoint]."
   Write-Warning "This will remove access to all scan data within this target group and is only reversible for the next 7 days"
+  _ICRestMethod -url $HuntServerAddress/api/$Endpoint -method 'DELETE'
+}
+
+function Remove-ICControllerGroup {
+  param(
+    [parameter(Mandatory=$true, Position=0)]
+    [ValidateNotNullOrEmpty()]
+    [String]$ControllerGroupId
+  )
+
+  $Endpoint = "targets/$ControllerGroupId"
+  Write-Warning "Removing Controller Group [$HuntServerAddress/api/$Endpoint]."
+ # Write-Warning "This will remove access to all scan data within this target group and is only reversible for the next 7 days"
   _ICRestMethod -url $HuntServerAddress/api/$Endpoint -method 'DELETE'
 }
 
