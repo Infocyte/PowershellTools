@@ -14,7 +14,7 @@ function New-ICQuery {
     [ValidateNotNullorEmpty()]
     [String]$Query,
 
-		[String]$QueryName
+	[String]$QueryName
     )
 
   $Credential = Get-ICCredentials -CredentialId $CredentialId
@@ -381,11 +381,8 @@ function Import-ICSurvey {
 		[String]
 		$TargetGroupId,
 
-  	[String]
-  	$TargetGroupName = "OfflineScans",
-	
-  	[String]
-  	$ControllerGroupName = "OfflineGroup"	
+      	[String]
+      	$TargetGroupName = "OfflineScans"
   )
 
   BEGIN {
@@ -398,7 +395,7 @@ function Import-ICSurvey {
 			$headers = @{
 		    Authorization = $Global:ICToken
 				scanid = $ScanId
-		  }
+		    }
   		try {
   			$objects = Invoke-RestMethod $HuntServerAddress/api/survey -Headers $headers -Method POST -InFile $FilePath -ContentType "application/octet-stream"
   		} catch {
@@ -408,67 +405,60 @@ function Import-ICSurvey {
   		$objects
   	}
 
-		if ($ScanId) {
-			# Check for existing ScanId and use it
-			$scans = Get-ICScans -NoLimit
-			if ($scans.id -contains $ScanId) {
-				$TargetGroupName = ($Scans | where { $_.scanId -eq $ScanId}).targetList
-			} else {
-				Throw "No scan exists with ScanId $ScanId. Specify an existing ScanId to add this survey result to or use other parameters to generate one."
-			}
+	if ($ScanId) {
+		# Check for existing ScanId and use it
+		$scans = Get-ICScans -NoLimit
+		if ($scans.id -contains $ScanId) {
+			$TargetGroupName = ($Scans | where { $_.scanId -eq $ScanId}).targetList
+		} else {
+			Throw "No scan exists with ScanId $ScanId. Specify an existing ScanId to add this survey result to or use other parameters to generate one."
 		}
-		elseif ($TargetGroupId) {
-			# Check TargetGroupId and create new ScanId for that group
-			Write-Host "Checking for existance of target group with TargetGroupId: '$TargetGroupId' and generating new ScanId"
-			$TargetGroups = Get-ICTargetGroups
-			if ($TargetGroups.id -contains $TargetGroupId) {
-				$TargetGroupName = ($TargetGroups | where { $_.id -eq $TargetGroupId }).name
-			} else {
-				Throw "No Target Group exists with TargetGroupId $TargetGroupId. Specify an existing TargetGroupId to add this survey to or use other parameters to generate one."
-			}
+	}
+	elseif ($TargetGroupId) {
+		# Check TargetGroupId and create new ScanId for that group
+		Write-Host "Checking for existance of target group with TargetGroupId: '$TargetGroupId' and generating new ScanId"
+		$TargetGroups = Get-ICTargetGroups
+		if ($TargetGroups.id -contains $TargetGroupId) {
+			$TargetGroupName = ($TargetGroups | where { $_.id -eq $TargetGroupId }).name
+		} else {
+			Throw "No Target Group exists with TargetGroupId $TargetGroupId. Specify an existing TargetGroupId to add this survey to or use other parameters to generate one."
 		}
-		else {
-			Write-Host "No ScanId or TargetGroupId specified. Checking for existance of target group: '$TargetGroupName'"
-	  	$TargetGroups = Get-ICTargetGroups
-	  	if ($TargetGroups.name -contains $TargetGroupName) {
-	  		Write-Host "$TargetGroupName Exists."
-				$TargetGroupId = ($targetGroups | where { $_.name -eq $TargetGroupName}).id
-	  	} else {
-	  			Write-Host "$TargetGroupName does not exist. Creating new Target Group '$TargetGroupName'"
-			  	$ControllerGroups = Get-ICControllerGroups		
-			  	if ($ControllerGroups.name -contains $ControllerGroupName) {	
-			  		Write-Host "$ControllerGroupName Exists."
-						$ControllerGroupId = ($ControllerGroups | where { $_.name -eq $ControllerGroupName}).id
-						New-ICTargetGroup -Name $TargetGroupName -ControllerGroupId $ControllerGroupId
-				} else {
-						Write-Host "$ControllerGroupName does not exist. Creating new Controller Group $ControllerGroupName"
-						$ControllerGroupId = (New-ICControllerGroup -Name $ControllerGroupName).id
-						New-ICTargetGroup -Name $TargetGroupName -ControllerGroupId $ControllerGroupId
-					}	
-					Start-Sleep 1
-          Start-Sleep 1
-          $TargetGroups = Get-ICTargetGroups
-          $TargetGroupId = ($targetGroups | where { $_.name -eq $TargetGroupName}).id
-	  	}
-		}
+	}
+	else {
+		Write-Host "No ScanId or TargetGroupId specified. Checking for existance of target group: '$TargetGroupName'"
+  	    $TargetGroups = Get-ICTargetGroups
+  	    if ($TargetGroups.name -contains $TargetGroupName) {
+  		    Write-Host "$TargetGroupName Exists."
+			$TargetGroupId = ($targetGroups | where { $_.name -eq $TargetGroupName}).id
+  	    } else {
+            Write-Host "$TargetGroupName does not exist. Creating new Target Group '$TargetGroupName'"
+            $g = Get-ICControllerGroups
+            if ($g.id.count -eq 1) {
+                $ControllerGroupId = $g.id
+            } else {
+                $ControllerGroupId = $g[0].id
+            }
+            $TargetGroupId = (New-ICTargetGroup -Name $TargetGroupName -ControllerGroupId $ControllerGroupId).id
+  	    }
+	}
 
-		# Creating ScanId
-		if (-NOT $ScanId) {
-			$ScanName = "Offline-" + (get-date).toString("yyyyMMdd-HHmm")
-			Write-Host "Creating scan named $ScanName [$TargetGroupName-$ScanName]..."
-			$StartTime = _Get-ICTimeStampUTC
-			$body = @{
-				name = $scanName;
-				targetId = $TargetGroupId;
-				startedOn = $StartTime
-			}
-			$newscan = _ICRestMethod -url $HuntServerAddress/api/scans -body $body -Method 'POST'
-			Start-Sleep 1
-			$ScanId = $newscan.id
+	# Creating ScanId
+	if (-NOT $ScanId) {
+		$ScanName = "Offline-" + (get-date).toString("yyyyMMdd-HHmm")
+		Write-Host "Creating scan named $ScanName [$TargetGroupName-$ScanName]..."
+		$StartTime = _Get-ICTimeStampUTC
+		$body = @{
+			name = $scanName;
+			targetId = $TargetGroupId;
+			startedOn = $StartTime
 		}
+		$newscan = _ICRestMethod -url $HuntServerAddress/api/scans -body $body -Method 'POST'
+		Start-Sleep 1
+		$ScanId = $newscan.id
+	}
 
 
-		Write-Host "Importing Survey Results into $TargetGroupName-$ScanName [ScanId: $ScanId] [TargetGroupId: $TargetGroupId]"
+	Write-Host "Importing Survey Results into $TargetGroupName-$ScanName [ScanId: $ScanId] [TargetGroupId: $TargetGroupId]"
   }
 
   PROCESS {

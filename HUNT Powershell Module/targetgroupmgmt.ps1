@@ -4,10 +4,18 @@ function New-ICTargetGroup {
     [parameter(Mandatory=$true, Position=0)]
     [ValidateNotNullOrEmpty()]
     [String]$Name,
-	[parameter(Mandatory=$true, Position=0)]
-    [ValidateNotNullOrEmpty()]
+
+	[parameter(Mandatory=$false, Position=1)]
     [String]$ControllerGroupId
   )
+
+  if (-NOT $ControllerGroupId) {
+    $g = Get-ICControllerGroups
+    if (($g.id.count -gt 1) -AND (-NOT $ControllerGroupId)) {
+        Write-Error "More than one Controller Group. Please specify ControllerGroupId."
+    }
+    $ControllerGroupId = $g.id
+  }
 
   $Endpoint = "targets"
   $body = @{
