@@ -69,7 +69,7 @@ function New-ICFlag {
 }
 
 
-function Get-ICFlags ([String]$FlagId) {
+function Get-ICFlag ([String]$FlagId) {
   if ($FlagId) {
     $Endpoint = "flags/$FlagId"
   } else {

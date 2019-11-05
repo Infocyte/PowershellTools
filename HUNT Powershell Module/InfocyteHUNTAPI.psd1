@@ -8,7 +8,7 @@
 RootModule = 'InfocyteHUNTAPI.psm1'
 
 # Version number of this module.
-ModuleVersion = '1.0'
+ModuleVersion = '1.0.0.0'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -82,35 +82,37 @@ FunctionsToExport = @(
   "New-ICToken",
   "Set-ICToken",
   "New-ICTargetGroup",
-  "Get-ICTargetGroups",
+  "Get-ICTargetGroup",
   "Remove-ICTargetGroup",
   "New-ICControllerGroup",
-  "Get-ICControllerGroups",
+  "Get-ICControllerGroup",
   "Remove-ICControllerGroup",
   "New-ICCredential",
-  "Get-ICCredentials",
+  "Get-ICCredential",
   "Remove-ICCredential",
   "New-ICQuery",
-  "Get-ICQueries",
+  "Get-ICQuery",
   "Remove-ICQuery",
-  "Get-ICAddresses",
-  "Remove-ICAddresses",
-  "Get-ICScans",
+  "Get-ICAddress",
+  "Remove-ICAddress",
+  "Get-ICScan",
   "Get-ICUserAuditLogs",
   "Add-ICComment",
-  "Get-ICUserTasks",
-  "Get-ICBoxes",
+  "Get-ICUserTask",
+  "Get-ICBox",
   "Get-ICFlagColorCodes",
   "New-ICFlag",
-  "Get-ICFlags",
+  "Get-ICFlag",
   "Update-ICFlag",
   "Remove-ICFlag",
   "New-ICScanOptions",
   "Add-ICScanSchedule",
-  "Get-ICScanSchedule",
+  "Get-ICScanchedule",
   "Remove-ICScanSchedule",
-  "Get-ICUserTaskItems",
-  "Get-ICReports"
+  "Get-ICUserTaskItem",
+  "Get-ICReports",
+  "Get-ICHelp",
+  "Invoke-ICExtension"
 )
 
 # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.

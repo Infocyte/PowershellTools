@@ -45,7 +45,7 @@ function Get-ICUserAuditLogs ([Switch]$NoLimit, [HashTable]$Where) {
 }
 
 # Get Infocyte HUNT User Tasks. These are the items in the task dropdown in the UI.
-function Get-ICUserTasks {
+function Get-ICUserTask {
 	[cmdletbinding()]
 	param(
 		[String]$UserTaskId,
@@ -86,7 +86,7 @@ function Get-ICUserTasks {
 	_ICGetMethod -url $url -filter $filter -NoLimit:$NoLimit
 }
 
-function Get-ICUserTaskItems {
+function Get-ICUserTaskItem {
 	[cmdletbinding()]
 	param(
 		[parameter(Mandatory=$true, Position=0)]

@@ -20,19 +20,19 @@ Authentication Functions:
 Target Group Management Functions:
 
 	New-ICTargetGroup (Input: Name)
-	Get-ICTargetGroups (Input: TargetGroupId)
+	Get-ICTargetGroup (Input: TargetGroupId)
 	Remove-ICTargetGRoup (Input: TargetGroupId)
 	New-ICCredential (Input: )
-	Get-ICCredentials (Input: )
+	Get-ICCredential (Input: )
 	New-ICQuery (Input: TargetGroupId, Query)
-	Get-ICQueries (Input: TargetGroupId)
-	Get-ICAddresses (Input: TargetGroupId)
-	Remove-ICAddresses (Input: TargetGroupId)
+	Get-ICQuery (Input: TargetGroupId)
+	Get-ICAddress (Input: TargetGroupId)
+	Remove-ICAddress (Input: TargetGroupId)
 
 HUNT Server Status Functions:
 
-    Get-ICScans
-    Get-ICUserTasks
+    Get-ICScan
+    Get-ICUserTask
     Get-ICLastScanId
 
 Data Export Functions:
@@ -42,14 +42,14 @@ Data Export Functions:
 	Get-ICApplications (Input: BoxId )
 	Get-ICVulnerabilities (Input: BoxId )
 	Get-ICFileDetail (Input: Hash)
-	Get-ICBoxes (Input: (AllScans, Last7 or Last30), targetGroupId)  # This gives you the boxid (a box is grouped scan data over a time period)
+	Get-ICBox (Input: (AllScans, Last7 or Last30), targetGroupId)  # This gives you the boxid (a box is grouped scan data over a time period)
 
 Scanning Functions:
 
 	Invoke-ICScan (Input: TargetGroupId)
 	Invoke-ICFindHosts (Input: TargetGroupId, QueryId)
   New-ICScanSchedule (Input: TargetGroupId, CronExpression)
-  Get-ICScanSchedule (Input: TargetGroupId)
+  Get-ICScanchedule (Input: TargetGroupId)
   Remove-ICScanSchedule (Input: TargetGroupId or ScheduleId)
 
 Offline Scans:

@@ -10,7 +10,7 @@ function New-ICTargetGroup {
   )
 
   if (-NOT $ControllerGroupId) {
-    $g = Get-ICControllerGroups
+    $g = Get-ICControllerGroup
     if (($g.id.count -gt 1) -AND (-NOT $ControllerGroupId)) {
         Write-Error "More than one Controller Group. Please specify ControllerGroupId."
     }
@@ -41,7 +41,7 @@ function New-ICControllerGroup {
   _ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method 'POST'
 }
 
-function Get-ICTargetGroups ([String]$TargetGroupId) {
+function Get-ICTargetGroup ([String]$TargetGroupId) {
   $Endpoint = "targets"
   $filter =  @{
     order = @("name", "id")
@@ -55,7 +55,7 @@ function Get-ICTargetGroups ([String]$TargetGroupId) {
   }
 }
 
-function Get-ICControllerGroups ([String]$ControllerGroupId) {
+function Get-ICControllerGroup ([String]$ControllerGroupId) {
   $Endpoint = "controllergroups"
   $filter =  @{
     order = @("name", "id")
@@ -120,7 +120,7 @@ function New-ICCredential {
   _ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method POST
 }
 
-function Get-ICCredentials ($CredentialId) {
+function Get-ICCredential ($CredentialId) {
 	Write-Verbose "Getting Credential Objects from Infocyte HUNT: $HuntServerAddress"
   $Endpoint = "credentials"
   $filter =  @{
@@ -148,7 +148,7 @@ function Remove-ICCredential {
 }
 
 
-function Get-ICAddresses ([String]$TargetGroupId, [HashTable]$Where, [Switch]$NoLimit) {
+function Get-ICAddress ([String]$TargetGroupId, [HashTable]$Where, [Switch]$NoLimit) {
   $Endpoint = "Addresses"
 	$filter =  @{
 		order = "lastAccessedOn"
@@ -171,7 +171,7 @@ function Get-ICAddresses ([String]$TargetGroupId, [HashTable]$Where, [Switch]$No
   _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
 }
 
-function Remove-ICAddresses {
+function Remove-ICAddress {
   Param(
     [ValidateNotNullorEmpty()]
     [String]$TargetGroupId
@@ -189,7 +189,7 @@ function Remove-ICAddresses {
 }
 
 
-function Get-ICScans ([String]$TargetGroupId, $TargetGroupName, [HashTable]$Where, [Switch]$NoLimit) {
+function Get-ICScan ([String]$TargetGroupId, $TargetGroupName, [HashTable]$Where, [Switch]$NoLimit) {
   $Endpoint = "IntegrationScans"
   $filter =  @{
     order = "scanCompletedOn desc"
@@ -206,7 +206,7 @@ function Get-ICScans ([String]$TargetGroupId, $TargetGroupName, [HashTable]$Wher
   }
 
   if ($TargetGroupId) {
-    $tgname = (Get-ICTargetGroups -TargetGroupId $TargetGroupId).name
+    $tgname = (Get-ICTargetGroup -TargetGroupId $TargetGroupId).name
     $filter['where']['and'] += @{ targetList = $tgname }
     Write-Verbose "Getting Scans against Target Group $TargetGroup [$TargetGroupId] from $HuntServerAddress"
   } elseif ($TargetGroupName) {
@@ -218,7 +218,7 @@ function Get-ICScans ([String]$TargetGroupId, $TargetGroupName, [HashTable]$Wher
   _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
 }
 
-function Get-ICBoxes ([Switch]$Last90, [Switch]$Last7, [Switch]$Last30, [Switch]$IncludeDeleted, [Switch]$Global, [String]$targetGroupId, [Switch]$NoLimit) {
+function Get-ICBox ([Switch]$Last90, [Switch]$Last7, [Switch]$Last30, [Switch]$IncludeDeleted, [Switch]$Global, [String]$targetGroupId, [Switch]$NoLimit) {
   $Endpoint = "Boxes"
   $filter =  @{
     limit = $resultlimit
@@ -245,7 +245,7 @@ function Get-ICBoxes ([Switch]$Last90, [Switch]$Last7, [Switch]$Last30, [Switch]
   }
 
   $boxes = _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
-  $TargetGroups = Get-ICTargetGroups
+  $TargetGroups = Get-ICTargetGroup
   $boxes | % {
     if ($_.targetId) {
        $tgid = $_.targetId

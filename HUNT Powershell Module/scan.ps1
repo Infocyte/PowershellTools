@@ -17,8 +17,8 @@ function New-ICQuery {
 	[String]$QueryName
     )
 
-  $Credential = Get-ICCredentials -CredentialId $CredentialId
-  $TargetGroup = Get-ICTargetGroups -TargetGroupId $TargetGroupId
+  $Credential = Get-ICCredential -CredentialId $CredentialId
+  $TargetGroup = Get-ICTargetGroup -TargetGroupId $TargetGroupId
 	Write-Host "Creating new Query ($query) in TargetGroup $TargetGroup.name  using credential $($Credential.name) [$($Credential.username)]"
   $Endpoint = "queries"
   $data = @{
@@ -38,7 +38,7 @@ function New-ICQuery {
   _ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method POST
 }
 
-function Get-ICQueries ([String]$TargetGroupId) {
+function Get-ICQuery ([String]$TargetGroupId) {
   $Endpoint = "queries"
   $filter =  @{
     limit = $resultlimit
@@ -73,8 +73,8 @@ function Invoke-ICFindHosts {
 
 		[String]$QueryId
 	)
-	$TargetGroup = Get-ICTargetGroups -TargetGroupId $TargetGroupId
-	$Queries = Get-ICQueries -TargetGroupId $TargetGroupId
+	$TargetGroup = Get-ICTargetGroup -TargetGroupId $TargetGroupId
+	$Queries = Get-ICQuery -TargetGroupId $TargetGroupId
 	if (-NOT $Queries) {
 		Throw "Target Group not found or does not have any Queries associated with it"
 	}
@@ -107,7 +107,7 @@ function Invoke-ICScan {
 
 		[Switch]$PerformDiscovery
 	)
-	$TargetGroup = Get-ICTargetGroups -TargetGroupId $TargetGroupId
+	$TargetGroup = Get-ICTargetGroup -TargetGroupId $TargetGroupId
 	if (-NOT $TargetGroup) {
 		Throw "TargetGroup with id $TargetGroupId does not exist!"
 	}
@@ -117,7 +117,7 @@ function Invoke-ICScan {
 		$UserTask = Invoke-ICFindHosts -TargetGroupId $TargetGroupId
 		While ($stillactive) {
 			Start-Sleep 10
-			$taskstatus = Get-ICUserTasks -UserTaskId $UserTask.userTaskId
+			$taskstatus = Get-ICUserTask -UserTaskId $UserTask.userTaskId
 			if ($taskstatus.status -eq "Active") {
 					Write-Host "Waiting on Discovery. Progress: $($taskstatus.progress)%"
 			} elseif ($taskstatus.status -eq "Completed") {
@@ -159,7 +159,7 @@ function Invoke-ICScanTarget {
 
 	# Select Target targetgroup
 	if ($TargetGroupId) {
-		$TargetGroup = Get-ICTargetGroups -TargetGroupId $TargetGroupId
+		$TargetGroup = Get-ICTargetGroup -TargetGroupId $TargetGroupId
 		if (-NOT $TargetGroup) {
 					Throw "TargetGroup with id $TargetGroupid does not exist!"
 		} else {
@@ -172,7 +172,7 @@ function Invoke-ICScanTarget {
 
 	# Select Credential
 	if ($CredentialId) {
-		$Credential = Get-ICCredentials -CredentialId $credentialId
+		$Credential = Get-ICCredential -CredentialId $credentialId
 		if (-NOT $Credential) {
 			Throw "Credential with id $credentialId does not exist!"
 		} else {
@@ -180,7 +180,7 @@ function Invoke-ICScanTarget {
     }
 	} else {
     # Use Credentialname
-    $Credential =  Get-ICCredentials | where { $_.name -eq $CredentialName }
+    $Credential =  Get-ICCredential | where { $_.name -eq $CredentialName }
 		if (-NOT $CredentialName) {
 			Throw "Credential with name [$CredentialName] does not exist! Please create it or specify a different credential (referenced by id or name)"
       $body['credential'] = @{ name = $CredentialName }
@@ -257,7 +257,7 @@ function Add-ICScanSchedule {
 
 		[PSObject]$ScanOptions
 	)
-	$TargetGroup = Get-ICTargetGroups -TargetGroupId $TargetGroupId
+	$TargetGroup = Get-ICTargetGroup -TargetGroupId $TargetGroupId
 	if (-NOT $TargetGroup) {
 		Throw "No such target group with id $TargetGroupId"
 	}
@@ -281,7 +281,7 @@ function Add-ICScanSchedule {
 	_ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method POST
 }
 
-function Get-ICScanSchedule ($TargetGroupId) {
+function Get-ICScanchedule ($TargetGroupId) {
   $Endpoint = "ScheduledJobs"
   $filter =  @{
     order = @("relatedId")
@@ -289,10 +289,10 @@ function Get-ICScanSchedule ($TargetGroupId) {
     skip = 0
   }
 	if ($TargetGroupId) {
-		$TargetGroups = Get-ICTargetGroups -TargetGroupId $TargetGroupId
+		$TargetGroups = Get-ICTargetGroup -TargetGroupId $TargetGroupId
 		$ScheduledJobs = _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$true | where { $_.relatedId -eq $TargetGroupId}
 	} else {
-		$TargetGroups = Get-ICTargetGroups
+		$TargetGroups = Get-ICTargetGroup
 		$ScheduledJobs = _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$true
 	}
 
@@ -332,7 +332,7 @@ function Remove-ICScanSchedule {
 		$targetGroupId
 	)
 
-	$Schedules = Get-ICScanSchedule
+	$Schedules = Get-ICScanchedule
 	if ($ScheduleId) {
 		$schedule = $Schedules | where { $_.id -eq $ScheduleId}
 	}
@@ -407,7 +407,7 @@ function Import-ICSurvey {
 
 	if ($ScanId) {
 		# Check for existing ScanId and use it
-		$scans = Get-ICScans -NoLimit
+		$scans = Get-ICScan -NoLimit
 		if ($scans.id -contains $ScanId) {
 			$TargetGroupName = ($Scans | where { $_.scanId -eq $ScanId}).targetList
 		} else {
@@ -417,7 +417,7 @@ function Import-ICSurvey {
 	elseif ($TargetGroupId) {
 		# Check TargetGroupId and create new ScanId for that group
 		Write-Host "Checking for existance of target group with TargetGroupId: '$TargetGroupId' and generating new ScanId"
-		$TargetGroups = Get-ICTargetGroups
+		$TargetGroups = Get-ICTargetGroup
 		if ($TargetGroups.id -contains $TargetGroupId) {
 			$TargetGroupName = ($TargetGroups | where { $_.id -eq $TargetGroupId }).name
 		} else {
@@ -426,13 +426,13 @@ function Import-ICSurvey {
 	}
 	else {
 		Write-Host "No ScanId or TargetGroupId specified. Checking for existance of target group: '$TargetGroupName'"
-  	    $TargetGroups = Get-ICTargetGroups
+  	    $TargetGroups = Get-ICTargetGroup
   	    if ($TargetGroups.name -contains $TargetGroupName) {
   		    Write-Host "$TargetGroupName Exists."
 			$TargetGroupId = ($targetGroups | where { $_.name -eq $TargetGroupName}).id
   	    } else {
             Write-Host "$TargetGroupName does not exist. Creating new Target Group '$TargetGroupName'"
-            $g = Get-ICControllerGroups
+            $g = Get-ICControllerGroup
             if ($g.id.count -eq 1) {
                 $ControllerGroupId = $g.id
             } else {

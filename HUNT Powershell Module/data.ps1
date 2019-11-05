@@ -93,7 +93,7 @@ function Get-ICConnections ([String]$BoxId, [HashTable]$where, [Switch]$All, [Sw
   if ($BoxId) {
     $filter['where']['and'] += @{ boxId = $BoxId }
   } else {
-    $BoxId = (Get-ICBoxes -Last90 -Global).id
+    $BoxId = (Get-ICBox -Last90 -Global).id
     $filter['where']['and'] += @{ boxId = $BoxId }
   }
   if ($where.count -gt 0) {
@@ -118,7 +118,7 @@ function Get-ICAccounts ([String]$BoxId, [HashTable]$where, [Switch]$NoLimit) {
   if ($BoxId) {
     $filter['where']['and'] += @{ boxId = $BoxId }
   } else {
-    $BoxId = (Get-ICBoxes -Last90 -Global).id
+    $BoxId = (Get-ICBox -Last90 -Global).id
     $filter['where']['and'] += @{ boxId = $BoxId }
   }
   if ($where.count -gt 0) {
@@ -145,7 +145,7 @@ function Get-ICScripts ([String]$BoxId, [HashTable]$where, [Switch]$NoLimit) {
   if ($BoxId) {
     $filter['where']['and'] += @{ boxId = $BoxId }
   } else {
-    $BoxId = (Get-ICBoxes -Last90 -Global).id
+    $BoxId = (Get-ICBox -Last90 -Global).id
     $filter['where']['and'] += @{ boxId = $BoxId }
   }
   if ($where.count -gt 0) {
@@ -175,7 +175,7 @@ function Get-ICApplications {
   if ($BoxId) {
     $filter['where']['and'] += @{ boxId = $BoxId }
   } else {
-    $BoxId = (Get-ICBoxes -Last90 -Global).id
+    $BoxId = (Get-ICBox -Last90 -Global).id
     $filter['where']['and'] += @{ boxId = $BoxId }
   }
   if ($where.count -gt 0) {
@@ -184,7 +184,7 @@ function Get-ICApplications {
     }
   }
 
-  # KB filter now redundant since Bothan update 
+  # KB filter now redundant since Bothan update
   # $filter['where']['and'] += @{ name = @{ nilike = "%KB/d%" }}
   # $filter['where']['and'] += @{ name = @{ nilike = "Update for%" }}
 
@@ -192,10 +192,6 @@ function Get-ICApplications {
   $apps | Sort-Object hostname, applicationId -unique | Sort-Object scannedOn -Descending
 }
 
-function _create_hashtable ([HashTable]$table) {
-
-
-}
 
 function Get-ICVulnerabilities {
   [cmdletbinding()]
@@ -206,7 +202,7 @@ function Get-ICVulnerabilities {
   )
 
   if (-NOT $BoxId) {
-    $BoxId = (Get-ICBoxes -Last90 -Global).id
+    $BoxId = (Get-ICBox -Last90 -Global).id
   }
   $apps = Get-ICApplications -BoxId $BoxId -where $where -NoLimit:$NoLimit
 
