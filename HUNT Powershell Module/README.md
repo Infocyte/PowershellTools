@@ -2,8 +2,8 @@
 Tested on Powershell Version: 5.0
 
 ## Getting Started
-Import the module:
-> PS> Import-Module .\InfocyteHUNTAPI.psd1
+Install the module:
+> PS> Install-Module -Name InfocyteHUNTAPI
 
 Create an API token in the Web Console within your profile or admin panel.
 Use Set-ICToken to connect to your HUNT server and set your API token.
