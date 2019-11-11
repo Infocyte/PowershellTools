@@ -1,72 +1,83 @@
 
 # General function for getting various objects (files, processes, memory injects, autostarts, etc.) from HUNT
-function Get-ICObjects {
+function Get-ICObject {
   [cmdletbinding()]
   param(
-    [parameter(Mandatory=$true)]
+    [parameter()]
+    [Alias("Get-ICObjects")]
     [ValidateSet(
-      "Processes",
-      "Modules",
-      "Drivers",
-      "Memory",
-      "Artifacts",
-      "Autostarts",
-      "Hosts",
-      "Connections",
-      "Applications",
-      "Vulnerabilities",
-      "Accounts",
-      "Scripts"
+      "Process",
+      "Module",
+      "Driver",
+      "MemScan",
+      "Artifact",
+      "Autostart",
+      "Host",
+      "Connection",
+      "Application",
+      "Account",
+      "Script",
+      "File"
     )]
-    [String]$Type,
-
-    [String]$TargetGroupId,
+    [String]$Type="File",
     [String]$BoxId,
-    [String]$ScanId,
     [HashTable]$where,
     [Switch]$NoLimit
   )
-
+  $Files = @(
+      "Process",
+      "Module",
+      "Driver",
+      "MemScan",
+      "Artifact",
+      "Autostart",
+      "Script"
+  )
+  $filter =  @{
+    order = "scannedOn desc" # "hostCompletedOn desc"
+    limit = $resultlimit
+    skip = 0
+    where = @{ and = @() }
+  }
   switch ( $Type ) {
-    "Processes" { $Endpoint = 'IntegrationProcesses'    }
-    "Modules" { $Endpoint = 'IntegrationModules'    }
-    "Drivers" { $Endpoint = 'IntegrationDrivers'   }
-    "Memory" { $Endpoint = 'IntegrationMemScans' }
-    "Artifacts" { $Endpoint = 'IntegrationArtifacts'  }
-    "Autostarts" { $Endpoint = 'IntegrationAutostarts' }
-    "Hosts" { $Endpoint = 'IntegrationHosts'  }
-    "Accounts" { # Write-Warning "This type is not yet supported by the Integration APIs. Use Get-ICAccounts"
-                  if ($ScanId) { Write-Warning "This type does not yet support ScanId. Use BoxId." }
-                  else { Get-ICAccounts -BoxId $BoxId -where $where -NoLimit:$NoLimit }
+    "Process" {   $Endpoint = 'boxprocessinstances' }
+    "Module" { $Endpoint = 'boxmoduleinstances' }
+    "Driver" { $Endpoint = 'boxdriverinstances' }
+    "MemScan" {  $Endpoint = 'Boxmemscaninstances' }
+    "Artifact" {   $Endpoint = 'boxartifactinstances' }
+    "Autostart" {  $Endpoint = 'boxautostartinstances' }
+    "Script" {     $Endpoint = 'BoxScriptInstances' }
+    "Connection" { $Endpoint = 'BoxConnectionInstances'
+                    $filter.remove('order')
+                    if (-NOT $where) {
+                        $filter.where['and'] += @{ state = "ESTABLISHED"}
+                    }
                 }
-    "Scripts" { # Write-Warning "This type is not yet supported by the Integration APIs. Use Get-ICScripts"
-                  if ($ScanId) { Write-Warning "This type does not yet support ScanId. Use BoxId." }
-                  else { Get-ICScripts -BoxId $BoxId -where $where -NoLimit:$NoLimit }
-              }
-    "Connections" { # Write-Warning "This type is not yet supported by the Integration APIs. Use Get-ICConnections"
-                    if ($ScanId) { Write-Warning "This type does not yet support ScanId. Use BoxId." }
-                    else { Get-ICConnections -BoxId $BoxId -where $where -NoLimit:$NoLimit }
-                  }
-    "Applications" { # Write-Warning "This type is not yet supported by the Integration APIs. Use Get-ICApplications"
-                      if ($ScanId) { Write-Warning "This type does not yet support ScanId. Use BoxId." }
-                      else { Get-ICApplications -BoxId $BoxId -where $where -NoLimit:$NoLimit }
-                  }
-    "Vulnerabilities" { # Write-Warning "This type is not yet supported by the Integration APIs. Use Get-ICVulnerabilities"
-                        if ($ScanId) { Write-Warning "This type does not yet support ScanId. Use BoxId." }
-                        else { Get-ICVulnerabilities -BoxId $BoxId -where $where -NoLimit:$NoLimit }
-                      }
+    "Host" {   $Endpoint = 'boxhosts'
+                $filter['order'] = 'completedOn desc'
+            }
+    "Account" {    $Endpoint = 'BoxAccountInstancesByHost'
+                    $filter.remove('order')
+                }
+    "Application" {    $Endpoint = 'BoxApplicationInstances'
+                        $filter.remove('order')
+                    }
+    "File" {
+            If (-NOT $Where) {
+                Write-Warning "Not Accepted: You should provide a filter for this query to reduce strain on the database."
+                return
+            }
+            $Files | % { Get-ICBoxObjects -Type $_ -BoxId $BoxId -where $where -NoLimit:$NoLimit }
+         }
     Default { }
   }
   if ($Endpoint) {
-    $filter =  @{
-      order = "hostCompletedOn desc"
-      limit = $resultlimit
-      skip = 0
-      where = @{ and = @() }
-    }
 
     if ($BoxId) {
-      Write-Warning "boxid filtering will not work with the current Integration APIs for files (supports TargetGroupId or ScanId)"
+      $filter['where']['and'] += @{ boxId = $BoxId }
+    } else {
+      $BoxId = (Get-ICBox -Last7 -Global).id
+      $filter['where']['and'] += @{ boxId = $BoxId }
     }
     if ($where.count -gt 0) {
       $where.GetEnumerator() | % {
@@ -74,90 +85,11 @@ function Get-ICObjects {
       }
     }
 
-    if ($scanId) { $filter.where['and'] += @{ scanId = $scanId } }
-    #elseif ($BoxId) { $filter.where['and'] += @{ boxId = $BoxId } }
-    elseif ($TargetGroupId) { $filter.where['and'] += @{ targetId = $TargetGroupId } }
-
     _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
   }
 }
 
-# Get Connection objects
-function Get-ICConnections ([String]$BoxId, [HashTable]$where, [Switch]$All, [Switch]$NoLimit) {
-  $Endpoint = "BoxConnectionInstances"
-  $filter =  @{
-    limit = $resultlimit
-    skip = 0
-    where = @{ and = @() }
-  }
-  if ($BoxId) {
-    $filter['where']['and'] += @{ boxId = $BoxId }
-  } else {
-    $BoxId = (Get-ICBox -Last90 -Global).id
-    $filter['where']['and'] += @{ boxId = $BoxId }
-  }
-  if ($where.count -gt 0) {
-    $where.GetEnumerator() | % {
-      $filter['where']['and'] += @{ $($_.key) = $($_.value) }
-    }
-  } else {
-    if (-NOT $All) { $filter.where['and'] += @{ state = "ESTABLISHED"} }
-  }
-
-  _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
-}
-
-# Get Account objects
-function Get-ICAccounts ([String]$BoxId, [HashTable]$where, [Switch]$NoLimit) {
-  $Endpoint = "BoxAccountInstancesByHost"
-  $filter =  @{
-    limit = $resultlimit
-    skip = 0
-    where = @{ and = @() }
-  }
-  if ($BoxId) {
-    $filter['where']['and'] += @{ boxId = $BoxId }
-  } else {
-    $BoxId = (Get-ICBox -Last90 -Global).id
-    $filter['where']['and'] += @{ boxId = $BoxId }
-  }
-  if ($where.count -gt 0) {
-    $where.GetEnumerator() | % {
-      $filter['where']['and'] += @{ $($_.key) = $($_.value) }
-    }
-  }
-
-
-  _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
-}
-
-# Get Script objects
-function Get-ICScripts ([String]$BoxId, [HashTable]$where, [Switch]$NoLimit) {
-  $Endpoint = "BoxScriptInstances"
-
-  $filter =  @{
-    limit = $resultlimit
-    order = "scannedOn desc"
-    skip = 0
-    where = @{ and = @() }
-  }
-
-  if ($BoxId) {
-    $filter['where']['and'] += @{ boxId = $BoxId }
-  } else {
-    $BoxId = (Get-ICBox -Last90 -Global).id
-    $filter['where']['and'] += @{ boxId = $BoxId }
-  }
-  if ($where.count -gt 0) {
-    $where.GetEnumerator() | % {
-      $filter['where']['and'] += @{ $($_.key) = $($_.value) }
-    }
-  }
-
-  _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
-}
-
-function Get-ICApplications {
+function Get-ICApplication {
   [cmdletbinding()]
   param(
     [String]$BoxId,
@@ -193,7 +125,7 @@ function Get-ICApplications {
 }
 
 
-function Get-ICVulnerabilities {
+function Get-ICVulnerability {
   [cmdletbinding()]
   param(
     [String]$BoxId,
@@ -278,7 +210,7 @@ function Get-ICFileDetail {
 }
 
 # Get Account objects
-function Get-ICAlerts {
+function Get-ICAlert {
   [cmdletbinding()]
   param(
     [Switch]$IncludeArchived,
@@ -307,7 +239,7 @@ function Get-ICAlerts {
   _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
 }
 
-function Get-ICReports {
+function Get-ICReport {
   [cmdletbinding()]
   param(
     [String]$ReportId,

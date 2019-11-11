@@ -2,7 +2,7 @@
 # Status and Progress APIs
 
 # Get Infocyte HUNT Jobs (Active jobs or all jobs)
-function Get-ICJobs ([Switch]$All, [HashTable]$Where, [Switch]$NoLimit) {
+function Get-ICJob ([Switch]$All, [HashTable]$Where, [Switch]$NoLimit) {
 	$url = ("$HuntServerAddress/api/jobs")
 	$filter =  @{
 		order = "createdOn"
@@ -27,7 +27,7 @@ function Get-ICJobs ([Switch]$All, [HashTable]$Where, [Switch]$NoLimit) {
 }
 
 # Get Infocyte HUNT User Audit Logs
-function Get-ICUserAuditLogs ([Switch]$NoLimit, [HashTable]$Where) {
+function Get-ICUserAuditLog ([Switch]$NoLimit, [HashTable]$Where) {
 	$url = ("$HuntServerAddress/api/useractivities")
 	$filter =  @{
 		order = "createdOn"

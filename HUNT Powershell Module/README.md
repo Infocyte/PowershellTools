@@ -37,10 +37,9 @@ HUNT Server Status Functions:
 
 Data Export Functions:
 
-	Get-ICObjects (Input: Type, ScanId, BoxId )
-	Get-ICConnections (Input: BoxId )
-	Get-ICApplications (Input: BoxId )
-	Get-ICVulnerabilities (Input: BoxId )
+	Get-ICObject (Input: Type, ScanId, BoxId )
+	Get-ICApplication (Input: BoxId )
+	Get-ICVulnerability (Input: BoxId )
 	Get-ICFileDetail (Input: Hash)
 	Get-ICBox (Input: (AllScans, Last7 or Last30), targetGroupId)  # This gives you the boxid (a box is grouped scan data over a time period)
 
@@ -48,9 +47,9 @@ Scanning Functions:
 
 	Invoke-ICScan (Input: TargetGroupId)
 	Invoke-ICFindHosts (Input: TargetGroupId, QueryId)
-  New-ICScanSchedule (Input: TargetGroupId, CronExpression)
-  Get-ICScanchedule (Input: TargetGroupId)
-  Remove-ICScanSchedule (Input: TargetGroupId or ScheduleId)
+    New-ICScanSchedule (Input: TargetGroupId, CronExpression)
+    Get-ICScanchedule (Input: TargetGroupId)
+    Remove-ICScanSchedule (Input: TargetGroupId or ScheduleId)
 
 Offline Scans:
 
