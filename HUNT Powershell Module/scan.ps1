@@ -281,7 +281,7 @@ function Add-ICScanSchedule {
 	_ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method POST
 }
 
-function Get-ICScanchedule ($TargetGroupId) {
+function Get-ICScanSchedule ($TargetGroupId) {
   $Endpoint = "ScheduledJobs"
   $filter =  @{
     order = @("relatedId")

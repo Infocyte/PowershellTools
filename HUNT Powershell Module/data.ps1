@@ -67,7 +67,7 @@ function Get-ICObject {
                 Write-Warning "Not Accepted: You should provide a filter for this query to reduce strain on the database."
                 return
             }
-            $Files | % { Get-ICBoxObjects -Type $_ -BoxId $BoxId -where $where -NoLimit:$NoLimit }
+            $Files | % { Get-ICObject -Type $_ -BoxId $BoxId -where $where -NoLimit:$NoLimit }
          }
     Default { }
   }

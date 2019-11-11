@@ -8,7 +8,7 @@
 RootModule = 'InfocyteHUNTAPI.psm1'
 
 # Version number of this module.
-ModuleVersion = '1.0.0.0'
+ModuleVersion = '1.1.0.0'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -93,7 +93,7 @@ FunctionsToExport = @(
   "Get-ICAddress",
   "Remove-ICAddress",
   "Get-ICScan",
-  "Get-ICUserAuditLogs",
+  "Get-ICUserAuditLog",
   "Add-ICComment",
   "Get-ICUserTask",
   "Get-ICBox",
@@ -104,7 +104,7 @@ FunctionsToExport = @(
   "Remove-ICFlag",
   "New-ICScanOptions",
   "Add-ICScanSchedule",
-  "Get-ICScanchedule",
+  "Get-ICScanSchedule",
   "Remove-ICScanSchedule",
   "Get-ICUserTaskItem",
   "Get-ICReport",
