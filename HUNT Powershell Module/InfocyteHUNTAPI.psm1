@@ -42,13 +42,13 @@ function Get-ICHelp {
     Write-Host "Example:"
     Write-Host -ForegroundColor Cyan 'PS> Set-ICToken -HuntServer "https://myserver.infocyte.com" -Token ASDFASDASFASDASF'
     Write-Host -ForegroundColor Cyan 'PS> $Box = Get-ICBox -Last30 | where { $_.TargetGroup -eq "Brooklyn Office"}'
-    Write-Host -ForegroundColor Cyan 'PS> Get-ICObject -Type Processes -BoxId $Box.Id'
+    Write-Host -ForegroundColor Cyan 'PS> Get-ICObject -Type Process -BoxId $Box.Id'
 
     Write-Host 'Using custom loopback filters: $where = [Hashtable]@{ term1 = "asdf1"; term2 = "asdf2" }'
     Write-Host 'Note: Best time format is ISO 8601 or Get-Dates type code "o". i.e. 2019-05-03T00:37:40.0056344-05:00'
     Write-Host 'For more information on filtering, see loopbacks website here: https://loopback.io/doc/en/lb2/Where-filter.html'
     Write-Host -ForegroundColor Cyan 'PS> $customfilter = @{ threatName = "Unknown"; modifiedOn = @{ gt = $((Get-Date).AddDays(-10).GetDateTimeFormats('o')) }; size = @{ lt = 1000000 } }'
-    Write-Host -ForegroundColor Cyan 'PS> Get-ICObject -Type Artifacts -BoxId $Box.Id -where $customfilter'
+    Write-Host -ForegroundColor Cyan 'PS> Get-ICObject -Type Artifact -BoxId $Box.Id -where $customfilter'
 
     Write-Host "Offline Scan Processing Example (Default Target Group = OfflineScans):"
     Write-Host -ForegroundColor Cyan 'PS> Import-ICSurvey -Path .\surveyresult.json.gz'
@@ -56,7 +56,7 @@ function Get-ICHelp {
     Write-Host "Offline Scan Processing Example (Default Target Group = OfflineScans):"
     Write-Host -ForegroundColor Cyan 'PS> Get-ICTargetGroup'
     Write-Host -ForegroundColor Cyan 'PS> Get-ChildItem C:\FolderOfSurveyResults\ -filter *.json.gz | Import-ICSurvey -Path .\surveyresult.json.gz -TargetGroupId b3fe4271-356e-42c0-8d7d-01041665a59b'
-    Write-Host -ForegroundColor Cyan 'PS> Get-ICObject -Type Processes -BoxId $Box.Id'
+    Write-Host -ForegroundColor Cyan 'PS> Get-ICObject -Type File -BoxId $Box.Id -where @{ path = @{ regexp = "/roaming/i" } }'
 }
 Get-ICHelp
 
