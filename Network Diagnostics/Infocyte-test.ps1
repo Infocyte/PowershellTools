@@ -54,32 +54,33 @@
 Param(
 	[Parameter(Position = 0, Mandatory = $True, HelpMessage = "The remote system to test connectivity to")]
 	[ValidateNotNullOrEmpty()]
-  [String]
-  $Target,
+  	[String]
+  	$Target,
 
 	[Parameter(Position = 1, Mandatory = $True, HelpMessage = "Elevated account that will be used with HUNT")]
 	[ValidateNotNullOrEmpty()]
 	[System.Management.Automation.PSCredential]
 	$Credential,
 
-  [Parameter(Mandatory = $False, HelpMessage = "Address of proxy in the form of: http://<myproxy-ip>:8080")]
-  [String]
-  $ProxyAddress,
+  	[Parameter(Mandatory = $False, HelpMessage = "Address of proxy in the form of: http://<myproxy-ip>:8080")]
+  	[String]
+  	$ProxyAddress,
 
 	[Parameter(Mandatory = $False, HelpMessage = "Proxy credentials for authenticated proxies")]
 	[ValidateNotNullOrEmpty()]
 	[System.Management.Automation.PSCredential]
 	$ProxyCredential,
 
-	$HUNTServerAddress
+	$ReturnAddress
 )
 
 #requires -version 2.0
 $Admin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
 If (-NOT $Admin) {
-	Write-Warning "NOTE: Your shell is not running as Administrator (But you shouldn't need it for this script)."
+	#Write-Warning "NOTE: Your shell is not running as Administrator (But you shouldn't need it for this script)."
 }
 
+$errorActionPreference = "Continue"
 # $PSScriptRoot
 # [ValidatePattern("\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}")]
 # FUNCTIONS
@@ -90,10 +91,10 @@ Function Get-DNSEntry ($target) {
 		Write-Verbose "Resolving $target"
         $Temp = [System.Net.Dns]::GetHostEntry($target)
 	} catch {
-		$ErrorMessage = $_.Exception.Message
-		$FailedItem = $_.Exception.ItemName
-		Write-Warning "[ERROR] Failed DNS Lookup against $target - No such host/IP is known - Error Item: $FailedItem, Message: $Message"
-		Write-Warning "Using DNS $(nslookup $target 2> $null)"
+		$Message = $_.Exception.Message
+		$ErrorType = $_.Exception.GetType().FullName
+		Write-Warning "[ERROR] Failed DNS Lookup against $target - No such host/IP is known - Message: $Message"
+		Write-Warning "Using DNS $(nslookup $target)"
 		return
 	}
 	if ($target -match "\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}") {
@@ -258,9 +259,9 @@ Function Test-ADCredentials {
 	try {
 		$pc = New-Object System.DirectoryServices.AccountManagement.PrincipalContext($ct, $Credential.GetNetworkCredential().Domain)
 	} catch {
-		$ErrorMessage = $_.Exception.Message
-		$FailedItem = $_.Exception.ItemName
-		Write-Warning "ERROR: Could not contact DirectoryServices on domain $($Credential.GetNetworkCredential().Domain)  - Error Item: $FailedItem, Message: $Message"
+		$Message = $_.Exception.Message
+		$ErrorType = $_.Exception.GetType().FullName
+		Write-Warning "ERROR: Could not contact DirectoryServices on domain $($Credential.GetNetworkCredential().Domain)  - Message: $Message"
 		return
 	}
 
@@ -325,9 +326,8 @@ Function New-ProxyWebClient {
 		$wc = new-object net.webclient
 		$proxyUri = new-object system.uri($ProxyAddress)
 	} catch {
-		$ErrorMessage = [String]$_.Exception.Message
-		$FailedItem = [String]$_.Exception.ItemName
-		Write-Warning "ERROR: Could not set up proxy - Error Item: $FailedItem, Message: $Message"
+		$Message = [String]$_.Exception.Message
+		Write-Warning "ERROR: Could not set up proxy - Message: $Message"
 	}
 	if ($Credential) {
 		# Configure Authenticated proxy
@@ -339,9 +339,8 @@ Function New-ProxyWebClient {
 			$wc.Proxy = new-object system.net.WebProxy($proxyUri, $bypassLocal)
 			$wc.Proxy.Credentials = $cachedCredentials.GetCredential($proxyUri, $AuthType, $Domain)
 		} catch {
-			$ErrorMessage = [String]$_.Exception.Message
-			$FailedItem = [String]$_.Exception.ItemName
-			Write-Warning "ERROR: Could not add credentials to proxy - Error Item: $FailedItem, Message: $Message"
+			$Message = [String]$_.Exception.Message
+			Write-Warning "ERROR: Could not add credentials to proxy - Message: $Message"
 		}
 		return $wc
 
@@ -352,9 +351,9 @@ Function New-ProxyWebClient {
 			$wc.Proxy = new-object system.net.WebProxy($proxyUri, $bypassLocal)
 			$wc.Proxy.Credentials = [System.Net.CredentialCache]::DefaultNetworkCredentials
 		} catch {
-			$ErrorMessage = $_.Exception.Message
-			$FailedItem = $_.Exception.ItemName
-			Write-Warning "ERROR: Error while setting system's default proxy credentials - Error Item: $FailedItem, Message: $Message"
+			$Message = $_.Exception.Message
+			$ErrorType = $_.Exception.GetType().FullName
+			Write-Warning "ERROR: Error while setting system's default proxy credentials - Message: $Message"
 		}
 		$showcurrentproxy = netsh winhttp show proxy
 		Write-Verbose $showcurrentproxy
@@ -374,19 +373,23 @@ Function New-ProxyWebClient {
 		$FQUsername = $Username
 	}
 	$TestNum = 0
-	$TestWebsite = 'http://infocyte.com'
+	$TestResults = @{}
 	if (-NOT $PSScriptRoot) {
 		$PSScriptRoot = Split-Path $MyInvocation.MyCommand.Path -Parent
 	}
 	$OutputFileLocation = "$PSScriptRoot\InfocyteTest.log"
 	$ports = 22,53,80,135,137,139,389,443,445,1024,1025,1026,3389,5985,5986,49152,49153,49154
-	$ExternalIP = (Invoke-WebRequest ifconfig.me/ip).Content.Trim()
+	$ExternalIP = (Invoke-WebRequest ifconfig.me/ip -UseBasicParsing).Content.Trim()
+	$IPAddress = Get-WmiObject Win32_NetworkAdapterConfiguration | Where-Object { $_.ipenabled -AND $_.Ipaddress.length -gt 0 -AND $_.DefaultIPGateway.length -gt 0 }
+	If (-NOT $ReturnAddress) {
+		$ReturnAddress = $IPAddress.ipaddress[0]
+	}
 
 	# Start transcript log of this script's output
 	Start-Transcript -path $OutputFileLocation
 	Write-Host "Running script with the following parameters:"
 	Write-Host "Remote Test Target: $Target"
-	Write-Host "Executed From: $HUNTServerAddress [ExtIP: $ExternalIP] by $(whoami)"
+	Write-Host "Executed From: $ReturnAddress [ExtIP: $ExternalIP] by $(whoami)"
 	Write-Host "Credential: $($Credential.Username)"
 	Write-Host "ProxyAddress: $ProxyAddress"
 	Write-Host "ProxyCredential: $($ProxyCredential.Username)"
@@ -398,6 +401,16 @@ Function New-ProxyWebClient {
 		} else {
 			Write-Warning "ProxyAddress ($ProxyAddress) may be in the wrong format.  Should be http://myproxyaddress.com or http://192.168.1.80:8080"
 		}
+	}
+	$TestResults['Config'] = @{
+		Target = $target
+		ReturnAddress = $ReturnAddress
+		SourceAddress = $IPAddress.ipaddress[0]
+		DNS = $IPAddress.DNSServerSearchOrder
+		ExtIP = $ExternalIP
+		Credential = $($Credential.Username)
+		ProxyAddress = $ProxyAddress
+		ProxyCredential = $($ProxyCredential.Username)
 	}
 
     Write-Host -ForegroundColor Cyan "`n==========================================================================="
@@ -416,42 +429,68 @@ Function New-ProxyWebClient {
 	#region Internet Tests
 	# Test DNS Resolution and connectivity to the internet
 	$Testnum += 1
+	$InternetTestAddr = "www.google.com"
 	Write-Host -ForegroundColor Cyan "`n[TEST $TestNum] Testing DNS resolution and connectivity to the internet (Optional)"
-	$DNSEntry = Get-DNSEntry www.google.com
+	$Result = @{
+	   Name = "Connectivity Test (Optional)"
+	   Test = $TestNum
+	   Description = "Testing DNS resolution and connectivity to the internet ($InternetTestAddr)"
+	   Success = $True
+   }
+	$DNSEntry = Get-DNSEntry $InternetTestAddr
 	if ($DNSEntry) {
 		Write-Host "SUCCESS: $($DNSEntry.Hostname) => $($DNSEntry.IP)"
+		$Result['DNSResult'] = $True
 	} else {
-		Write-Warning "FAIL: DNS Resolution of www.google.com failed - Your internet may be down"
+		Write-Warning "FAIL: DNS Resolution of $InternetTestAddr failed - Your internet may be down"
+		$Result['DNSResult'] = $False
+		$Result['Success'] = $False
 	}
 
 	try {
-		$ICMP = Test-Connection -BufferSize 16 -Count 1 -ComputerName www.google.com -ea STOP
-		Write-Host "SUCCESS: Ping (ICMP) to www.google.com ($($ICMP.IPV4Address)) in $($ICMP.ResponseTime) m/s"
+		$ICMP = Test-Connection -BufferSize 16 -Count 1 -ComputerName $InternetTestAddr -ea STOP
+		Write-Host "SUCCESS: Ping (ICMP) to $InternetTestAddr ($($ICMP.IPV4Address)) in $($ICMP.ResponseTime) m/s"
+		$Result['ICMPResult'] = $True
 	} catch {
-		$ErrorMessage = $_.Exception.Message
-		$FailedItem = $_.Exception.ItemName
-		Write-Warning "FAIL: Ping (ICMP) to www.google.com - Error Item: $FailedItem, Message: $Message"
+		$Message = $_.Exception.Message
+		$ErrorType = $_.Exception.GetType().FullName
+		Write-Warning "FAIL: Ping (ICMP) to $InternetTestAddr - Message: $Message"
+		$Result['ICMPResult'] = $False
 	}
+	$TestResults["$TestNum"] = $Result
 
 
 	# Test DNS Resolution and connectivity to Incyte
 	$TestNum += 1
 	Write-Host -ForegroundColor Cyan "`n[TEST $TestNum] Testing DNS resolution and connectivity to Infocyte (Required)"
-	$DNSEntry = Get-DNSEntry incyte.infocyte.com
+	$Result = @{
+	   Name = "Infocyte Cloud Connectivity Test"
+	   Test = $TestNum
+	   Description = "Testing DNS resolution and connectivity to Infocyte (Required)"
+	   Success = $True
+   }
+	$DNSEntry = Get-DNSEntry "incyte.infocyte.com"
 	if ($DNSEntry) {
 		Write-Host "SUCCESS: $($DNSEntry.Hostname) => $($DNSEntry.IP)"
+		$Result['DNSResult'] = $True
 	} else {
 		Write-Warning "FAIL: DNS Resolution of incyte.infocyte.com failed - Your internet may be down"
+		$Result['DNSResult'] = $False
+		$Result['Success'] = $False
 	}
 
 	try {
 		$ICMP = Test-Connection -BufferSize 16 -Count 1 -ComputerName incyte.infocyte.com -ea STOP
 		Write-Host "SUCCESS: Ping (ICMP) to incyte.infocyte.com ($($ICMP.IPV4Address)) in $($ICMP.ResponseTime) m/s"
+		$Result['ICMPResult'] = $True
 	} catch {
-		$ErrorMessage = $_.Exception.Message
-		$FailedItem = $_.Exception.ItemName
-		Write-Warning "FAIL: Ping (ICMP) to incyte.infocyte.com (($($ICMP.IPV4Address)) - Error Item: $FailedItem, Message: $Message"
+		$Message = $_.Exception.Message
+		$ErrorType = $_.Exception.GetType().FullName
+		Write-Warning "FAIL: Ping (ICMP) to incyte.infocyte.com (($($ICMP.IPV4Address)) - Message: $Message"
+		$Result['ICMPResult'] = $False
 	}
+	$TestResults["$TestNum"] = $Result
+
 	#endregion Internet Test
 
 	#region Proxy Tests
@@ -462,6 +501,13 @@ Function New-ProxyWebClient {
 	# Write-Host $int
 	$TestNum += 1
 	Write-Host  -ForegroundColor Cyan "`n[TEST $TestNum] Testing web connectivity with direct access (No Proxy)"
+	$TestWebsite = 'https://incyte.infocyte.com'
+	$Result = @{
+	   Name = "Infocyte Cloud Connectivity Test"
+	   Test = $TestNum
+	   Description = "Testing DNS resolution and connectivity to Infocyte"
+	   Success = $True
+   }
 
 	#Configure Proxy if required
 	$showcurrentproxy = netsh winhttp show proxy
@@ -471,84 +517,83 @@ Function New-ProxyWebClient {
 	try {
 		$wc = new-object net.webclient
 		$results = $wc.DownloadString($TestWebsite)
-		if ($results -match "Malware Hunting") {
+		if ($results -match "All services are operational") {
 			Write-Host "SUCCESS: Web (http) connectivity with direct access (No Proxy) succeeded to $TestWebsite"
+			$Result['NoProxy'] = $True
 		} else {
 			Write-Warning "FAIL: Web (http) connectivity with direct access (No Proxy) failed to $TestWebsite"
-			$results
+			$Result['NoProxy'] = $False
+			$Result['Success'] = $False
 		}
 	} catch {
 			Write-Warning "FAIL: Web (http) connectivity with direct access (No Proxy) failed to $TestWebsite"
-			$ErrorMessage = $_.Exception.Message
-			$FailedItem = $_.Exception.ItemName
-			Write-Warning "Error Item: $FailedItem, Message: $Message"
+			$Message = $_.Exception.Message
+			Write-Warning "Message: $Message"
+			$Result['NoProxy'] = $False
+			$Result['Success'] = $False
 	}
 
     if ($ProxyAddress) {
-
-		# Testing web client with unauthenticated Proxy
-		Write-Host "Testing web client with unauthenticated proxy ($ProxyAddress)"
-		try {
-			$wc = New-ProxyWebClient $ProxyAddress
-			$results = $wc.DownloadString($TestWebsite)
-			if ($results -match "Malware Hunting") {
-				Write-Host "SUCCESS: Web (http) connectivity with unauthenticated Proxy succeeded to $TestWebsite"
-			} else {
-				Write-Warning "FAIL: Web (http) connectivity with unauthenticated Proxy failed to $TestWebsite"
-				$results
-			}
-		} catch {
-			Write-Warning "FAIL: Web (http) connectivity with unauthenticated Proxy failed to $TestWebsite"
-			$ErrorMessage = $_.Exception.Message
-			$FailedItem = $_.Exception.ItemName
-			Write-Warning "Error Item: $FailedItem, Message: $Message"
-		}
-
-
-        if ($ProxyCredential) {
-
+		if ($ProxyCredential) {
 			# Testing web client with authenticated Proxy
             $AuthType = "Negotiate"
    			Write-Host "Testing proxied web client with $AuthType Proxy Auth"
             $wc = New-ProxyWebClient $ProxyAddress $ProxyCredential $AuthType
-			try {
-				$results = $wc.DownloadString($TestWebsite)
-				if ($results -match "Malware Hunting") {
-					Write-Host "SUCCESS: Web (http) connectivity through proxy with $AuthType authentication succeeded to $TestWebsite"
-				} else {
-					Write-Warning "FAIL: Web (http) connectivity through proxy with $AuthType authentication failed to $TestWebsite"
-					#$results
-				}
-			} catch {
-				Write-Warning "FAIL: Web (http) connectivitythrough proxy with $AuthType authentication failed to $TestWebsite"
-				$ErrorMessage = $_.Exception.Message
-				$FailedItem = $_.Exception.ItemName
-				Write-Warning "Error Item: $FailedItem, Message: $Message"
+		} else {
+			# Testing web client with unauthenticated Proxy
+			Write-Host "Testing web client with unauthenticated proxy ($ProxyAddress)"
+			$wc = New-ProxyWebClient $ProxyAddress
+		}
+		try {
+			$results = $wc.DownloadString($TestWebsite)
+			if ($results -match "All services are operational") {
+				Write-Host "SUCCESS: Web (http) connectivity with unauthenticated Proxy succeeded to $TestWebsite"
+				$Result['WithProxy'] = $True
+				$Result['Success'] = $True
+			} else {
+				Write-Warning "FAIL: Web (http) connectivity with unauthenticated Proxy failed to $TestWebsite"
+				$Result['WithProxy'] = $False
+				$Result['Success'] = $False
 			}
+		} catch {
+			Write-Warning "FAIL: Web (http) connectivity with unauthenticated Proxy failed to $TestWebsite"
+			$Message = $_.Exception.Message
+			Write-Warning "Message: $Message"
+			$Result['WithProxy'] = $False
+			$Result['Success'] = $False
 		}
     }
+	$TestResults["$TestNum"] = $Result
 	#endregion
 
 	#region Remote Target Connectivity Tests
 	# Test DNS Resolution and connectivity to Target
 	$TestNum += 1
 	Write-Host -ForegroundColor Cyan "`n[TEST $TestNum] Testing DNS resolution and connectivity to $target"
+	$Result = @{
+	   Name = "Target DNS Test"
+	   Test = $TestNum
+	   Description = "Testing DNS resolution and connectivity to $target"
+	   Success = $True
+   }
 	$DNSEntry = Get-DNSEntry $target
 	if ($DNSEntry) {
 		$IP = $DNSEntry.IP
 		$Hostname = $DNSEntry.Hostname
         Write-Host "SUCCESS: DNS Resoloved $target to $Hostname ($IP)"
+		$Result['DNSResult'] = $True
         if ($Hostname -notlike "*.$Domain") {
             Write-Warning "This system seems to have resolved to a domain that is different from the provided credentials for $Domain."
             Write-Warning "You may need to provide the correct credentials for the resolved domain or check your DNS provider"
             Write-Warning "If this result is unexpected, ensure this system is pointed to the correct DNS server."
-            Write-Warning "Currently using DNS $(nslookup $target 2> $null)"
-        }
+			$Result['DNSDomainAlignment'] = $False
+        } else {
+			$Result['DNSDomainAlignment'] = $True
+		}
 	} else {
 		Write-Warning "FAIL: DNS Resolution to target failed"
-		Write-Warning "No target to test against.  Exiting Script"
-		Stop-Transcript
-		break
+		$Result['DNSResult'] = $False
+		$Result['Success'] = $False
 	}
 
 	# Test Remote Connectivity (Ping)
@@ -556,18 +601,27 @@ Function New-ProxyWebClient {
 	try {
 		$ICMP = Test-Connection -BufferSize 16 -Count 1 -ComputerName $IP -ea STOP
 		Write-Host "SUCCESS: Ping (ICMP) to $Hostname ($($ICMP.IPV4Address)) in $($ICMP.ResponseTime) m/s"
+		$Result['ICMPResult'] = $True
 	} catch {
-		$ErrorMessage = $_.Exception.Message
-		$FailedItem = $_.Exception.ItemName
-		Write-Warning "FAIL: Ping (ICMP) to $Hostname (($($ICMP.IPV4Address)) - Error Item: $FailedItem, Message: $Message"
+		$Message = $_.Exception.Message
+		$ErrorType = $_.Exception.GetType().FullName
+		Write-Warning "FAIL: Ping (ICMP) to $Hostname (($($ICMP.IPV4Address)) - Message: $Message"
+		$Result['ICMPResult'] = $False
 	}
+	$TestResults["$TestNum"] = $Result
 
 	# Test Remote Connectivity (Ports)
 	$TestNum += 1
 	Write-Host -ForegroundColor Cyan "`n[TEST $TestNum] Performing TCP port scan of the following ports:"
 	Write-Host $ports
+	$Result = @{
+	   Name = "Port Scan"
+	   Test = $TestNum
+	   Description = "Performing TCP port scan of the following ports [$ports] to $target"
+	   Success = $True
+   }
 	$PortResults = $ports | Test-Connectivity -IP $IP
-	try { Start-Transcript -path $OutputFileLocation -Append | Out-Null } catch {}
+	$Result['Results'] = $PortResults
     Write-Host "==========================================================================="
     Write-Host -NoNewline ("{0,-8}`t{1,-35}`t{2}`n" -f "Port","Name","Access")
     $PortResults | ForEach-Object {
@@ -579,69 +633,96 @@ Function New-ProxyWebClient {
     }
 	Write-Host ""
     $PortResults | ForEach-Object {
-		$result = $_
-		if (-NOT $result.Access) {
+		$r = $_
+		if (-NOT $r.Access) {
 			Switch ($_.Port){
 				22  {
-						Write-Warning "FAIL: No Access to $($result.Name) on $IP - Will affect SSH Execution and Deployment against a Unix-based Hosts"
+						Write-Warning "FAIL: No Access to $($r.Name) on $IP - Will affect SSH Execution and Deployment against a Unix-based Hosts"
+						$Result['SSH'] = $False
 					}
 
 				135 {
-						Write-Warning "FAIL: No Access to $($result.Name) on $IP - Will affect WMI Execution and Deployment against a Windows-based Hosts"
+						Write-Warning "FAIL: No Access to $($r.Name) on $IP - Will affect WMI Execution and Deployment against a Windows-based Hosts"
+						$Result['WMI'] = $False
 					}
 				139 {
 						If (-NOT ($PortResults | Where-Object { $_.Port -eq 445 }).Access) {
-							Write-Warning "FAIL: No Access to $($result.Name) on $IP - May affect RPC Execution and Deployment against a Windows-based Hosts"
+							Write-Warning "FAIL: No Access to $($r.Name) on $IP - May affect RPC Execution and Deployment against a Windows-based Hosts"
+							$Result['SMB'] = $False
 						}
 					}
 				445 {
 						If (-NOT ($PortResults | Where-Object { $_.Port -eq 139 }).Access) {
-							Write-Warning "FAIL: No Access to $($result.Name) on $IP - May affect RPC Execution and Deployment against a Windows-based Hosts"
+							Write-Warning "FAIL: No Access to $($r.Name) on $IP - May affect RPC Execution and Deployment against a Windows-based Hosts"
+							$Result['SMB'] = $False
 						}
 					}
 
 				5985 {
-						Write-Warning "FAIL: No Access to $($result.Name) on $IP - May affect PSRemoting Execution and Deployment against a Windows-based Hosts"
+						Write-Warning "FAIL: No Access to $($r.Name) on $IP - May affect PSRemoting Execution and Deployment against a Windows-based Hosts"
+						$Result['WinRM'] = $False
 					 }
+				49152 {
+						If (-NOT ($PortResults | Where-Object { $_.Port -eq 49153 }).Access) {
+							Write-Warning "FAIL: No Access to $($r.Name) on $IP - Will affect WMI Execution and Deployment against a Windows-based Hosts"
+							$Result['DynamicPorts'] = $False
+						}
+					}
 				default { }
 			}
 		}
 	}
+	$open = ($PortResults | where { $_.Access }).count
+	if ($open -eq 0) {
+		$Result['Success'] = $False
+	}
+	$TestResults["$TestNum"] = $Result
 	#endregion Remote Target Connectivity Test
 
 	#region Permissions Tests
 	# Test Credentials against domain
 	$TestNum += 1
 	Write-Host -ForegroundColor Cyan "`n[TEST $TestNum] Validating Credentials are valid..."
+	$Result = @{
+	   Name = "Credential Test"
+	   Test = $TestNum
+	   Description = "Validating Credentials are valid on $Domain"
+	   Success = $True
+   }
 	$TestCreds = Test-ADCredentials $Creds
 	if ($TestCreds.isValid) {
 		Write-Host "SUCCESS: Credentials for $Username are valid on $Domain"
 	} else {
 		Write-Warning "FAIL: Credentials for $Username are either not valid or you cannot connect to DirectoryServices on $Domain"
+		$Result['Success'] = $False
 	}
+	$TestResults["$TestNum"] = $Result
 
-	# Test Permissions
-	$TestNum += 1
-    Write-Host -ForegroundColor Cyan "`n[TEST $TestNum] Testing Permissions of account: $Domain\$Username"
+	# Get RSOP permissions
     Write-Host "Getting Resultant Set of Policy (RSoP) for localhost - output to file .\InfocyteTest_RSoP_localhost.html"
-	$res = GPResult.exe /USER $Username /H InfocyteTest_RSoP_localhost.html /F
-	if ($res -match "does not have RSOP data") {
-		Write-Warning "$res"
-		Write-Warning "Fallback: Attempting to gather RSoP for current user"
-		GPResult.exe /H InfocyteTest_RSoP_localhost.html /F
-	}
+	GPResult.exe /USER $Username /H InfocyteTest_RSoP_localhost.html /F
+	GPResult.exe /USER $Username /v > InfocyteTest_RSoP_localhost.txt
+
+	<#
 	Write-Host "Getting Resultant Set of Policy (RSoP) for $Hostname - output to file .\InfocyteTest_RSoP_$Hostname.txt"
-	$res = Gpresult /S $Hostname /U $FQUsername /P ($Creds.GetNetworkCredential().Password) /USER $Username /v > InfocyteTest_RSoP_$Hostname.txt
+	Gpresult /S $Hostname /U $FQUsername /P ($Creds.GetNetworkCredential().Password) /USER $Username /v > InfocyteTest_RSoP_$Hostname.txt
 	if ($res -match "does not have RSOP data") {
 		Write-Warning "$res"
 		Write-Warning "Fallback: Attempting to gather RSoP for current user"
 		Gpresult /S $Hostname /U $FQUsername /P ($Creds.GetNetworkCredential().Password) /v > InfocyteTest_RSoP_$Hostname.txt
 	}
+	#>
 	#endregion Permissions Test
 
 	#region Remote Execution Protocol Tests
 	# Test WMI Execution
 	$TestNum += 1
+	$Result = @{
+	   Name = "WMI Test"
+	   Test = $TestNum
+	   Description = " Testing WMI Execution Against $Hostname ($target)"
+	   Success = $True
+   }
 	Write-Host -ForegroundColor Cyan "`n[TEST $TestNum] Testing WMI Execution..."
 	if (($PortResults | Where-Object { $_.Port -eq 135 }).Access) {
 		$GetWmiObjectParams = @{
@@ -650,14 +731,17 @@ Function New-ProxyWebClient {
 			ComputerName = $Hostname
 			Credential = $Creds
 			Impersonation = 'Impersonate'
-			#Authority = "ntlmdomain:$Domain"
+			Authority = "ntlmdomain:$Domain"
 		}
 
 		Try {
 			$OS = (Get-WmiObject @GetWmiObjectParams -ea Stop).Caption
-			Write-Host "SUCCESS: WMI w/ NTLM succeeded.  $IP is a $OS System"
+			Write-Host "SUCCESS: WMI w/ NTLM succeeded.  $Hostname ($IP) is a $OS System"
+			$Result['NTLM'] = $True
 		} Catch {
-			Write-Warning "FAIL: WMI with NTLM failed to $IP"
+			Write-Warning "FAIL: WMI with NTLM failed to $Hostname ($IP)"
+			$Result['NTLM'] = $False
+			$Result['Success'] = $False
 		}
 
 		# Test Kerberos
@@ -672,36 +756,54 @@ Function New-ProxyWebClient {
         #Write-Host "Testing WMI w/ explicit Kerberos authentication (Recommended)"
 		Try {
 			$OS = (Get-WmiObject @GetWmiObjectParams -ea Stop).Caption
-			Write-Host "SUCCESS: WMI w/ Kerberos succeeded.  $IP is a $OS System"
+			Write-Host "SUCCESS: WMI w/ Kerberos succeeded.  $Hostname ($IP) is a $OS System"
+			$Result['Kerberos'] = $True
+			$Result['Success'] = $True
 		} Catch {
-			Write-Warning "FAIL: WMI with Kerberos failed to $Domain\$Hostname"
+			Write-Warning "FAIL: WMI with Kerberos failed to $Domain\$Hostname ($IP)"
+			$Result['Kerberos'] = $False
 		}
 
 	} else {
 		Write-Warning "No connectivity to RPC port - skipping WMI test"
+		$Result['Success'] = $False
 	}
+	$TestResults["$TestNum"] = $Result
 
 	# Test SMB Connectivity
 	$TestNum += 1
-	Write-Host -ForegroundColor Cyan "`n[TEST $TestNum] Testing Server Message Block (SMB) connectivity..."
+	$Result = @{
+	   Name = "SMB Test"
+	   Test = $TestNum
+	   Description = "Testing Server Message Block (SMB) connectivity to $($IP)/C$ ($target)"
+	   Success = $True
+   }
+	Write-Host -ForegroundColor Cyan "`n[TEST $TestNum] Testing Server Message Block (SMB) connectivity to $($IP)/C$ ($target)"
 	if (($PortResults | Where-Object { $_.Port -eq 139}).Access -OR ($PortResults | Where-Object { $_.Port -eq 445}).Access) {
 
         try {
             $mountdrive = New-PSDrive -Name test -PSProvider FileSystem -Root "\\$IP\C$" -Credential $Creds -ea STOP
             Write-Host "SUCCESS: Connected to $IP via SMB"
-            Remove-PSDrive test
         } catch {
-			$ErrorMessage = $_.Exception.Message
-			$FailedItem = $_.Exception.ItemName
-            Write-Warning "FAIL: Could not connect to $IP via SMB - C$ administrative share may not be accessible - Error Item: $FailedItem, Message: $Message"
+			$Message = $_.Exception.Message
+            Write-Warning "FAIL: Could not connect to $IP via SMB - C$ administrative share may not be accessible - Message: $Message"
+			$Result['Success'] = $False
         }
 
 	} else {
 		Write-Warning "No connectivity to NetBIOS and SMB ports - skipping SMB Transfer test"
+		$Result['Success'] = $False
 	}
+	$TestResults["$TestNum"] = $Result
 
 	# Test Remote Schtasks
 	$TestNum += 1
+	$Result = @{
+	   Name = "Remote SchTasks Test"
+	   Test = $TestNum
+	   Description = "Testing Remote Schtasks Execution to $IP ($target)"
+	   Success = $True
+   }
 	Write-Host -ForegroundColor Cyan "`n[TEST $TestNum] Testing Remote Schtasks Execution..."
 	if (($PortResults | Where-Object { $_.Port -eq 139}).Access -OR ($PortResults | Where-Object { $_.Port -eq 445}).Access) {
 
@@ -716,12 +818,14 @@ Function New-ProxyWebClient {
                 Write-Host "SUCCESS: Remote task (test) was initiated on $IP"
             } else {
                 Write-Warning "FAIL: Remote task (test) failed to initiate"
-                Write-Warning $b
+                Write-Warning "$b"
+				$Result['Success'] = $False
             }
 
         } else {
             Write-Warning "FAIL: Remote task (test) failed on $IP"
-            Write-Warning $a
+            Write-Warning "$a"
+			$Result['Success'] = $False
         }
 
 
@@ -731,7 +835,7 @@ Function New-ProxyWebClient {
             Write-Host "SUCCESS: Remote task (test) ran successfully on $IP"
         } else {
             Write-Warning "FAIL: Remote task (test) ran into some issues on $IP"
-            Write-Warning $a
+            Write-Warning "$a"
         }
 
         #Delete the task (Cleanup)
@@ -740,35 +844,50 @@ Function New-ProxyWebClient {
 
 	} else {
 		Write-Warning "No connectivity to NetBIOS and SMB ports - skipping Remote Schtasks test"
+		$Result['Success'] = $False
 	}
+	$TestResults["$TestNum"] = $Result
 
 
 	# Test PSRemoting
 	$TestNum += 1
+	$Result = @{
+	   Name = "WinRM Test"
+	   Test = $TestNum
+	   Description = "Testing Powershell Remoting (WinRM) Execution to $target"
+	   Success = $True
+   }
 	Write-Host -ForegroundColor Cyan "`n[TEST $TestNum] Testing Powershell Remoting Execution..."
 	if (($PortResults | Where-Object { $_.Port -eq 5985}).Access -or ($PortResults | Where-Object { $_.Port -eq 5986}).Access) {
 
         try {
             $errorActionPreference = "Stop"
-            $result = Invoke-Command -ComputerName $Hostname -Credential $Creds -ea Stop { 1 }
-            Write-Host "SUCCESS: Powershell Remoting Session established with $IP"
+            $r = Invoke-Command -ComputerName $target -Credential $Creds -ea Stop { 1 }
+            Write-Host "SUCCESS: Powershell Remoting Session established with $target"
         }
         catch {
-			$ErrorMessage = $_.Exception.Message
-			$FailedItem = $_.Exception.ItemName
-            Write-Warning "FAIL: PSRemoting to $IP failed - Error Item: $FailedItem"
-			Write-Warning "Error Item: $FailedItem, Message: $Message"
+			$Message = $_.Exception.Message
+            Write-Warning "FAIL: PSRemoting to $target failed. Message: $Message"
+			$Result['Success'] = $False
         }
 
 	} else {
 		Write-Warning "No connectivity to Powershell Remoting ports - skipping Powershell Remoting test"
+		$Result['Success'] = $False
 	}
+	$TestResults["$TestNum"] = $Result
 	#endregion Remote Execution Protocol Tests
 
 
 	# Test Endpoint Return Path to HUNT Server
 	$TestNum += 1
-	Write-Host -ForegroundColor Cyan "`n[TEST $TestNum] Testing remote endpoint TCP443 return path to HUNT server..."
+	$Result = @{
+	   Name = "Return Path Test"
+	   Test = $TestNum
+	   Description = "Testing remote endpoint TCP443 return path to $ReturnAddress"
+	   Success = $True
+   }
+	Write-Host -ForegroundColor Cyan "`n[TEST $TestNum] Testing remote endpoint TCP443 return path to $ReturnAddress..."
 
 	$RemoteScript = '
 	#Infocyte Test
@@ -778,35 +897,46 @@ Function New-ProxyWebClient {
 		try { $tcpclient.Close() } catch {}
 		if ($tcpclient.Connected) { $tcpclient.Close(); "Infocyte: SUCCESS" > C:\windows\temp\accesstest.txt }	else { "Infocyte: FAIL" > C:\windows\temp\accesstest.txt }
 	}
-	Test-Port '+$HuntServerAddress+''
+	Test-Port '+$ReturnAddress+''
 	$bytes = [System.Text.Encoding]::Unicode.GetBytes($RemoteScript)
 	$encodedCommand = [Convert]::ToBase64String($bytes)
 
 	if (($PortResults | Where-Object { $_.Port -eq 135 }).Access) {
 			try {
-				Invoke-WmiMethod -class Win32_process -name Create -ArgumentList "powershell.exe -Windowstyle Hidden -ExecutionPolicy Bypass -encodedCommand $encodedCommand" -ComputerName $Target
-				Start-Sleep 3
-				$returnpathresults = Get-Content test:\\result.txt
+				Invoke-WmiMethod -class Win32_process -name Create -ArgumentList "powershell.exe -Windowstyle Hidden -ExecutionPolicy Bypass -encodedCommand $encodedCommand" -ComputerName $Target | Out-Null
+				Start-Sleep 5
+				$returnpathresults = Get-Content test:\\result.txt -ea SilentlyContinue
+				if ($returnpathresults -match "SUCCESS") {
+				} elseif ($returnpathresults -match "Failed") {
+					$Result['Return443'] = "BLOCKED"
+					$Result['Success'] = $False
+				} else {
+					$Result['Success'] = $False
+				}
 			} catch {
-				$ErrorMessage = $_.Exception.Message
-				$FailedItem = $_.Exception.ItemName
-				Write-Warning "FAIL: Could not test return path - WMI Command Failed - Error Item: $FailedItem, Message: $Message"
+				$Message = $_.Exception.Message
+				Write-Warning "FAIL: Could not test return path - WMI Command Failed - Message: $Message"
+				$Result['Success'] = $False
+			} finally {
+				Remove-PSDrive test -ea SilentlyContinue
 			}
 
-			Remove-PSDrive test
 
 	} else {
 		Write-Warning "No connectivity to WMI ports - skipping Remote Endpoint Return Path test"
+		$Result['Success'] = $False
 	}
+	$TestResults["$TestNum"] = $Result
+
 	<#
 		if (($PortResults | Where-Object { $_.Port -eq 139}).Access -OR ($PortResults | Where-Object { $_.Port -eq 445}).Access) {
 				try {
 						$mountdrive = New-PSDrive -Name test -PSProvider FileSystem -Root "\\$IP\C$\Windows\Temp" -Credential $Creds -ea STOP
 						Write-Host "SUCCESS: Connected to $IP via SMB"
 				} catch {
-					$ErrorMessage = $_.Exception.Message
-					$FailedItem = $_.Exception.ItemName
-					Write-Warning "FAIL: Could not test return path - C$ administrative share may not be accessible - Error Item: $FailedItem, Message: $Message"
+					$Message = $_.Exception.Message
+					$ErrorType = $_.Exception.GetType().FullName
+					Write-Warning "FAIL: Could not test return path - C$ administrative share may not be accessible - Message: $Message"
 				}
 
 				$RemoteScript | Out-File -FilePath "test:\testaccess.ps1"  -Width 4096
@@ -818,11 +948,11 @@ Function New-ProxyWebClient {
 
 	#>
 
+	$TestResults | ConvertTo-Json | Out-File "$PSScriptRoot\InfocyteTest.json"
 
 	Write-Host -ForegroundColor Cyan "All Tests Complete!"
 	Write-Host "Results are found here:"
-	Write-Host "$PSScriptRoot\InfocyteTest_RSoP_$Hostname.txt"
+	Write-Host "$PSScriptRoot\InfocyteTest_RSoP_localhost.txt"
 	Write-Host "$PSScriptRoot\InfocyteTest_RSoP_localhost.html"
 	Write-Host "$PSScriptRoot\InfocyteTest.log"
-
-    Stop-Transcript
+	Write-Host "$PSScriptRoot\InfocyteTest.json"
