@@ -23,7 +23,7 @@ function Get-ICHelp {
     Write-Host "Data Export Functions:"
     Write-Host -ForegroundColor Cyan "`tGet-ICBox, Get-ICScan, Get-ICObject, Get-ICApplication, Get-ICVulnerability, Get-ICAlert, Get-ICActivityTrace, Get-ICFileDetail`n"
     Write-Host "Scanning Functions:"
-    Write-Host -ForegroundColor Cyan "`tInvoke-ICScan, Invoke-ICScanTarget, Invoke-ICFindHosts, New-ICScanOptions, Add-ICScanSchedule, Get-ICScanchedule, Remove-ICScanSchedule`n"
+    Write-Host -ForegroundColor Cyan "`tInvoke-ICScan, Invoke-ICScanTarget, Invoke-ICFindHosts, New-ICScanOptions, Add-ICScanSchedule, Get-ICScanSchedule, Remove-ICScanSchedule`n"
     Write-Host "Offline Scan Import Functions:"
     Write-Host -ForegroundColor Cyan "`tImport-ICSurvey`n"
     Write-Host "Admin Functions:"
