@@ -1,6 +1,24 @@
+<#PSScriptInfo
+
+	.VERSION 0.4
+
+	.DESCRIPTION Test-ICNetworkAccess Tests remote administration protocols and configurations for agentless scanning with Infocyte
+
+	.GUID 393bf8a3-21b2-4821-a503-435777de3d53
+
+	.AUTHOR @singlethreaded
+
+	.COMPANYNAME Infocyte, Inc.
+
+	.COPYRIGHT (c) 2019 Infocyte, Inc. All rights reserved.
+
+	.RELEASENOTES
+
+#>
+
 <#
-    .SYNOPSIS
-        Tests Domain, System, and Credential configuration for use with Infocyte HUNT
+	.SYNOPSIS
+        Test-ICNetworkAccess Tests remote administration protocols and configurations for agentless scanning with Infocyte
 
     .DESCRIPTION
         Tests Domain, System, and Credential configuration for use with Infocyte HUNT.  Will attempt several
@@ -19,13 +37,13 @@
         (Optional) Proxy credentials (PSCredential Object)
 
     .EXAMPLE
-        $Netcreds = Get-Credentials
-        PS C:\> .\Infocyte-Test.ps1 -Target 192.168.1.5 -Credential $Netcreds
+        PS C:\> $Netcreds = Get-Credentials
+        PS C:\> Test-ICNetworkAccess -Target 192.168.1.5 -Credential $Netcreds
 
     .EXAMPLE
-        $Netcreds = Get-Credentials
+        PS C:\> $Netcreds = Get-Credentials
 		PS C:\> $Proxycreds = Get-Credentials
-        	PS C:\> .\Test-InfocyteCredentials.ps1 -Target 192.168.1.5 -Credential $Netcreds -ProxyAddress "http://192.168.1.2:8080" -ProxyCredential $Proxycreds
+        PS C:\> Test-ICNetworkAccess -Target 192.168.1.5 -Credential $Netcreds -ProxyAddress "http://192.168.1.2:8080" -ProxyCredential $Proxycreds
 
     .NOTES
 		Tests we will run:
@@ -50,320 +68,320 @@
 		11. Test 443 Back to HUNT Server from Remote Endpoint
 
 #>
-[CmdletBinding()]
-Param(
-	[Parameter(Position = 0, Mandatory = $True, HelpMessage = "The remote system to test connectivity to")]
-	[ValidateNotNullOrEmpty()]
-  	[String]
-  	$Target,
-
-	[Parameter(Position = 1, Mandatory = $True, HelpMessage = "Elevated account that will be used with HUNT")]
-	[ValidateNotNullOrEmpty()]
-	[System.Management.Automation.PSCredential]
-	$Credential,
-
-  	[Parameter(Mandatory = $False, HelpMessage = "Address of proxy in the form of: http://<myproxy-ip>:8080")]
-  	[String]
-  	$ProxyAddress,
-
-	[Parameter(Mandatory = $False, HelpMessage = "Proxy credentials for authenticated proxies")]
-	[ValidateNotNullOrEmpty()]
-	[System.Management.Automation.PSCredential]
-	$ProxyCredential,
-
-	$ReturnAddress
-)
-
-#requires -version 2.0
-$Admin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
-If (-NOT $Admin) {
-	#Write-Warning "NOTE: Your shell is not running as Administrator (But you shouldn't need it for this script)."
-}
-
-$errorActionPreference = "Continue"
-# $PSScriptRoot
-# [ValidatePattern("\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}")]
-# FUNCTIONS
-
-Function Get-DNSEntry ($target) {
-
-	try {
-		Write-Verbose "Resolving $target"
-        $Temp = [System.Net.Dns]::GetHostEntry($target)
-	} catch {
-		$Message = $_.Exception.Message
-		$ErrorType = $_.Exception.GetType().FullName
-		Write-Warning "[ERROR] Failed DNS Lookup against $target - No such host/IP is known - Message: $Message"
-		Write-Warning "Using DNS $(nslookup $target)"
-		return
-	}
-	if ($target -match "\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}") {
-		$IPAddress = $target
-	} else {
-		if (($temp.AddressList | Where-Object { $_.AddressFamily -eq 'InterNetwork' }) -is [System.Net.IPAddress]) {
-			$IPAddress = ($temp.AddressList | Where-Object { $_.AddressFamily -eq 'InterNetwork' }).IPAddressToString
-		} else {
-			$IPAddress = ($temp.AddressList | Where-Object { $_.AddressFamily -eq 'InterNetwork' })[0].IPAddressToString
-		}
-	}
-	$Result = @{
-		IP = $IPAddress
-		IPs = $temp.AddressList.IPAddressToString
-		HostName = $Temp.HostName
-	}
-	New-Object PSObject -Property $Result
-}
-
-function Test-Port ($target, $port) {
-
-    $tcpclient = New-Object Net.Sockets.TcpClient
-    try
-    {
-        $tcpclient.Connect($target,$port)
-    } catch {}
-
-    if($tcpclient.Connected)
-    {
-        $tcpclient.Close()
-		Write-Verbose "[SUCCESS] Port $port on $target is open"
-		$True
-    }
-	else {
-		Write-Warning "[FAILURE] Port $port on $target is closed"
-		$False
-    }
-}
-
-function Test-Connectivity {
+Function Test-ICNetworkAccess {
 	[CmdletBinding()]
 	Param(
-		[Parameter(Position = 0, Mandatory = $True, ValueFromPipeline=$False)]
-		[ValidatePattern("\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}")]
-		[String]
-		$IP,
+		[Parameter(Position = 0, Mandatory = $True, HelpMessage = "The remote system to test connectivity to")]
+		[ValidateNotNullOrEmpty()]
+	  	[String]
+	  	$Target,
 
-		[Parameter(Position = 1, Mandatory = $True, ValueFromPipeline=$True)]
-		[ValidateRange(1,65535)]
-		[Int32]
-		$port,
-
-		[Parameter(Position = 2, Mandatory = $False, ValueFromPipeline=$False)]
-		[ValidateRange(1,128)]
-		[Int32]
-		$MaxThreads = 24
-	)
-
-	BEGIN {
-		$portdict = @{
-			22 = "SSH (TCP 22)"
-			53 = "DNS (TCP 53)"
-			80 = "HTTP (TCP 80)"
-			135 = "WMI/RPC (TCP 135)"
-			137 = "NetBIOS (TCP 137)"
-			139 = "NetBIOS (TCP 139)"
-			389 = "LDAP (TCP 389)"
-			443 = "HTTPS (TCP 443)"
-			445 = "SMB (TCP 445)"
-			1024 = "Dynamic-Legacy (TCP 1024)"
-			1025 = "Dynamic-Legacy (TCP 1025)"
-			1026 = "Dynamic-Legacy (TCP 1026)"
-			3389 = "Remote Desktop (TCP 3389)"
-			5985 = 	"PSRemoting-HTTP (TCP 5985)"
-			5986 = 	"PSRemoting-HTTPS (TCP 5986)"
-			49152 = "Dynamic (TCP 49152)"
-			49153 = "Dynamic (TCP 49153)"
-			49154 = "Dynamic (TCP 49154)"
-		}
-
-		$TestPort_Scriptblock = {
-				Param($target, $port)
-
-				$tcpclient = New-Object Net.Sockets.TcpClient
-				try
-				{
-					$tcpclient.Connect($target,$port)
-				} catch {}
-
-				if($tcpclient.Connected)
-				{
-					$tcpclient.Close()
-					Write-Verbose "[SUCCESS] Port $port on $target is open"
-					$True
-				}
-				else {
-					Write-Warning "[FAILURE] Port $port on $target is closed"
-					$False
-				}
-		}
-		$ports = @()
-	}
-
-	PROCESS {
-		$ports += $_
-	}
-
-	END {
-
-		# Create Runspace for multi-threading
-		$RunspacePool = [RunspaceFactory]::CreateRunspacePool(1, $MaxThreads)
-		$RunspacePool.Open()
-		$Jobs = @()
-
-		$ports | ForEach-Object {
-			$Job = [powershell]::Create().AddScript($TestPort_Scriptblock)
-			$Job.AddArgument($IP) | Out-Null
-			$Job.AddArgument($_) | Out-Null
-			$Job.RunspacePool = $RunspacePool
-			$Jobs += New-Object PSObject -Property @{
-				Port = $_
-				Pipe = $Job
-				Result = $Job.BeginInvoke()
-			}
-		}
-
-		# Track Progress of Port Scan
-		$elapsedTime = [system.diagnostics.stopwatch]::StartNew()
-		Do {
-			Write-Progress -activity "Port Scanning" -Status "$([string]::Format("Waiting... Elapsed Time: {0:d2}:{1:d2}.{2:d3}", $elapsedTime.Elapsed.minutes, $elapsedTime.Elapsed.seconds, $elapsedTime.Elapsed.Milliseconds))"
-			#Start-Sleep -Milliseconds 50
-		} While ( $Jobs.Result.IsCompleted -contains $false)
-		Write-Progress -activity "Port Scanning" -Completed "Port scan completed!"
-
-		$Results = @()
-		ForEach ($Job in $Jobs ) {
-			$Result = @{
-				"Port"   = $Job.Port
-				"Name"   = $portdict[$Job.Port]
-				"Access" = $Job.Pipe.EndInvoke($Job.Result)[0]
-			}
-			$Results += New-Object PSObject -Property $Result
-		}
-
-		# Cleanup
-		$elapsedTime.stop()
-		$RunspacePool.Close()
-
-		$Results
-	}
-}
-
-Function Test-ADCredentials {
-	Param(
-		[Parameter(Position = 0, Mandatory = $True)]
+		[Parameter(Position = 1, Mandatory = $True, HelpMessage = "Elevated account that will be used with HUNT")]
+		[ValidateNotNullOrEmpty()]
 		[System.Management.Automation.PSCredential]
-		$Credential
+		$Credential,
+
+	  	[Parameter(Mandatory = $False, HelpMessage = "Address of proxy in the form of: http://<myproxy-ip>:8080")]
+	  	[String]
+	  	$ProxyAddress,
+
+		[Parameter(Mandatory = $False, HelpMessage = "Proxy credentials for authenticated proxies")]
+		[ValidateNotNullOrEmpty()]
+		[System.Management.Automation.PSCredential]
+		$ProxyCredential,
+
+		$ReturnAddress
 	)
 
-	Add-Type -AssemblyName System.DirectoryServices.AccountManagement -IgnoreWarnings
-	$ct = [System.DirectoryServices.AccountManagement.ContextType]::Domain
-	try {
-		$pc = New-Object System.DirectoryServices.AccountManagement.PrincipalContext($ct, $Credential.GetNetworkCredential().Domain)
-	} catch {
-		$Message = $_.Exception.Message
-		$ErrorType = $_.Exception.GetType().FullName
-		Write-Warning "ERROR: Could not contact DirectoryServices on domain $($Credential.GetNetworkCredential().Domain)  - Message: $Message"
-		return
+	#requires -version 3.0
+	$Admin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
+	If (-NOT $Admin) {
+		Write-Verbose "NOTE: Your shell is not running as Administrator (But you shouldn't need it for this script)."
 	}
 
-	New-Object PSObject -Property @{
-		Username = $Credential.UserName
-		isValid  = $pc.ValidateCredentials($Credential.GetNetworkCredential().UserName, $Credential.GetNetworkCredential().Password)
-	}
-}
+	# $PSScriptRoot
+	# [ValidatePattern("\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}")]
+	# FUNCTIONS
 
-Function Test-RemoteWMI {
-	Param($IP, $credential)
+	Function Get-DNSEntry ($target) {
 
-	$GetWmiObjectParams = @{
-		Class = "win32_OperatingSystem"
-		Property = "Caption"
-		ComputerName = $IP
-		Credential = $credential
-	}
-
-	Try {
-		$OS = (Get-WmiObject @GetWmiObjectParams).Caption
-	} Catch {
-
-	}
-
-	$GetWmiObjectParams2 = @{
-		ClassName = "Win32_Process"
-		Property = "Name,CommandLine,ExecutablePath"
-		ComputerName = $IP
-		Credential = $credential
-	}
-	$proc = (Get-CimInstance @GetWmiObjectParams)
-	#(Get-CimInstance -ClassName Win32_Process -Property Name, CommandLine, ExecutablePath)[6] | select Name, CommandLine, ExecutablePath | fl
-}
-
-Function New-ProxyWebClient {
-	# Test HTTP Proxy Authentication (Basic, NTLM, Digest, Negotiate/Kerberos)
-	Param(
-			[Parameter(Position = 0, Mandatory = $True)]
-			[String]
-			$ProxyAddress,
-
-			[Parameter(Position = 1, Mandatory = $False)]
-			[System.Management.Automation.PSCredential]
-			$Credential,
-
-			[Parameter(Position = 2, Mandatory = $False)]
-			[String]
-			$AuthType = "Negotiate"
-	)
-
-	$BypassLocal = $True
-	$BypassList = @()
-    if ($AuthType -eq "") {
-        #			[ValidateSet("", "Basic", "NTLM", "Digest", "Kerberos", "Negotiate")]
-        $AuthType = "Negotiate"
-    }
-	#$BypassList.Insert(";*.$Domain")
-
-	try {
-
-		$wc = new-object net.webclient
-		$proxyUri = new-object system.uri($ProxyAddress)
-	} catch {
-		$Message = [String]$_.Exception.Message
-		Write-Warning "ERROR: Could not set up proxy - Message: $Message"
-	}
-	if ($Credential) {
-		# Configure Authenticated proxy
-		Write-Verbose "Configuring Proxy ($ProxyAddress) using $AuthType authentication"
 		try {
-			$cachedCredentials = new-object system.net.CredentialCache
-			$cachedCredentials.Add($proxyUri, $AuthType, $Credential.GetNetworkCredential())
-
-			$wc.Proxy = new-object system.net.WebProxy($proxyUri, $bypassLocal)
-			$wc.Proxy.Credentials = $cachedCredentials.GetCredential($proxyUri, $AuthType, $Domain)
-		} catch {
-			$Message = [String]$_.Exception.Message
-			Write-Warning "ERROR: Could not add credentials to proxy - Message: $Message"
-		}
-		return $wc
-
-	} else {
-		# Use Default System Proxy Settings (Internet Explorer Settings)
-		Write-Verbose "Configuring Proxy ($ProxyAddress) using default (Internet Explorer) Proxy credentials"
-		try {
-			$wc.Proxy = new-object system.net.WebProxy($proxyUri, $bypassLocal)
-			$wc.Proxy.Credentials = [System.Net.CredentialCache]::DefaultNetworkCredentials
+			Write-Verbose "Resolving $target"
+	        $Temp = [System.Net.Dns]::GetHostEntry($target)
 		} catch {
 			$Message = $_.Exception.Message
 			$ErrorType = $_.Exception.GetType().FullName
-			Write-Warning "ERROR: Error while setting system's default proxy credentials - Message: $Message"
+			Write-Warning "[ERROR] Failed DNS Lookup against $target - No such host/IP is known - Message: $Message"
+			Write-Warning "Using DNS $(nslookup $target)"
+			return
 		}
-		$showcurrentproxy = netsh winhttp show proxy
-		Write-Verbose $showcurrentproxy
-		return $wc
-
+		if ($target -match "\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}") {
+			$IPAddress = $target
+		} else {
+			if (($temp.AddressList | Where-Object { $_.AddressFamily -eq 'InterNetwork' }) -is [System.Net.IPAddress]) {
+				$IPAddress = ($temp.AddressList | Where-Object { $_.AddressFamily -eq 'InterNetwork' }).IPAddressToString
+			} else {
+				$IPAddress = ($temp.AddressList | Where-Object { $_.AddressFamily -eq 'InterNetwork' })[0].IPAddressToString
+			}
+		}
+		$Result = @{
+			IP = $IPAddress
+			IPs = $temp.AddressList.IPAddressToString
+			HostName = $Temp.HostName
+		}
+		New-Object PSObject -Property $Result
 	}
-}
+
+	function Test-Port ($target, $port) {
+
+	    $tcpclient = New-Object Net.Sockets.TcpClient
+	    try
+	    {
+	        $tcpclient.Connect($target,$port)
+	    } catch {}
+
+	    if($tcpclient.Connected)
+	    {
+	        $tcpclient.Close()
+			Write-Verbose "[SUCCESS] Port $port on $target is open"
+			$True
+	    }
+		else {
+			Write-Warning "[FAILURE] Port $port on $target is closed"
+			$False
+	    }
+	}
+
+	function Test-Connectivity {
+		[CmdletBinding()]
+		Param(
+			[Parameter(Position = 0, Mandatory = $True, ValueFromPipeline=$False)]
+			[ValidatePattern("\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}")]
+			[String]
+			$IP,
+
+			[Parameter(Position = 1, Mandatory = $True, ValueFromPipeline=$True)]
+			[ValidateRange(1,65535)]
+			[Int32]
+			$port,
+
+			[Parameter(Position = 2, Mandatory = $False, ValueFromPipeline=$False)]
+			[ValidateRange(1,128)]
+			[Int32]
+			$MaxThreads = 24
+		)
+
+		BEGIN {
+			$portdict = @{
+				22 = "SSH (TCP 22)"
+				53 = "DNS (TCP 53)"
+				80 = "HTTP (TCP 80)"
+				135 = "WMI/RPC (TCP 135)"
+				137 = "NetBIOS (TCP 137)"
+				139 = "NetBIOS (TCP 139)"
+				389 = "LDAP (TCP 389)"
+				443 = "HTTPS (TCP 443)"
+				445 = "SMB (TCP 445)"
+				1024 = "Dynamic-Legacy (TCP 1024)"
+				1025 = "Dynamic-Legacy (TCP 1025)"
+				1026 = "Dynamic-Legacy (TCP 1026)"
+				3389 = "Remote Desktop (TCP 3389)"
+				5985 = 	"PSRemoting-HTTP (TCP 5985)"
+				5986 = 	"PSRemoting-HTTPS (TCP 5986)"
+				49152 = "Dynamic (TCP 49152)"
+				49153 = "Dynamic (TCP 49153)"
+				49154 = "Dynamic (TCP 49154)"
+			}
+
+			$TestPort_Scriptblock = {
+					Param($target, $port)
+
+					$tcpclient = New-Object Net.Sockets.TcpClient
+					try
+					{
+						$tcpclient.Connect($target,$port)
+					} catch {}
+
+					if($tcpclient.Connected)
+					{
+						$tcpclient.Close()
+						Write-Verbose "[SUCCESS] Port $port on $target is open"
+						$True
+					}
+					else {
+						Write-Warning "[FAILURE] Port $port on $target is closed"
+						$False
+					}
+			}
+			$ports = @()
+		}
+
+		PROCESS {
+			$ports += $_
+		}
+
+		END {
+
+			# Create Runspace for multi-threading
+			$RunspacePool = [RunspaceFactory]::CreateRunspacePool(1, $MaxThreads)
+			$RunspacePool.Open()
+			$Jobs = @()
+
+			$ports | ForEach-Object {
+				$Job = [powershell]::Create().AddScript($TestPort_Scriptblock)
+				$Job.AddArgument($IP) | Out-Null
+				$Job.AddArgument($_) | Out-Null
+				$Job.RunspacePool = $RunspacePool
+				$Jobs += New-Object PSObject -Property @{
+					Port = $_
+					Pipe = $Job
+					Result = $Job.BeginInvoke()
+				}
+			}
+
+			# Track Progress of Port Scan
+			$elapsedTime = [system.diagnostics.stopwatch]::StartNew()
+			Do {
+				Write-Progress -activity "Port Scanning" -Status "$([string]::Format("Waiting... Elapsed Time: {0:d2}:{1:d2}.{2:d3}", $elapsedTime.Elapsed.minutes, $elapsedTime.Elapsed.seconds, $elapsedTime.Elapsed.Milliseconds))"
+				#Start-Sleep -Milliseconds 50
+			} While ( $Jobs.Result.IsCompleted -contains $false)
+			Write-Progress -activity "Port Scanning" -Completed "Port scan completed!"
+
+			$Results = @()
+			ForEach ($Job in $Jobs ) {
+				$Result = @{
+					"Port"   = $Job.Port
+					"Name"   = $portdict[$Job.Port]
+					"Access" = $Job.Pipe.EndInvoke($Job.Result)[0]
+				}
+				$Results += New-Object PSObject -Property $Result
+			}
+
+			# Cleanup
+			$elapsedTime.stop()
+			$RunspacePool.Close()
+
+			$Results
+		}
+	}
+
+	Function Test-ADCredentials {
+		Param(
+			[Parameter(Position = 0, Mandatory = $True)]
+			[System.Management.Automation.PSCredential]
+			$Credential
+		)
+
+		Add-Type -AssemblyName System.DirectoryServices.AccountManagement -IgnoreWarnings
+		$ct = [System.DirectoryServices.AccountManagement.ContextType]::Domain
+		try {
+			$pc = New-Object System.DirectoryServices.AccountManagement.PrincipalContext($ct, $Credential.GetNetworkCredential().Domain)
+		} catch {
+			$Message = $_.Exception.Message
+			$ErrorType = $_.Exception.GetType().FullName
+			Write-Warning "ERROR: Could not contact DirectoryServices on domain $($Credential.GetNetworkCredential().Domain)  - Message: $Message"
+			return
+		}
+
+		New-Object PSObject -Property @{
+			Username = $Credential.UserName
+			isValid  = $pc.ValidateCredentials($Credential.GetNetworkCredential().UserName, $Credential.GetNetworkCredential().Password)
+		}
+	}
+
+	Function Test-RemoteWMI {
+		Param($IP, $credential)
+
+		$GetWmiObjectParams = @{
+			Class = "win32_OperatingSystem"
+			Property = "Caption"
+			ComputerName = $IP
+			Credential = $credential
+		}
+
+		Try {
+			$OS = (Get-WmiObject @GetWmiObjectParams).Caption
+		} Catch {
+
+		}
+
+		$GetWmiObjectParams2 = @{
+			ClassName = "Win32_Process"
+			Property = "Name,CommandLine,ExecutablePath"
+			ComputerName = $IP
+			Credential = $credential
+		}
+		$proc = (Get-CimInstance @GetWmiObjectParams)
+		#(Get-CimInstance -ClassName Win32_Process -Property Name, CommandLine, ExecutablePath)[6] | select Name, CommandLine, ExecutablePath | fl
+	}
+
+	Function New-ProxyWebClient {
+		# Test HTTP Proxy Authentication (Basic, NTLM, Digest, Negotiate/Kerberos)
+		Param(
+				[Parameter(Position = 0, Mandatory = $True)]
+				[String]
+				$ProxyAddress,
+
+				[Parameter(Position = 1, Mandatory = $False)]
+				[System.Management.Automation.PSCredential]
+				$Credential,
+
+				[Parameter(Position = 2, Mandatory = $False)]
+				[String]
+				$AuthType = "Negotiate"
+		)
+
+		$BypassLocal = $True
+		$BypassList = @()
+	    if ($AuthType -eq "") {
+	        #			[ValidateSet("", "Basic", "NTLM", "Digest", "Kerberos", "Negotiate")]
+	        $AuthType = "Negotiate"
+	    }
+		#$BypassList.Insert(";*.$Domain")
+
+		try {
+
+			$wc = new-object net.webclient
+			$proxyUri = new-object system.uri($ProxyAddress)
+		} catch {
+			$Message = [String]$_.Exception.Message
+			Write-Warning "ERROR: Could not set up proxy - Message: $Message"
+		}
+		if ($Credential) {
+			# Configure Authenticated proxy
+			Write-Verbose "Configuring Proxy ($ProxyAddress) using $AuthType authentication"
+			try {
+				$cachedCredentials = new-object system.net.CredentialCache
+				$cachedCredentials.Add($proxyUri, $AuthType, $Credential.GetNetworkCredential())
+
+				$wc.Proxy = new-object system.net.WebProxy($proxyUri, $bypassLocal)
+				$wc.Proxy.Credentials = $cachedCredentials.GetCredential($proxyUri, $AuthType, $Domain)
+			} catch {
+				$Message = [String]$_.Exception.Message
+				Write-Warning "ERROR: Could not add credentials to proxy - Message: $Message"
+			}
+			return $wc
+
+		} else {
+			# Use Default System Proxy Settings (Internet Explorer Settings)
+			Write-Verbose "Configuring Proxy ($ProxyAddress) using default (Internet Explorer) Proxy credentials"
+			try {
+				$wc.Proxy = new-object system.net.WebProxy($proxyUri, $bypassLocal)
+				$wc.Proxy.Credentials = [System.Net.CredentialCache]::DefaultNetworkCredentials
+			} catch {
+				$Message = $_.Exception.Message
+				$ErrorType = $_.Exception.GetType().FullName
+				Write-Warning "ERROR: Error while setting system's default proxy credentials - Message: $Message"
+			}
+			$showcurrentproxy = netsh winhttp show proxy
+			Write-Verbose $showcurrentproxy
+			return $wc
+
+		}
+	}
 
 
-# MAIN
+	# MAIN
 	$Creds = [System.Management.Automation.PSCredential]$Credential
 	$Username = $Creds.GetNetworkCredential().UserName
 	$Domain = $Creds.GetNetworkCredential().Domain
@@ -457,7 +475,7 @@ Function New-ProxyWebClient {
 		Write-Warning "FAIL: Ping (ICMP) to $InternetTestAddr - Message: $Message"
 		$Result['ICMPResult'] = $False
 	}
-	$TestResults["$TestNum"] = $Result
+	$TestResults["Test$TestNum"] = $Result
 
 
 	# Test DNS Resolution and connectivity to Incyte
@@ -489,7 +507,7 @@ Function New-ProxyWebClient {
 		Write-Warning "FAIL: Ping (ICMP) to incyte.infocyte.com (($($ICMP.IPV4Address)) - Message: $Message"
 		$Result['ICMPResult'] = $False
 	}
-	$TestResults["$TestNum"] = $Result
+	$TestResults["Test$TestNum"] = $Result
 
 	#endregion Internet Test
 
@@ -563,7 +581,7 @@ Function New-ProxyWebClient {
 			$Result['Success'] = $False
 		}
     }
-	$TestResults["$TestNum"] = $Result
+	$TestResults["Test$TestNum"] = $Result
 	#endregion
 
 	#region Remote Target Connectivity Tests
@@ -575,12 +593,12 @@ Function New-ProxyWebClient {
 	   Test = $TestNum
 	   Description = "Testing DNS resolution and connectivity to $target"
 	   Success = $True
-   }
+	}
 	$DNSEntry = Get-DNSEntry $target
 	if ($DNSEntry) {
 		$IP = $DNSEntry.IP
 		$Hostname = $DNSEntry.Hostname
-        Write-Host "SUCCESS: DNS Resoloved $target to $Hostname ($IP)"
+        Write-Host "SUCCESS: DNS Resolved $target to $Hostname ($IP)"
 		$Result['DNSResult'] = $True
         if ($Hostname -notlike "*.$Domain") {
             Write-Warning "This system seems to have resolved to a domain that is different from the provided credentials for $Domain."
@@ -608,7 +626,7 @@ Function New-ProxyWebClient {
 		Write-Warning "FAIL: Ping (ICMP) to $Hostname (($($ICMP.IPV4Address)) - Message: $Message"
 		$Result['ICMPResult'] = $False
 	}
-	$TestResults["$TestNum"] = $Result
+	$TestResults["Test$TestNum"] = $Result
 
 	# Test Remote Connectivity (Ports)
 	$TestNum += 1
@@ -676,7 +694,7 @@ Function New-ProxyWebClient {
 	if ($open -eq 0) {
 		$Result['Success'] = $False
 	}
-	$TestResults["$TestNum"] = $Result
+	$TestResults["Test$TestNum"] = $Result
 	#endregion Remote Target Connectivity Test
 
 	#region Permissions Tests
@@ -696,7 +714,7 @@ Function New-ProxyWebClient {
 		Write-Warning "FAIL: Credentials for $Username are either not valid or you cannot connect to DirectoryServices on $Domain"
 		$Result['Success'] = $False
 	}
-	$TestResults["$TestNum"] = $Result
+	$TestResults["Test$TestNum"] = $Result
 
 	# Get RSOP permissions
     Write-Host "Getting Resultant Set of Policy (RSoP) for localhost - output to file .\InfocyteTest_RSoP_localhost.html"
@@ -768,7 +786,7 @@ Function New-ProxyWebClient {
 		Write-Warning "No connectivity to RPC port - skipping WMI test"
 		$Result['Success'] = $False
 	}
-	$TestResults["$TestNum"] = $Result
+	$TestResults["Test$TestNum"] = $Result
 
 	# Test SMB Connectivity
 	$TestNum += 1
@@ -794,7 +812,7 @@ Function New-ProxyWebClient {
 		Write-Warning "No connectivity to NetBIOS and SMB ports - skipping SMB Transfer test"
 		$Result['Success'] = $False
 	}
-	$TestResults["$TestNum"] = $Result
+	$TestResults["Test$TestNum"] = $Result
 
 	# Test Remote Schtasks
 	$TestNum += 1
@@ -846,7 +864,7 @@ Function New-ProxyWebClient {
 		Write-Warning "No connectivity to NetBIOS and SMB ports - skipping Remote Schtasks test"
 		$Result['Success'] = $False
 	}
-	$TestResults["$TestNum"] = $Result
+	$TestResults["Test$TestNum"] = $Result
 
 
 	# Test PSRemoting
@@ -875,7 +893,7 @@ Function New-ProxyWebClient {
 		Write-Warning "No connectivity to Powershell Remoting ports - skipping Powershell Remoting test"
 		$Result['Success'] = $False
 	}
-	$TestResults["$TestNum"] = $Result
+	$TestResults["Test$TestNum"] = $Result
 	#endregion Remote Execution Protocol Tests
 
 
@@ -926,7 +944,7 @@ Function New-ProxyWebClient {
 		Write-Warning "No connectivity to WMI ports - skipping Remote Endpoint Return Path test"
 		$Result['Success'] = $False
 	}
-	$TestResults["$TestNum"] = $Result
+	$TestResults["Test$TestNum"] = $Result
 
 	<#
 		if (($PortResults | Where-Object { $_.Port -eq 139}).Access -OR ($PortResults | Where-Object { $_.Port -eq 445}).Access) {
@@ -956,3 +974,5 @@ Function New-ProxyWebClient {
 	Write-Host "$PSScriptRoot\InfocyteTest_RSoP_localhost.html"
 	Write-Host "$PSScriptRoot\InfocyteTest.log"
 	Write-Host "$PSScriptRoot\InfocyteTest.json"
+	return $TestResults
+}
