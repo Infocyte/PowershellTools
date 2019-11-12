@@ -69,3 +69,4 @@ Get-ICHelp
 . "$PSScriptRoot\status.ps1"
 . "$PSScriptRoot\scan.ps1"
 . "$PSScriptRoot\admin.ps1"
+. "$PSScriptRoot\development.ps1"
