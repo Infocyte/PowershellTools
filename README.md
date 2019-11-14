@@ -3,11 +3,9 @@ Useful Powershell tools and modules for operating Infocyte HUNT.
 
 ## HUNT API Powershell Module
 
-Download the HUNT Powershell Module folder from this repository.
-
-Open up a Powershell terminal and import the Infocyte HUNT API Powershell Module with this command: `Import-Module .\HUNT Powershell Module\InfocyteHUNTAPI.psd1`.
-
-NOTE: If your system is configured not to permit the execution of scripts because of a restrictive local execution policy, open Powershell in an administrative context and execute the following command: `Set-ExecutionPolicy Bypass`. Once that is complete, use the `Import-Module` command again.
+Contains API wrappers for interfacing and controlling Infocyte in Powershell. Also has extension development/testing utilities.
+Open up a Powershell terminal and install the Infocyte HUNT API Powershell Module with this command:
+> PS> Install-Module -Name InfocyteHUNTAPI
 
 
 ## Offline Scanning and Analysis
@@ -38,3 +36,10 @@ Review the results by logging in to the Infocyte HUNT server and selecting the "
 > Get-Help Import-ICSurvey
 
 If anything goes wrong, feel free to email us at support@infocyte.com, and we will assist you with any of your issues in regards to this script.
+
+
+## Network Diagnostic Script
+
+This function will help you test and troubleshoot network problems and remote execution problems for agentless scans.
+Open up a Powershell terminal and install the Infocyte network diagnostic with this command:
+> PS> Install-Script -Name Test-ICNetworkAccess
