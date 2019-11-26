@@ -10,7 +10,7 @@ New-Module -name install_huntagent -scriptblock {
 
 	# Example:
 	# [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12; (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; installagent alpo1 asdfhrendsa
-	
+
 	# Logs are stored here: "$($env:TEMP)\huntagentinstall.log"
 
 	Function Install-HuntAgent() {
@@ -33,13 +33,13 @@ New-Module -name install_huntagent -scriptblock {
 		if (-NOT $Interactive) { $ErrorActionPreference = "silentlycontinue" }
 
 		If (-NOT $InstanceName) {
-			if ($Interactive) { Write-Error "Please provide Infocyte HUNT instance name (i.e. mycompany in mycompany.infocyte.com)" }
+			Write-Error "Please provide Infocyte HUNT instance name (i.e. mycompany in mycompany.infocyte.com)"
 			"$(Get-Date) [Error] Installation Error: Install started but no InstanceName provided in arguments." >> $LogPath
 			return
 		}
 
 		If (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
-			if ($Interactive) { Write-Error "You do not have Administrator rights to run this script!`nPlease re-run this script as an Administrator!" }
+			Write-Error "You do not have Administrator rights to run this script!`nPlease re-run this script as an Administrator!"
 			"$(Get-Date) [Error] Installation Error: Install started but script not run as administrator" >> $LogPath
 			return
 		}
