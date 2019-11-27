@@ -8,7 +8,7 @@ The following command is all you need. Run it on any windows system and it will 
 To execute this script as a one liner on a windows host with powershell, run this command replacing `instancename` and `regkey` with your hunt instance <mandatory> and registration key [optional].
 
 
-> [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12; (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; installagent <instancename> [regkey]
+> [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12; (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; installagent \<instancename\> [regkey]
 
 
 #### The essential arguments are after the command *installagent*:  
