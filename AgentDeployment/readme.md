@@ -12,8 +12,8 @@ To execute this script as a one liner on a windows host with powershell, run thi
 
 
 #### The positional arguments after the command *installagent* are:  
-`-InstanceName instancename` **(1st Argument) <Manadatory>:**
-`-RegKey regkey` **(2nd Argument) [Optional]:**
+**(1st Argument) <Manadatory>:** `-InstanceName instancename`
+**(2nd Argument) [Optional]:** `-RegKey regkey` 
 
 `instancename` is your cname from the URL, not the FULL url https://instancename.infocyte.com). This script will append the url for you during install.
 
