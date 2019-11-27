@@ -1,5 +1,5 @@
 ## Infocyte Agent Scripted Installer (One Line Powershell)
-**Platform:** Windows  
+**Platform:** Microsoft Windows 7+ or Server 2008R2+
 **Powershell Version:** 3.0+
 **.NET Version:** 4.5+
 
