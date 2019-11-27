@@ -3,7 +3,7 @@
 **Powershell Version:** 3.0+\
 **.NET Version:** 4.5+
 
-The following command is all you need.  Run it on any windows system and it will download this script and execute it.  This is useful for scripted software distribution, sccm, or GPO deployments in leue of an MSI.  The script will manage an automated installation process for the HUNT agent.  *IMPORTANT: You DO NOT need to download this script. Leave it here unless you want to host it yourself.*
+The following command is all you need.  Run it on any windows system and it will download this script and execute it.  This is useful for scripted software distribution, sccm, or GPO deployments in leu of an MSI.  The script will manage an automated installation process for the HUNT agent.  *IMPORTANT: You DO NOT need to download this script. Leave it here unless you want to host it yourself.*
 
 To execute this script on a windows host, run this command replacing `<instancename>` and `<regkey>` with your hunt instance \<mandatory\> and registration key [optional].
 
@@ -19,7 +19,7 @@ Instance Name (*instancename*) is your cname from the URL, not the FULL url http
 
 Registration Key (*regkey*) is created in the Agent Admin panel. This will automatically approve the agent registration and add it to its' default Target Group. Without it, the agent will initially report as "pending" in the web console and cannot be used until approved.
 
-*Note: *InstanceName* (1) and *RegKey* (2) are positional arguments so they don't require argument headers if in position 1 and 2 after `installagent`.*
+Note: *InstanceName* (1) and *RegKey* (2) are positional arguments so they don't require argument headers if in position 1 and 2 after `installagent`.
 
 ### Example 1 (instancename only):  
 > `[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12;
@@ -40,14 +40,14 @@ If running from outside Powershell (like in a batch or GPO install script):
 
 
 ##### Interactive Mode
-Silent run is default so if you want to troubleshoot or check out what is happening, check the log file or run the command in interactive mode:  Add `-Interactive` to the end of the command.
+Silent run is default so if you want to troubleshoot or check out what is happening, check the log file or run the command in interactive mode:  Add *-Interactive* to the end of the command.
 
-Log can be read here:\
+Log can be read here:
 > `Get-Content "C:\Windows\Temp\infocyteagentinstaller.log"`
 
 ##### Proxy Configuration:
-* Authenticated: *-Proxy "<user>:<password>@<ProxyAddress>:<ProxyPort>"*
-* Unauthenticated: *-Proxy "<ProxyAddress>:<ProxyPort>"*
+* Authenticated: *-Proxy "\<user\>:\<password\>@\<ProxyAddress\>:\<ProxyPort\>"*
+* Unauthenticated: *-Proxy "\<ProxyAddress\>:\<ProxyPort\>"*
 
 ##### Force Reinstall:
 Use *-Force* to force a reinstall (by default it bails)
