@@ -11,13 +11,16 @@ To execute this script as a one liner on a windows host with powershell, run thi
 > [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12; (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; installagent \<instancename\> [regkey]
 
 
-#### The essential arguments are after the command *installagent*:  
-**-InstanceName (1st Argument) <Manadatory>:** `instancename`  
-**-RegKey (2nd Argument) [Optional]:** `regkey`
+#### The positional arguments after the command *installagent* are:  
+`-InstanceName instancename` **(1st Argument) <Manadatory>:**
+`-RegKey regkey` **(2nd Argument) [Optional]:**
 
-Instance name is your cname from the URL, not the FULL url https://instancename.infocyte.com). This script will append the url for you during install.
+`instancename` is your cname from the URL, not the FULL url https://instancename.infocyte.com). This script will append the url for you during install.
 
 Registration Key (`regkey`) is created in the Agent Admin panel. This will automatically approve the agent registration and add it to its' default Target Group. Without it, the agent will initially report as "pending" in the web console and cannot be used till approved.
+
+Note: InstanceName (1) and RegKey (2) are positional arguments so they don't require argument headers if in position 1 and 2 after `installagent`.
+
 
 #### Example 1:  
 ```powershell
@@ -59,5 +62,3 @@ Use -FriendlyName to add a name for the system. This can be added or changed in 
 (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex;
 installagent -InstanceName "demo1" -RegKey "asdfasdf" -FriendlyName "DBServer1" -Proxy "user:password@192.168.1.1:8080" -Interactive
 ```
-
-Note: InstanceName (1) and RegKey (2) are positional arguments so they don't actually require argument headers if in position 1 and 2 after `installagent`.
