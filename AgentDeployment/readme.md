@@ -1,4 +1,4 @@
-## Infocyte HUNT Agent Scripted Installer (One Line Powershell Installer)
+## Infocyte Agent Scripted Installer (One Line Powershell)
 **Platform:** Windows  
 **Powershell Version:** 3.0+
 **.NET Version:** 4.5+
