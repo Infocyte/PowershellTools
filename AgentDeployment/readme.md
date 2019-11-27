@@ -1,6 +1,6 @@
 ## Infocyte Agent Scripted Installer (One Line Powershell)
-**Platform:** Microsoft Windows 7+ or Server 2008R2+
-**Powershell Version:** 3.0+
+**Platform:** Microsoft Windows 7+ or Server 2008R2+  
+**Powershell Version:** 3.0+  
 **.NET Version:** 4.5+
 
 The following command is all you need.  Run it on any windows system and it will download this script and execute it.  This is useful for scripted software distribution, sccm, or GPO deployments in leue of an MSI.  The script will manage an automated installation process for the HUNT agent.  *IMPORTANT: You DO NOT need to download this script. Leave it here unless you want to host it yourself.*
@@ -46,14 +46,14 @@ Log can be read here:
 > `Get-Content "C:\Windows\Temp\infocyteagentinstaller.log"`
 
 ##### Proxy Configuration:
-* Authenticated: `"<user>:<password>@<ProxyAddress>:<ProxyPort>"`
-* Unauthenticated: `"<ProxyAddress>:<ProxyPort>"`
+* Authenticated: `-Proxy "<user>:<password>@<ProxyAddress>:<ProxyPort>"`
+* Unauthenticated: `-Proxy "<ProxyAddress>:<ProxyPort>"`
 
 ##### Force Reinstall:
 Use `-Force` to force a reinstall (by default it bails)
 
 ##### Friendly Name:
-Use `-FriendlyName "String"` to add a name for the system. This can be added or changed in the web console as well after install.
+Use `-FriendlyName` to add a descriptive name for the system (otherwise it uses hostname). This can be added or changed in the web console as well after install.
 
 
 ### Example 3 (lots of arguments):  
