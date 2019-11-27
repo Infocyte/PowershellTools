@@ -216,8 +216,8 @@ New-Module -name install_InfocyteAgent -scriptblock {
 		}
 	}
 
-	Set-Alias installagent -Value Install-InfocyteAgent | Out-Null
-	Set-Alias uninstallagent -Value Uninstall-InfocyteAgent | Out-Null
-	Export-ModuleMember -Alias 'installagent' -Function 'Install-InfocyteAgent' | Out-Null
-	Export-ModuleMember -Alias 'uninstallagent' -Function 'Uninstall-InfocyteAgent' | Out-Null
-}
+	Export-ModuleMember -Alias 'installagent' -Function 'Install-InfocyteAgent'
+	Export-ModuleMember -Alias 'uninstallagent' -Function 'Uninstall-InfocyteAgent'
+} | Out-Null
+Set-Alias installagent -Value Install-InfocyteAgent
+Set-Alias uninstallagent -Value Uninstall-InfocyteAgent
