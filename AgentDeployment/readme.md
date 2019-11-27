@@ -5,10 +5,10 @@
 
 The following command is all you need.  Run it on any windows system and it will download this script and execute it.  This is useful for scripted software distribution, sccm, or GPO deployments in leu of an MSI.  The script will manage an automated installation process for the HUNT agent.  *IMPORTANT: You DO NOT need to download this script. Leave it here unless you want to host it yourself.*
 
-To execute this script on a windows host, run this command replacing `<instancename>` and `<regkey>` with your hunt instance \<mandatory\> and registration key [optional].
+To execute this script on a windows host, run this command replacing `<instancename>` and `[regkey]` with your hunt instance \<mandatory\> and registration key [optional].
 
 
-> `[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12; (new-object Net.WebClient).DownloadString("https://github.com/Infocyte/PowershellTools/blob/agentdeployment-workflow/AgentDeployment/install_huntagent.ps1") | iex; installagent \<instancename\> [regkey]`
+> `[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12; (new-object Net.WebClient).DownloadString("https://github.com/Infocyte/PowershellTools/blob/agentdeployment-workflow/AgentDeployment/install_huntagent.ps1") | iex; installagent <instancename> [regkey]`
 
 
 #### The positional arguments after the command *installagent* are:  
