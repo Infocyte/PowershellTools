@@ -28,7 +28,7 @@ installagent demo1`
 
 ### Example 2 (For use in batch or GPO):
 If running from outside Powershell (like in a batch or GPO install script):
-> powershell.exe -ExecutionPolicy bypass -noprofile -nologo -command { [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12; (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; installagent alpo1 }
+> `powershell.exe -ExecutionPolicy bypass -noprofile -nologo -command { [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12; (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; installagent alpo1 }`
 
 ---
 
@@ -55,12 +55,10 @@ Log can be read here:
 Use `-Force` to force a reinstall (by default it bails)
 
 ##### Friendly Name:
-Use -FriendlyName to add a name for the system. This can be added or changed in the web console as well after install.
-
-`-FriendlyName "John Doe's Laptop"`
+Use -FriendlyName to add a name for the system. This can be added or changed in the web console as well after install. \n `-FriendlyName "John Doe's Laptop"`
 
 
 ### Example 3 (lots of arguments):  
-> [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12;
+> `[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12;
 (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex;
-installagent -InstanceName "demo1" -RegKey "asdfasdf" -FriendlyName "DBServer1" -Proxy "user:password@192.168.1.1:8080" -Interactive
+installagent -InstanceName "demo1" -RegKey "asdfasdf" -FriendlyName "DBServer1" -Proxy "user:password@192.168.1.1:8080" -Interactive`
