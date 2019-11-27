@@ -30,6 +30,8 @@ installagent demo1
 If running from outside Powershell (like in a batch or GPO install script):
 > powershell.exe -ExecutionPolicy bypass -noprofile -nologo -command { [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12; (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; installagent alpo1 }
 
+---
+
 ## Additional (Optional) Parameters:
 * `-Interactive`
 * `-Force`
