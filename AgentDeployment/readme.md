@@ -8,7 +8,7 @@ The following command is all you need.  Run it on any windows system and it will
 To execute this script on a windows host, run this command replacing `instancename` and `regkey` with your hunt instance \<mandatory\> and registration key [optional].
 
 
-> [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12; (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; installagent \<instancename\> [regkey]
+> [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12; (new-object Net.WebClient).DownloadString("https://github.com/Infocyte/PowershellTools/blob/agentdeployment-workflow/AgentDeployment/install_huntagent.ps1") | iex; installagent \<instancename\> [regkey]
 
 
 #### The positional arguments after the command *installagent* are:  
@@ -21,13 +21,15 @@ Registration Key (`regkey`) is created in the Agent Admin panel. This will autom
 
 *Note: `InstanceName` (1) and `RegKey` (2) are positional arguments so they don't require argument headers if in position 1 and 2 after `installagent`.*
 
+### Example 1 (For use in batch or GPO):
+If running from outside Powershell (like in a GPO install script), you may need to do this:
+> powershell.exe -ExecutionPolicy bypass -noprofile -nologo -command { [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12; (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; installagent alpo1 }
 
-### Example 1:  
-```powershell
-[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12;
+### Example 2 (instancename only):  
+> [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12;
 (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex;
 installagent demo1
-```
+
 
 ## Additional (Optional) Parameters:
 * `-Interactive`
@@ -56,7 +58,7 @@ Use -FriendlyName to add a name for the system. This can be added or changed in 
 `-FriendlyName "John Doe's Laptop"`
 
 
-### Example 2:  
+### Example 3 (lots of arguments):  
 ```powershell
 [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12;
 (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex;
