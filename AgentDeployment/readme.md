@@ -3,7 +3,8 @@
 **Powershell Version:** 3.0+
 **.NET Version:** 4.5+
 
-The following command is all you need.  Run it on any windows system and it will download this script and execute it.  This is useful for scripted software distribution, sccm, or GPO deployments in leue of an MSI.  The script will manage an automated installation process for the HUNT agent.  *IMPORTANT: You DO NOT need to download this script. Leave it here unless you want to host it yourself.*  
+The following command is all you need.  Run it on any windows system and it will download this script and execute it.  This is useful for scripted software distribution, sccm, or GPO deployments in leue of an MSI.  The script will manage an automated installation process for the HUNT agent.  *IMPORTANT: You DO NOT need to download this script. Leave it here unless you want to host it yourself.*
+
 To execute this script on a windows host, run this command replacing `instancename` and `regkey` with your hunt instance \<mandatory\> and registration key [optional].
 
 
@@ -39,8 +40,7 @@ If running from outside Powershell (like in a batch or GPO install script):
 
 
 ##### Interactive Mode
-Silent run is default so if you want to troubleshoot or check out what is happening, check the log file or run the command in interactive mode:  
-Add `-Interactive` to the end of the command.
+Silent run is default so if you want to troubleshoot or check out what is happening, check the log file or run the command in interactive mode:  Add `-Interactive` to the end of the command.
 
 Log can be read here:
 > `Get-Content "C:\Windows\Temp\infocyteagentinstaller.log"`
@@ -53,8 +53,7 @@ Log can be read here:
 Use `-Force` to force a reinstall (by default it bails)
 
 ##### Friendly Name:
-Use -FriendlyName to add a name for the system. This can be added or changed in the web console as well after install.  
-`-FriendlyName "John Doe's Laptop"`
+Use `-FriendlyName "String"` to add a name for the system. This can be added or changed in the web console as well after install.
 
 
 ### Example 3 (lots of arguments):  
