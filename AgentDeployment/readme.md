@@ -3,7 +3,7 @@
 **Powershell Version:** 3.0+
 **.NET Version:** 4.5+
 
-The following command is all you need. Run it on any windows system and it will download this script and execute it. This is useful for scripted software distribution, sccm, or GPO deployments in leue of an MSI. The script will manage an automated installation process for the HUNT agent. IMPORTANT: You DO NOT need to download this script. Leave it here unless you want to host it yourself.
+The following command is all you need. Run it on any windows system and it will download this script and execute it. This is useful for scripted software distribution, sccm, or GPO deployments in leue of an MSI. The script will manage an automated installation process for the HUNT agent. *IMPORTANT: You DO NOT need to download this script. Leave it here unless you want to host it yourself.*
 
 To execute this script on a windows host, run this command replacing `instancename` and `regkey` with your hunt instance \<mandatory\> and registration key [optional].
 
@@ -19,7 +19,7 @@ To execute this script on a windows host, run this command replacing `instancena
 
 Registration Key (`regkey`) is created in the Agent Admin panel. This will automatically approve the agent registration and add it to its' default Target Group. Without it, the agent will initially report as "pending" in the web console and cannot be used till approved.
 
-Note: InstanceName (1) and RegKey (2) are positional arguments so they don't require argument headers if in position 1 and 2 after `installagent`.
+*Note: InstanceName (1) and RegKey (2) are positional arguments so they don't require argument headers if in position 1 and 2 after `installagent`.*
 
 
 ### Example 1:  
@@ -45,8 +45,8 @@ Log can be read here:
 `Get-Content "C:\Windows\Temp\infocyteagentinstaller.log"`
 
 ##### Proxy Configuration:
-Authenticated: "<user>:<password>@<ProxyAddress>:<ProxyPort>"
-Unauthenticated: "<ProxyAddress>:<ProxyPort>"
+* Authenticated: `"<user>:<password>@<ProxyAddress>:<ProxyPort>"`
+* Unauthenticated: `"<ProxyAddress>:<ProxyPort>"`
 
 ##### Force Reinstall:
 Use `-Force` to force a reinstall (by default it bails)
