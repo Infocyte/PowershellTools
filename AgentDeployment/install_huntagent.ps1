@@ -21,7 +21,7 @@ New-Module -name install_huntagent -scriptblock {
 			[Parameter(Position = 1)]
 			[String]$RegKey,
 
-			[Switch]$Interactive
+			[Switch]$Silent
 		)
 
 		$agentDestination = "$($env:TEMP)\agent.windows.exe"
@@ -30,23 +30,23 @@ New-Module -name install_huntagent -scriptblock {
 		$hunturl = "https://$InstanceName.infocyte.com"
 
 		# Make script silent unless run interactive
-		if (-NOT $Interactive) { $ErrorActionPreference = "silentlycontinue" }
+		if ($Silent) { $ErrorActionPreference = "silentlycontinue" }
 
 		If (-NOT $InstanceName) {
-			Write-Error "Please provide Infocyte HUNT instance name (i.e. mycompany in mycompany.infocyte.com)"
+			Write-Warning "Please provide Infocyte HUNT instance name (i.e. mycompany in mycompany.infocyte.com)"
 			"$(Get-Date) [Error] Installation Error: Install started but no InstanceName provided in arguments." >> $LogPath
 			return
 		}
 
 		If (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
-			Write-Error "You do not have Administrator rights to run this script!`nPlease re-run this script as an Administrator!"
+			Write-Warning "You do not have Administrator rights to run this script!`nPlease re-run this script as an Administrator!"
 			"$(Get-Date) [Error] Installation Error: Install started but script not run as administrator" >> $LogPath
 			return
 		}
 
 		$InstallPath = 'C:\Program Files\Infocyte\Agent\agent.windows.exe'
 		If (Get-Service -name huntAgent -ErrorAction SilentlyContinue) {
-			if ($Interactive) { Write-Error "huntAgent service already installed" }
+			if (-NOT $Silent) { Write-Warning "huntAgent service already installed" }
 			"$(Get-Date) [Information] Install started but HUNTAgent service already running. Skipping." >> $LogPath
 			return
 		}
@@ -60,7 +60,7 @@ New-Module -name install_huntagent -scriptblock {
 		try {
 			$wc.DownloadFile($agentURL, $agentDestination)
 		} catch {
-			if ($Interactive) { Write-Error "Could not download HUNT agent from $agentURL" }
+			if (-NOT $Silent) { Write-Warning "Could not download HUNT agent from $agentURL" }
 			"$(Get-Date) [Error] Installation Error: Install started but could not download agent.windows.exe from $agentURL." >> $LogPath
 		}
 
@@ -71,26 +71,30 @@ New-Module -name install_huntagent -scriptblock {
 			$Hash = [System.BitConverter]::ToString($SHA1CryptoProvider.ComputeHash($inputBytes))
 			$sha1 = $Hash.Replace('-','').ToUpper()
 		} catch {
-			if ($Interactive) { Write-Warning "Hash Error. $_" }
+			if (-NOT $Silent) { Write-Warning "Hash Error. $_" }
 			$sha1 = "Hashing Error"
 			#"$(Get-Date) [Warning] Installation Warning: Could not hash agent.survey.exe." >> $LogPath
 		}
 
 		# Setup exe arguments
 		#$arguments = "--url $hunturl --install"
-		#if (-NOT $interactive) { $arguments += " --quiet" }
+		#if ($Silent) { $arguments += " --quiet" }
 		#if ($RegKey) { $arguments += " --key $RegKey" }
 
 		$arguments = @("--install", "--url $hunturl")
 		if ($RegKey) { $arguments += "--key $RegKey" }
-		if (-NOT $interactive) { $arguments += "--quiet" }
+		if ($Silent) { $arguments += "--quiet" }
 
 		"$(Get-Date) [Information] Installing Agent: Downloading agent.windows.exe from $agentURL [sha1: $sha1] and executing with commandline: $($agentDestination.Substring($agentDestination.LastIndexOf('\')+1)) $arguments" >> $LogPath
 		# Execute!
 		try {
 			Start-Process -NoNewWindow -FilePath $agentDestination -ArgumentList $arguments -ErrorAction Stop
+			if (-NOT $Silent) { Write-Host "$(Get-Date) [Success] Installation Succeeded! Agent associated to $InstanceName." }
+			"$(Get-Date) [Success] Installation Succeeded! Agent associated to $InstanceName." >> $LogPath
+
 			#& $agentDestination $arguments
 		} catch {
+			if (-NOT $Silent) { Write-Warning "$(Get-Date) [Error] Installation Error: Could not start agent.windows.exe. [$_]" }
 			"$(Get-Date) [Error] Installation Error: Could not start agent.windows.exe. [$_]" >> $LogPath
 		}
 
