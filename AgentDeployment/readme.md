@@ -3,17 +3,17 @@
 **Powershell Version:** 3.0+
 **.NET Version:** 4.5+
 
-The following command is all you need. Run it on any windows system and it will download this script and execute it. This is useful for scripted software distribution, sccm, or GPO deployments in leue of an MSI. The script will manage the installation process for the HUNT agent. IMPORTANT: You DO NOT need to download this script. Leave it here unless you want to host it yourself.
+The following command is all you need. Run it on any windows system and it will download this script and execute it. This is useful for scripted software distribution, sccm, or GPO deployments in leue of an MSI. The script will manage an automated installation process for the HUNT agent. IMPORTANT: You DO NOT need to download this script. Leave it here unless you want to host it yourself.
 
-To execute this script as a one liner on a windows host with powershell, run this command replacing `instancename` and `regkey` with your hunt instance <mandatory> and registration key [optional].
+To execute this script on a windows host, run this command replacing `instancename` and `regkey` with your hunt instance \<mandatory\> and registration key [optional].
 
 
 > [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12; (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; installagent \<instancename\> [regkey]
 
 
 #### The positional arguments after the command *installagent* are:  
-**(1st Argument) <Manadatory>:** `-InstanceName instancename`
-**(2nd Argument) [Optional]:** `-RegKey regkey` 
+* **(1st Argument) <Manadatory>:** `-InstanceName instancename`
+* **(2nd Argument) [Optional]:** `-RegKey regkey`
 
 `instancename` is your cname from the URL, not the FULL url https://instancename.infocyte.com). This script will append the url for you during install.
 
@@ -22,14 +22,14 @@ Registration Key (`regkey`) is created in the Agent Admin panel. This will autom
 Note: InstanceName (1) and RegKey (2) are positional arguments so they don't require argument headers if in position 1 and 2 after `installagent`.
 
 
-#### Example 1:  
+### Example 1:  
 ```powershell
 [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12;
 (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex;
 installagent demo1
 ```
 
-### Additional (Optional) Parameters:
+## Additional (Optional) Parameters:
 * `-Interactive`
 * `-Force`
 * `-FriendlyName "String"`
@@ -56,7 +56,7 @@ Use -FriendlyName to add a name for the system. This can be added or changed in 
 `-FriendlyName "John Doe's Laptop"`
 
 
-#### Example 2:  
+### Example 2:  
 ```powershell
 [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12;
 (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex;
