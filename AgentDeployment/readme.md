@@ -21,15 +21,14 @@ Registration Key (`regkey`) is created in the Agent Admin panel. This will autom
 
 *Note: `InstanceName` (1) and `RegKey` (2) are positional arguments so they don't require argument headers if in position 1 and 2 after `installagent`.*
 
-### Example 1 (For use in batch or GPO):
-If running from outside Powershell (like in a GPO install script), you may need to do this:
-> powershell.exe -ExecutionPolicy bypass -noprofile -nologo -command { [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12; (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; installagent alpo1 }
-
-### Example 2 (instancename only):  
+### Example 1 (instancename only):  
 > [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12;
 (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex;
 installagent demo1
 
+### Example 2 (For use in batch or GPO):
+If running from outside Powershell (like in a batch or GPO install script):
+> powershell.exe -ExecutionPolicy bypass -noprofile -nologo -command { [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12; (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; installagent alpo1 }
 
 ## Additional (Optional) Parameters:
 * `-Interactive`
