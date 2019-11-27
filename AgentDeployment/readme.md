@@ -45,7 +45,7 @@ Silent run is default so if you want to troubleshoot or check out what is happen
 Add `-Interactive` to the end of the command.
 
 Log can be read here:
-`Get-Content "C:\Windows\Temp\infocyteagentinstaller.log"`
+> `Get-Content "C:\Windows\Temp\infocyteagentinstaller.log"`
 
 ##### Proxy Configuration:
 * Authenticated: `"<user>:<password>@<ProxyAddress>:<ProxyPort>"`
@@ -56,6 +56,7 @@ Use `-Force` to force a reinstall (by default it bails)
 
 ##### Friendly Name:
 Use -FriendlyName to add a name for the system. This can be added or changed in the web console as well after install.
+
 `-FriendlyName "John Doe's Laptop"`
 
 
