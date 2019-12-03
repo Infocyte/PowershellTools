@@ -225,23 +225,47 @@ function Invoke-ICScanTarget {
 }
 
 function New-ICScanOptions {
-	Write-Host 'ScanOption object properties should be set ($True or $False) and then passed into Invoke-ICScan or Add-ICScanSchedule'
-	$options = @{
-  	EnableProcess = $true
-		EnableAccount = $true
-		EnableMemory = $true
-		EnableModule = $true
-		EnableDriver = $true
-		EnableArtifact = $true
-		EnableAutostart = $true
-		EnableApplication = $true
-		EnableHook = $true
-		EnableNetwork = $true
-		EnableLogDelete = $true
-	  EnableSurveyDelete = $true
-		LowerPriority = $false
-  }
-	return $options
+    param(
+        [parameter(ValueFromPipeLine=$true)]
+        [String[]]$ExtensionIds,
+
+        [Switch]$ExtensionsOnly
+    )
+    BEGIN {
+        $Ids = @()
+    }
+    PROCESS {
+        $Ids += $_
+    }
+    END {
+        if (-NOT $Ids) {
+            $Ids = $ExtensionIds
+        }
+    	Write-Host 'ScanOption object properties should be set ($True or $False) and then passed into Invoke-ICScan or Add-ICScanSchedule'
+        if ($ExtensionsOnly) {
+            $default = $false
+        } else {
+            $default = $true
+        }
+    	$options = @{
+      	    EnableProcess = $default
+    		EnableAccount = $default
+    		EnableMemory = $default
+    		EnableModule = $default
+    		EnableDriver = $default
+    		EnableArtifact = $default
+    		EnableAutostart = $default
+    		EnableApplication = $default
+    		EnableHook = $default
+    		EnableNetwork = $default
+            EnableEventLog = $default
+    		EnableLogDelete = $true
+        }
+        if ($ExtensionIds) {
+            $options['extensionIds'] = $Ids
+        }
+    	return $options
+    }
 }
 
 function Add-ICScanSchedule {

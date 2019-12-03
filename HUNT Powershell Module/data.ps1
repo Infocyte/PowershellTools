@@ -17,7 +17,8 @@ function Get-ICObject {
       "Application",
       "Account",
       "Script",
-      "File"
+      "File",
+      "Extension"
     )]
     [String]$Type="File",
     [String]$BoxId,
@@ -40,26 +41,27 @@ function Get-ICObject {
     where = @{ and = @() }
   }
   switch ( $Type ) {
-    "Process" {   $Endpoint = 'boxprocessinstances' }
-    "Module" { $Endpoint = 'boxmoduleinstances' }
-    "Driver" { $Endpoint = 'boxdriverinstances' }
-    "MemScan" {  $Endpoint = 'Boxmemscaninstances' }
-    "Artifact" {   $Endpoint = 'boxartifactinstances' }
-    "Autostart" {  $Endpoint = 'boxautostartinstances' }
-    "Script" {     $Endpoint = 'BoxScriptInstances' }
-    "Connection" { $Endpoint = 'BoxConnectionInstances'
-                    $filter.remove('order')
-                    if (-NOT $where) {
-                        $filter.where['and'] += @{ state = "ESTABLISHED"}
+    "Process"   { $Endpoint = 'BoxProcessInstances' }
+    "Module"    { $Endpoint = 'BoxModuleInstances' }
+    "Driver"    { $Endpoint = 'BoxDriverInstances' }
+    "MemScan"   { $Endpoint = 'BoxMemscanInstances' }
+    "Artifact"      { $Endpoint = 'boxArtifactInstances' }
+    "Autostart"     { $Endpoint = 'boxAutostartInstances' }
+    "Script"        { $Endpoint = 'BoxScriptInstances' }
+    "Extension"     { $Endpoint = 'BoxExtensionInstances' }
+    "Connection"    { $Endpoint = 'BoxConnectionInstances'
+                        $filter.remove('order')
+                        if (-NOT $where) {
+                            $filter.where['and'] += @{ state = "ESTABLISHED"}
+                        }
                     }
+    "Host"      { $Endpoint = 'BoxHosts'
+                    $filter['order'] = 'completedOn desc'
                 }
-    "Host" {   $Endpoint = 'boxhosts'
-                $filter['order'] = 'completedOn desc'
-            }
-    "Account" {    $Endpoint = 'BoxAccountInstancesByHost'
+    "Account"   { $Endpoint = 'BoxAccountInstancesByHost'
                     $filter.remove('order')
                 }
-    "Application" {    $Endpoint = 'BoxApplicationInstances'
+    "Application"   { $Endpoint = 'BoxApplicationInstances'
                         $filter.remove('order')
                     }
     "File" {
@@ -68,7 +70,7 @@ function Get-ICObject {
                 return
             }
             $Files | % { Get-ICObject -Type $_ -BoxId $BoxId -where $where -NoLimit:$NoLimit }
-         }
+            }
     Default { }
   }
   if ($Endpoint) {

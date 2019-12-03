@@ -123,3 +123,60 @@ function Add-ICComment {
   }
 	_ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method POST
 }
+
+function Get-ICExtension {
+    Param(
+        [parameter(Position=0)]
+        [String]$Id,
+
+        [Switch]$IncludeBody,
+
+        [Switch]$NoLimit
+    )
+
+    if ($Id) {
+        $Endpoint = "extensions/$Id"
+        if ($IncludeBody) {
+            $Endpoint += "/latestVersion"
+        }
+    } else {
+        $Endpoint = "extensions"
+    }
+    _ICRestMethod -url $HuntServerAddress/api/$Endpoint -method GET -NoLimit:$NoLimit
+}
+
+
+function New-ICExtension {
+    Param(
+        [parameter(mandatory=$false)]
+        [String]$Id,
+
+        [parameter(mandatory=$true)]
+        [ValidateNotNullorEmpty()]
+        [String]$Name,
+
+        [parameter(mandatory=$true)]
+        [ValidateNotNullorEmpty()]
+        [String]$ScriptBody,
+
+        [parameter(mandatory=$true)]
+        [ValidateSet("collection","action")]
+        [String]$Type
+    )
+
+    $Endpoint = "extensions"
+    $body = @{
+        name = $Name
+        type = $Type
+        body = $ScriptBody
+        active = $true
+    }
+    if ($Id) {
+        Write-Host "Updating Extension: $name"
+        $body["id"] = $Id
+    } else {
+        Write-Host "Adding new Extension named: $name"
+    }
+
+    _ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method POST
+}

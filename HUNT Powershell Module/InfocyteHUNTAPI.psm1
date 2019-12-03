@@ -27,7 +27,7 @@ function Get-ICHelp {
     Write-Host "Offline Scan Import Functions:"
     Write-Host -ForegroundColor Cyan "`tImport-ICSurvey`n"
     Write-Host "Admin Functions:"
-    Write-Host -ForegroundColor Cyan "`tGet-ICFlagColourCodes, New-ICFlag, Update-ICFlag, Remove-ICFlag, Add-ICComment`n"
+    Write-Host -ForegroundColor Cyan "`tNew-ICExtension, Get-ICExtension, Get-ICFlagColourCodes, New-ICFlag, Update-ICFlag, Remove-ICFlag, Add-ICComment`n"
     Write-Host "`n"
     Write-Host "FAQ:"
     Write-Host "- Most data within HUNT are tagged and filterable by Scan (" -NoNewLine
