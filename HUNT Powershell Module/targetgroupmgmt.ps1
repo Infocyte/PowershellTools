@@ -264,3 +264,27 @@ function Get-ICBox ([Switch]$Last90, [Switch]$Last7, [Switch]$Last30, [Switch]$I
     }
 
 }
+
+
+function Get-ICAgent ([String]$Id, [Switch]$NoLimit) {
+    if ($Id) {
+        $Endpoint = "Agents/$Id"
+    } else {
+        $Endpoint = "Agents"
+    }
+    _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
+}
+
+function Remove-ICAgent {
+    Param(
+        [ValidateNotNullorEmpty()]
+        [String]$Id
+    )
+
+    Write-Warning "Uninstalling Agent $Id"
+    $Endpoint = "Agents/$Id"
+    _ICRestMethod -url "$HuntServerAddress/api/$Endpoint/uninstall" -method POST
+    Start-Sleep 2
+    _ICRestMethod -url "$HuntServerAddress/api/$Endpoint" -method DELETE
+    Write-Host "Agent Uninstalled and Deleted."
+}

@@ -8,7 +8,8 @@ if ($PSVersionTable.PSVersion.Major -lt 5) {
 }
 
 function Get-ICHelp {
-    Write-Host "Pass your Hunt Server credentials into Set-ICToken to connect to an instance of HUNT. This will store your login token and server into a global variable for use by the other commands"
+    Write-Host "Pass your Hunt Server credentials into Set-ICToken to connect to an instance of HUNT.
+        This will store your login token and server into a global variable for use by the other commands"
     Write-Host "`n"
     Write-Host "Help:"
     Write-Host -ForegroundColor Cyan "`tGet-ICHelp`n"
@@ -17,17 +18,22 @@ function Get-ICHelp {
     Write-Host "Authentication Functions:"
     Write-Host -ForegroundColor Cyan "`tNew-ICToken (depreciated / On-Prem only), Set-ICToken`n"
     Write-Host "Target Group Management Functions:"
-    Write-Host -ForegroundColor Cyan "`tNew-ICTargetGroup, Get-ICTargetGroup, Remove-ICTargetGroup, New-ICCredential, Get-ICCredential, Remove-ICCredential, New-ICQuery, Get-ICQuery, Remove-ICQuery, Get-ICAddress, Remove-ICAddress`n"
+    Write-Host -ForegroundColor Cyan "`tNew-ICTargetGroup, Get-ICTargetGroup, Remove-ICTargetGroup, New-ICCredential,
+        Get-ICCredential, Remove-ICCredential, New-ICQuery, Get-ICQuery, Remove-ICQuery,
+        Get-ICAddress, Remove-ICAddress, Get-ICAgent, Remove-ICAgent`n"
     Write-Host "HUNT Server Status Functions:"
     Write-Host -ForegroundColor Cyan "`tGet-ICUserAuditLog, Get-ICUserTask, Get-ICUserTaskItem`n"
     Write-Host "Data Export Functions:"
-    Write-Host -ForegroundColor Cyan "`tGet-ICBox, Get-ICScan, Get-ICObject, Get-ICApplication, Get-ICVulnerability, Get-ICAlert, Get-ICActivityTrace, Get-ICFileDetail`n"
+    Write-Host -ForegroundColor Cyan "`tGet-ICBox, Get-ICScan, Get-ICObject, Get-ICApplication, Get-ICVulnerability,
+        Get-ICAlert, Get-ICActivityTrace, Get-ICFileDetail`n"
     Write-Host "Scanning Functions:"
-    Write-Host -ForegroundColor Cyan "`tInvoke-ICScan, Invoke-ICScanTarget, Invoke-ICFindHosts, New-ICScanOptions, Add-ICScanSchedule, Get-ICScanSchedule, Remove-ICScanSchedule`n"
+    Write-Host -ForegroundColor Cyan "`tInvoke-ICScan, Invoke-ICScanTarget, Invoke-ICFindHosts, New-ICScanOptions,
+        Add-ICScanSchedule, Get-ICScanSchedule, Remove-ICScanSchedule`n"
     Write-Host "Offline Scan Import Functions:"
     Write-Host -ForegroundColor Cyan "`tImport-ICSurvey`n"
     Write-Host "Admin Functions:"
-    Write-Host -ForegroundColor Cyan "`tNew-ICExtension, Get-ICExtension, Get-ICFlagColourCodes, New-ICFlag, Update-ICFlag, Remove-ICFlag, Add-ICComment`n"
+    Write-Host -ForegroundColor Cyan "`tNew-ICExtension, Get-ICExtension, Get-ICFlagColourCodes,
+        New-ICFlag, Update-ICFlag, Remove-ICFlag, Add-ICComment`n"
     Write-Host "`n"
     Write-Host "FAQ:"
     Write-Host "- Most data within HUNT are tagged and filterable by Scan (" -NoNewLine
