@@ -85,6 +85,28 @@ function _ICRestMethod ([String]$url, $body=$null, [String]$method) {
 	}
 }
 
+function Invoke-ICAPI {
+    Param(
+        [parameter(Mandatory=$true)]
+        [ValidateNotNullorEmpty()]
+        [String]$Endpoint,
+
+        [parameter(Mandatory=$false, HelpMessage="Provide a hashtable or PSObject and it will be converted to the json body.")]
+        $body=$null,
+
+        [parameter(Mandatory=$false)]
+        [ValidateSet(
+          "GET",
+          "POST",
+          "DELETE",
+          "PATCH"
+        )]
+        [String]$Method="GET"
+    )
+
+    _ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method $Method
+}
+
 function Join-Object
 {
     <#
