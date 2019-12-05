@@ -17,51 +17,51 @@ function New-ICQuery {
 	[String]$QueryName
     )
 
-  $Credential = Get-ICCredential -CredentialId $CredentialId
-  $TargetGroup = Get-ICTargetGroup -TargetGroupId $TargetGroupId
+    $Credential = Get-ICCredential -CredentialId $CredentialId
+    $TargetGroup = Get-ICTargetGroup -TargetGroupId $TargetGroupId
 	Write-Host "Creating new Query ($query) in TargetGroup $TargetGroup.name  using credential $($Credential.name) [$($Credential.username)]"
-  $Endpoint = "queries"
-  $data = @{
-    value = $query
-    targetId = $TargetGroupId
-		name = $QueryName
-  }
-  if ($credentialId) {
-    $data['credentialId'] = $CredentialId
-  }
-  if ($sshCredentialId) {
-    $data['sshCredential'] = $sshCredentialId
-  }
-  $body = @{
-    data = $data
-  }
-  _ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method POST
+    $Endpoint = "queries"
+    $data = @{
+        value = $query
+        targetId = $TargetGroupId
+    	name = $QueryName
+    }
+    if ($credentialId) {
+        $data['credentialId'] = $CredentialId
+    }
+    if ($sshCredentialId) {
+        $data['sshCredential'] = $sshCredentialId
+    }
+    $body = @{
+        data = $data
+    }
+    _ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method POST
 }
 
 function Get-ICQuery ([String]$TargetGroupId) {
-  $Endpoint = "queries"
-  $filter =  @{
-    limit = $resultlimit
-    skip = 0
-  }
-  if ($TargetGroupId) {
-    $filter['where'] = @{ targetId = $TargetGroupId }
-    Write-Verbose "Getting Queries for Target Group Id: $TargetGroupId"
-  }
-  #Write-Verbose "Getting all Queries from TargetGroup $TargetGroup"
-  _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$true
+    $Endpoint = "queries"
+    $filter =  @{
+        limit = $resultlimit
+        skip = 0
+    }
+    if ($TargetGroupId) {
+        $filter['where'] = @{ targetId = $TargetGroupId }
+        Write-Verbose "Getting Queries for Target Group Id: $TargetGroupId"
+    }
+    #Write-Verbose "Getting all Queries from TargetGroup $TargetGroup"
+    _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$true
 }
 
 function Remove-ICQuery {
-  param(
-    [parameter(Mandatory=$true, Position=0)]
-    [ValidateNotNullOrEmpty()]
-    [String]$QueryId
-  )
+    param(
+        [parameter(Mandatory=$true, Position=0)]
+        [ValidateNotNullOrEmpty()]
+        [String]$QueryId
+    )
 
-  $Endpoint = "queries/$QueryId"
-  Write-Warning "Removing query [$HuntServerAddress/api/$Endpoint]."
-  _ICRestMethod -url $HuntServerAddress/api/$Endpoint -method 'DELETE'
+    $Endpoint = "queries/$QueryId"
+    Write-Warning "Removing query [$HuntServerAddress/api/$Endpoint]."
+    _ICRestMethod -url $HuntServerAddress/api/$Endpoint -method 'DELETE'
 }
 
 function Invoke-ICFindHosts {
@@ -147,28 +147,28 @@ function Invoke-ICScanTarget {
 		[String]$CredentialId,
 		[String]$CredentialName = "DefaultCredential",
 
-    [String]$sshCredentialId,
+        [String]$sshCredentialId,
 		[String]$sshCredentialName,
 
-    [PSObject]$ScanOptions
+        [PSObject]$ScanOptions
 	)
 
-  $body = @{
-    target = $target
-  }
+    $body = @{
+        target = $target
+    }
 
 	# Select Target targetgroup
 	if ($TargetGroupId) {
 		$TargetGroup = Get-ICTargetGroup -TargetGroupId $TargetGroupId
 		if (-NOT $TargetGroup) {
-					Throw "TargetGroup with id $TargetGroupid does not exist!"
+			Throw "TargetGroup with id $TargetGroupid does not exist!"
 		} else {
-      $body['targetGroup'] = @{id = $targetGroupId}
-    }
+            $body['targetGroup'] = @{id = $targetGroupId}
+        }
 	} else {
-    Write-Verbose "Using Target Group Name [$TargetGroupName] -- will be created if it does not exist."
-    $body['targetGroup'] = @{name = $TargetGroupName}
-  }
+        Write-Verbose "Using Target Group Name [$TargetGroupName] -- will be created if it does not exist."
+        $body['targetGroup'] = @{name = $TargetGroupName}
+    }
 
 	# Select Credential
 	if ($CredentialId) {
@@ -176,47 +176,27 @@ function Invoke-ICScanTarget {
 		if (-NOT $Credential) {
 			Throw "Credential with id $credentialId does not exist!"
 		} else {
-      $body['credential'] = @{ id = $credentialId }
-    }
+        $body['credential'] = @{ id = $credentialId }
+        }
 	} else {
-    # Use Credentialname
-    $Credential =  Get-ICCredential | where { $_.name -eq $CredentialName }
+        # Use Credentialname
+        $Credential =  Get-ICCredential | where { $_.name -eq $CredentialName }
 		if (-NOT $CredentialName) {
 			Throw "Credential with name [$CredentialName] does not exist! Please create it or specify a different credential (referenced by id or name)"
-      $body['credential'] = @{ name = $CredentialName }
-  	}
-  }
+            $body['credential'] = @{ name = $CredentialName }
+  	    }
+    }
 
-  # Select Credential
-  if ($sshCredentialId) {
-      $body['sshcredential'] = @{ id = $credentialId }
-  } elseif ($sshCredentialName) {
-      $body['sshcredential'] = @{ name = $sshCredentialName }
-  }
+    # Select Credential
+    if ($sshCredentialId) {
+        $body['sshcredential'] = @{ id = $credentialId }
+    } elseif ($sshCredentialName) {
+        $body['sshcredential'] = @{ name = $sshCredentialName }
+    }
 
-  if ($ScanOptions) {
-		$body['options'] = $ScanOptions
-	}
-  <#
-  EXAMPLE PAYLOAD
-  {
-    target: 'w12-01-infected.ca.galactica.int', // required
-    targetGroup: { // optional
-      id: null,
-      name: '',
-      scanAllAccessibleHosts: false
-    },
-    credential: { // required id or name
-      id: null,
-      name: 'service'
-    },
-    sshCredential: { // optional
-      id: null,
-      name: null
-    },
-    options: {}
-  }
-  #>
+    if ($ScanOptions) {
+    	$body['options'] = $ScanOptions
+    }
 
 	# Initiating Scan
 	$Endpoint = "targets/scan"
@@ -225,23 +205,47 @@ function Invoke-ICScanTarget {
 }
 
 function New-ICScanOptions {
-	Write-Host 'ScanOption object properties should be set ($True or $False) and then passed into Invoke-ICScan or Add-ICScanSchedule'
-	$options = @{
-  	EnableProcess = $true
-		EnableAccount = $true
-		EnableMemory = $true
-		EnableModule = $true
-		EnableDriver = $true
-		EnableArtifact = $true
-		EnableAutostart = $true
-		EnableApplication = $true
-		EnableHook = $true
-		EnableNetwork = $true
-		EnableLogDelete = $true
-	  EnableSurveyDelete = $true
-		LowerPriority = $false
-  }
-	return $options
+    param(
+        [parameter(ValueFromPipeLine=$true)]
+        [String[]]$ExtensionIds,
+
+        [Switch]$ExtensionsOnly
+    )
+    BEGIN {
+        $Ids = @()
+    }
+    PROCESS {
+        $Ids += $_
+    }
+    END {
+        if (-NOT $Ids) {
+            $Ids = $ExtensionIds
+        }
+    	Write-Host 'ScanOption object properties should be set ($True or $False) and then passed into Invoke-ICScan or Add-ICScanSchedule'
+        if ($ExtensionsOnly) {
+            $default = $false
+        } else {
+            $default = $true
+        }
+    	$options = @{
+      	    EnableProcess = $default
+    		EnableAccount = $default
+    		EnableMemory = $default
+    		EnableModule = $default
+    		EnableDriver = $default
+    		EnableArtifact = $default
+    		EnableAutostart = $default
+    		EnableApplication = $default
+    		EnableHook = $default
+    		EnableNetwork = $default
+            EnableEventLog = $default
+    		EnableLogDelete = $true
+        }
+        if ($ExtensionIds) {
+            $options['extensionIds'] = $Ids
+        }
+    	return $options
+    }
 }
 
 function Add-ICScanSchedule {
@@ -263,7 +267,7 @@ function Add-ICScanSchedule {
 	}
 	$Endpoint = "scheduledJobs"
 	Write-Verbose "Creating new schedule for TargetGroup: $($TargetGroup.name) with Cron Express: $CronExpression"
-  $body = @{
+    $body = @{
 		name = 'scan-scheduled'
 		relatedId = $TargetGroupId
 		schedule = $CronExpression
@@ -282,12 +286,12 @@ function Add-ICScanSchedule {
 }
 
 function Get-ICScanSchedule ($TargetGroupId) {
-  $Endpoint = "ScheduledJobs"
-  $filter =  @{
-    order = @("relatedId")
-    limit = $resultlimit
-    skip = 0
-  }
+    $Endpoint = "ScheduledJobs"
+    $filter =  @{
+        order = @("relatedId")
+        limit = $resultlimit
+        skip = 0
+    }
 	if ($TargetGroupId) {
 		$TargetGroups = Get-ICTargetGroup -TargetGroupId $TargetGroupId
 		$ScheduledJobs = _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$true | where { $_.relatedId -eq $TargetGroupId}
@@ -314,18 +318,18 @@ function Remove-ICScanSchedule {
 	[cmdletbinding(DefaultParameterSetName = 'scheduleId')]
 	param(
 		[parameter(
-				Mandatory,
-				ParameterSetName  = 'scheduleId',
-				Position = 0,
-				ValueFromPipeline,
-				ValueFromPipelineByPropertyName
+			Mandatory,
+			ParameterSetName  = 'scheduleId',
+			Position = 0,
+			ValueFromPipeline,
+			ValueFromPipelineByPropertyName
 		)]
 		[ValidateNotNullOrEmpty()]
 		[string]$scheduleId,
 
 		[parameter(
-				Mandatory,
-				ParameterSetName  = 'TargetGroupId'
+			Mandatory,
+			ParameterSetName  = 'TargetGroupId'
 		)]
 		[ValidateNotNullOrEmpty()]
 		[Alias("targetId")]
@@ -350,42 +354,37 @@ function Remove-ICScanSchedule {
 }
 
 function Import-ICSurvey {
-  # example script to upload a survey file to HUNT (2.10+)
-  # Script to upload manual .bz2 file to hunt server.
 	[cmdletbinding(DefaultParameterSetName = 'Path')]
 	param(
 		[parameter(
-				Mandatory,
-				ParameterSetName  = 'Path',
-				Position = 0,
-				ValueFromPipeline,
-				ValueFromPipelineByPropertyName
+			Mandatory,
+			ParameterSetName  = 'Path',
+			Position = 0,
+			ValueFromPipeline,
+			ValueFromPipelineByPropertyName
 		)]
 		[ValidateNotNullOrEmpty()]
 		[SupportsWildcards()]
 		[string[]]$Path, # <paths of the survey results (.bz2) files to upload>
 
 		[parameter(
-				Mandatory,
-				ParameterSetName = 'LiteralPath',
-				Position = 0,
-				ValueFromPipelineByPropertyName
+			Mandatory,
+			ParameterSetName = 'LiteralPath',
+			Position = 0,
+			ValueFromPipelineByPropertyName
 		)]
 		[ValidateNotNullOrEmpty()]
 		[Alias('PSPath')]
 		[string[]]$LiteralPath,
 
-		[String]
-		$ScanId,
+		[String]$ScanId,
 
-		[String]
-		$TargetGroupId,
+		[String]$TargetGroupId,
 
-      	[String]
-      	$TargetGroupName = "OfflineScans"
-  )
+      	[String]$TargetGroupName = "OfflineScans"
+    )
 
-  BEGIN {
+    BEGIN {
   	# INITIALIZE
   	$survey = "HostSurvey.json.gz"
   	$surveyext = "*.json.gz"
@@ -458,32 +457,31 @@ function Import-ICSurvey {
 	}
 
 
-	Write-Host "Importing Survey Results into $TargetGroupName-$ScanName [ScanId: $ScanId] [TargetGroupId: $TargetGroupId]"
-  }
+	   Write-Host "Importing Survey Results into $TargetGroupName-$ScanName [ScanId: $ScanId] [TargetGroupId: $TargetGroupId]"
+    }
 
-  PROCESS {
+    PROCESS {
 		# Resolve path(s)
         if ($PSCmdlet.ParameterSetName -eq 'Path') {
             $resolvedPaths = Resolve-Path -Path $Path | Select-Object -ExpandProperty Path
         } elseif ($PSCmdlet.ParameterSetName -eq 'LiteralPath') {
             $resolvedPaths = Resolve-Path -LiteralPath $LiteralPath | Select-Object -ExpandProperty Path
         }
-
-				# Process each item in resolved paths
-				foreach ($file in $resolvedPaths) {
-		 			Write-Host "Uploading survey [$file]..."
-		 			if ((Test-Path $file -type Leaf) -AND ($file -like $surveyext)) {
-		 				Upload-ICSurveys -FilePath $file -ScanId $ScanId
-		   		} else {
-		   			Write-Warning "$file does not exist or is not a $surveyext file"
-		   		}
-		   	}
+		# Process each item in resolved paths
+		foreach ($file in $resolvedPaths) {
+ 			Write-Host "Uploading survey [$file]..."
+ 			if ((Test-Path $file -type Leaf) -AND ($file -like $surveyext)) {
+ 				Upload-ICSurveys -FilePath $file -ScanId $ScanId
+   		    } else {
+   			    Write-Warning "$file does not exist or is not a $surveyext file"
+   		    }
+	   	}
 	}
 
-  END {
-  	# TODO: detect when scan is no longer processing submissions, then mark as completed
-  	#Write-Host "Closing scan..."
-  	#Invoke-RestMethod -Headers @{ Authorization = $token } -Uri "$HuntServerAddress/api/scans/$scanId/complete" -Method Post
-  }
+    END {
+	    # TODO: detect when scan is no longer processing submissions, then mark as completed
+        #Write-Host "Closing scan..."
+        #Invoke-RestMethod -Headers @{ Authorization = $token } -Uri "$HuntServerAddress/api/scans/$scanId/complete" -Method Post
+    }
 
 }

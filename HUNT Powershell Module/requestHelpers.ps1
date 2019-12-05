@@ -6,64 +6,72 @@ $Globallimit = 100000
 
 # Used with most Infocyte Get methods. Takes a filter object (hashtable) and adds authentication and passes it as the body for URI encoded parameters. NoLimit will iterate 1000 results at a time to the end of the data set.
 function _ICGetMethod ([String]$url, [HashTable]$filter, [Switch]$NoLimit) {
-  $skip = 0
+    $skip = 0
+    if (-NOT $Global:ICToken) {
+        Write-Error "API Token not set! Use Set-ICToken to connect to an Infocyte instance."
+        return
+    }
   Write-Progress -Activity "Getting Data from Hunt Server API" -status "Requesting data from $url [$skip]"
-  $count = 0
-  $body = @{
-		access_token = $Global:ICToken
-	}
-  if ($filter) {
+    $count = 0
+    $body = @{
+    	access_token = $Global:ICToken
+    }
+    if ($filter) {
     $body['filter'] = $filter | ConvertTo-JSON -Depth $Depth -Compress
-  }
-  Write-Verbose "Requesting data from $url (Limited to $resultlimit unless using -NoLimit)"
-  Write-Verbose "$($body | ConvertTo-JSON -Depth $Depth -Compress)"
-	try {
-		$Objects = Invoke-RestMethod $url -body $body -Method GET -ContentType 'application/json' -Proxy $Global:Proxy -ProxyCredential $Global:ProxyCredential
-	} catch {
-		Write-Warning "Error: $_"
-		return "ERROR: $($_.Exception.Message)"
-	}
-	if ($Objects) {
+    }
+    Write-Verbose "Requesting data from $url (Limited to $resultlimit unless using -NoLimit)"
+    Write-Verbose "$($body | ConvertTo-JSON -Depth $Depth -Compress)"
+    try {
+    	$Objects = Invoke-RestMethod $url -body $body -Method GET -ContentType 'application/json' -Proxy $Global:Proxy -ProxyCredential $Global:ProxyCredential
+    } catch {
+    	Write-Warning "Error: $_"
+    	return "ERROR: $($_.Exception.Message)"
+    }
+    if ($Objects) {
     $count += $Objects.count
-		Write-Output $Objects
-	} else {
-		return $null
-	}
+    	Write-Output $Objects
+    } else {
+    	return $null
+    }
 
-  if ($NoLimit -AND $Objects.count -eq $resultlimit) { $more = $true } else { $more = $false }
-  if ($Objects.count -gt $Globallimit) {
+    if ($NoLimit -AND $Objects.count -eq $resultlimit) { $more = $true } else { $more = $false }
+    if ($Objects.count -gt $Globallimit) {
     $more = $FALSE
     Write-Warning "Reached Global Limit ($GlobalLimit) -- Try refining your query with a where filter. Performance on the database seriously degrades when trying to pull more than 100k objects"
-  }
-	While ($more) {
-		$skip += $resultlimit
-		$filter['skip'] = $skip
-		$body.remove('filter') | Out-Null
-		$body.Add('filter', ($filter | ConvertTo-JSON -Depth $Depth -Compress))
+    }
+    While ($more) {
+    	$skip += $resultlimit
+    	$filter['skip'] = $skip
+    	$body.remove('filter') | Out-Null
+    	$body.Add('filter', ($filter | ConvertTo-JSON -Depth $Depth -Compress))
     Write-Progress -Activity "Getting Data from Hunt Server API" -status "Requesting data from $url [$skip]"
-		try {
-			$moreobjects = Invoke-RestMethod $url -body $body -Method GET -ContentType 'application/json' -Proxy $Global:Proxy -ProxyCredential $Global:ProxyCredential
-		} catch {
-			Write-Warning "Error: $_"
-			return "ERROR: $($_.Exception.Message)"
-		}
-		if ($moreobjects.count -gt 0) {
+    	try {
+    		$moreobjects = Invoke-RestMethod $url -body $body -Method GET -ContentType 'application/json' -Proxy $Global:Proxy -ProxyCredential $Global:ProxyCredential
+    	} catch {
+    		Write-Warning "Error: $_"
+    		return "ERROR: $($_.Exception.Message)"
+    	}
+    	if ($moreobjects.count -gt 0) {
       $count += $moreobjects.count
-			Write-Output $moreobjects
-		} else {
-			$more = $false
-		}
-	}
-  Write-Verbose "Recieved $count objects from $url"
+    		Write-Output $moreobjects
+    	} else {
+    		$more = $false
+    	}
+    }
+    Write-Verbose "Recieved $count objects from $url"
 }
 
 # Used with all other rest methods. Pass a body (hashtable) and it will add authentication.
 function _ICRestMethod ([String]$url, $body=$null, [String]$method) {
-  $headers = @{
-    Authorization = $Global:ICToken
-  }
-  Write-verbose "Sending $method command to $url"
-  Write-verbose "Body = $($body | ConvertTo-JSON -Compress -Depth 10)"
+    if (-NOT $Global:ICToken) {
+        Write-Error "API Token not set! Use Set-ICToken to connect to an Infocyte instance."
+        return
+    }
+    $headers = @{
+        Authorization = $Global:ICToken
+    }
+    Write-verbose "Sending $method command to $url"
+    Write-verbose "Body = $($body | ConvertTo-JSON -Compress -Depth 10)"
 	try {
 		$Result = Invoke-RestMethod $url -headers $headers -body ($body|ConvertTo-JSON -Compress -Depth $Depth) -Method $method -ContentType 'application/json' -Proxy $Global:Proxy -ProxyCredential $Global:ProxyCredential
 	} catch {
@@ -75,6 +83,28 @@ function _ICRestMethod ([String]$url, $body=$null, [String]$method) {
 	} else {
 		return $null
 	}
+}
+
+function Invoke-ICAPI {
+    Param(
+        [parameter(Mandatory=$true)]
+        [ValidateNotNullorEmpty()]
+        [String]$Endpoint,
+
+        [parameter(Mandatory=$false, HelpMessage="Provide a hashtable or PSObject and it will be converted to the json body.")]
+        $body=$null,
+
+        [parameter(Mandatory=$false)]
+        [ValidateSet(
+          "GET",
+          "POST",
+          "DELETE",
+          "PATCH"
+        )]
+        [String]$Method="GET"
+    )
+
+    _ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method $Method
 }
 
 function Join-Object
