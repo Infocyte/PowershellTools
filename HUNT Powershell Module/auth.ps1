@@ -79,22 +79,26 @@ function New-ICToken {
 
 
 # Generate an API token in the web console's profile or admin section.
+# You can save tokens and proxy info to disk as well with the -Save switch.
 function Set-ICToken {
 	[cmdletbinding()]
 	param(
-		[parameter(Mandatory=$true)]
+		[parameter(Mandatory=$true, HelpMessage="Hunt Instance Address. i.e. 'CloudDemo.infocyte.com'")]
 		[ValidateNotNullOrEmpty()]
 		[String]$HuntServer = "https://localhost:443",
 
-		[parameter(Mandatory=$true)]
-		[ValidateNotNullorEmpty()]
+		[parameter(HelpMessage="API Token from Infocyte App. Omit if using saved credentials.")]
 		[String]$Token,
 
+		[parameter(HelpMessage="Proxy Address and port: e.g. '192.168.1.5:8080'")]
 		[String]$Proxy,
 		[String]$ProxyUser,
 		[String]$ProxyPass,
 
-		[Switch]$DisableSSLVerification
+		[Switch]$DisableSSLVerification,
+
+		[parameter(HelpMessage="Will save provided credentials to disk for future use.")]
+		[Switch]$Save
 	)
 
 	if ($DisableSSLVerification) {
@@ -108,22 +112,77 @@ function Set-ICToken {
 		$Global:HuntServerAddress = $HuntServer
 	}
 
-	# Set Token to global variable
-	if ($Token.length -eq 64) {
-			$Global:ICToken = $Token
+	$credentialfile = "$env:appdata\infocyte\credentials.json"
+	$Global:ICCredentials = @{}
+	if (Test-Path $credentialfile) {
+		(Get-Content $credentialfile | ConvertFrom-JSON).psobject.properties | Foreach {
+			$Global:ICCredentials[$_.Name] = $_.Value
+		}
 	} else {
-		Write-Warning "That token won't work. Must be a 64 character string generated within your profile or admin panel within Infocyte HUNT's web console"
-		return
+		if (-NOT (Test-Path "$env:appdata\infocyte")) {
+			New-Item -ItemType "directory" -Path "$env:appdata\infocyte"
+		}
 	}
-	Write-Host "Setting Auth Token for $HuntServer to $Token"
+
+	if ($Token) {
+		# Set Token to global variable
+		if ($Token.length -eq 64) {
+				$Global:ICToken = $Token
+				Write-Host "Setting Auth Token for $HuntServer to $Token"
+		} else {
+			Write-Warning "That token won't work. Must be a 64 character string generated within your profile or admin panel within Infocyte HUNT's web console"
+			return
+		}
+	} else {
+		# Load from file
+		if ($Global:ICCredentials[$Global:HuntServerAddress]) {
+			Write-Host "Setting auth token from credential file: $credentialfile"
+			$Global:ICToken = $Global:ICCredentials[$Global:HuntServerAddress]
+		} else {
+			Write-Warning "No Token found for $($Global:HuntServerAddress) in credential file!"
+			Write-Warning "Please provide credentials with -Save switch to save them to credential file first."
+			return
+		}
+	}
 
 	if ($Proxy) {
+			Write-Host "Infocyte API functions will now use Proxy: $Proxy"
 			$Global:Proxy = $Proxy
 			if ($ProxyUser -AND $ProxyPass) {
+				Write-Host "Infocyte API functions will now use Proxy User: $ProxyUser"
 				$pw = ConvertTo-SecureString $ProxyPass -AsPlainText -Force
 				$Global:ProxyCredential = New-Object System.Management.Automation.PSCredential ($ProxyUser, $pw)
 			}
+	} else {
+		# Load from file
+		$Global:Proxy = $Global:ICCredentials["Proxy"]
+		if ($Global:Proxy) {
+			Write-Host "Infocyte API functions will use Proxy config loaded from credential file: $($Global:Proxy)"
+		}
+		if ($Global:ICCredentials["ProxyUser"]) {
+			$pw = ConvertTo-SecureString $Global:ICCredentials["ProxyPass"] -AsPlainText -Force
+			$Global:ProxyCredential = New-Object System.Management.Automation.PSCredential ($Global:ICCredentials["ProxyPass"], $pw)
+		}
 	}
-	Write-Verbose "Token, Hunt Server Address, and Proxy settings are stored in global variables for use in all IC cmdlets"
 
+	if ($Save) {
+		Write-Host "Saving Token and Proxy settings to credential file: $credentialfile"
+		$Global:ICCredentials[$Global:HuntServerAddress] = $Global:ICToken
+		if ($Proxy) {
+			$Global:ICCredentials["Proxy"] = $Proxy
+			if ($ProxyUser -AND $ProxyPass) {
+				$Global:ICCredentials["ProxyUser"] = $ProxyUser
+				$Global:ICCredentials["ProxyPass"] = $ProxyPass
+			}
+		}
+		if (Test-Path $credentialfile) {
+			# Archive current credential
+			Write-Host "Previous credential file has been backed up."
+			Copy-Item -Path $credentialfile -Destination "$($credentialfile)-OLD"
+		}
+		$Global:ICCredentials | ConvertTo-JSON | Out-File $credentialfile -Force
+		Write-Host "Token, Hunt Server Address, and Proxy settings are stored on disk. Omit token and proxy arguments to use saved versions."
+	} else {
+		Write-Host "Token, Hunt Server Address, and Proxy settings are stored in global session variables for use in all IC cmdlets."
+	}
 }
