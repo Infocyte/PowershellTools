@@ -27,6 +27,7 @@ function Invoke-ICExtension {
             $Ver2 = & "C:\Program Files\Infocyte\Agent\s1.exe" "--version"
             Write-Warning "You can also find the latest version ($Ver2) within your agent folder (C:\Program Files\Infocyte\Agent\)."
         }
+		return
     }
 
 	# & "s1.exe --no-delete --no-compress --verbose --only-extensions --extensions $Path"
