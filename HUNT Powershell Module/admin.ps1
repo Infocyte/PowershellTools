@@ -21,6 +21,7 @@ function Get-ICFlagColorCodes {
 
 #
 function New-ICFlag {
+    [cmdletbinding()]
     Param(
         [parameter(Mandatory=$true)]
         [ValidateNotNullorEmpty()]
@@ -46,7 +47,11 @@ function New-ICFlag {
 }
 
 
-function Get-ICFlag ([String]$FlagId) {
+function Get-ICFlag {
+    [cmdletbinding()]
+    param(
+        [String]$FlagId
+    ) 
     if ($FlagId) {
         $Endpoint = "flags/$FlagId"
     } else {
@@ -55,7 +60,17 @@ function Get-ICFlag ([String]$FlagId) {
     _ICRestMethod -url $HuntServerAddress/api/$Endpoint -method GET
 }
 
-function Update-ICFlag ([String]$FlagId, [String]$FlagName=$null, [String]$FlagColor, [int]$FlagWeight) {
+function Update-ICFlag  {
+    [cmdletbinding()]
+    Param(
+        [parameter(Mandatory=$true)]
+        [ValidateNotNullorEmpty()]
+        [String]$FlagId,
+
+        [String]$FlagName=$null,
+        [String]$FlagColor,
+        [int]$FlagWeight
+    )
     $Endpoint = "flags/$FlagId"
     Write-Verbose "Updating flag $FlagId with Color: $FlagColor, named: $FlagName, Weight: $FlagWeight"
     $body = @{}
@@ -68,6 +83,7 @@ function Update-ICFlag ([String]$FlagId, [String]$FlagName=$null, [String]$FlagC
 }
 
 function Remove-ICFlag {
+    [cmdletbinding()]
     Param(
         [parameter(Mandatory=$true)]
         [ValidateNotNullorEmpty()]
@@ -82,6 +98,7 @@ function Remove-ICFlag {
 }
 
 function Add-ICComment {
+    [cmdletbinding()]
     Param(
         [parameter(Position=0, Mandatory=$true)]
         [ValidateNotNullorEmpty()]
@@ -102,6 +119,7 @@ function Add-ICComment {
 }
 
 function Get-ICExtension {
+    [cmdletbinding()]
     Param(
         [parameter(Position=0)]
         [String]$Id,
@@ -124,6 +142,7 @@ function Get-ICExtension {
 
 
 function New-ICExtension {
+    [cmdletbinding()]
     Param(
         [parameter(mandatory=$false)]
         [String]$Id,

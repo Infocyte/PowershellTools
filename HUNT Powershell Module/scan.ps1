@@ -1,20 +1,21 @@
 # Scan APIs
 
 function New-ICQuery {
-  Param(
-    [parameter(Mandatory=$True)]
-    [String]$TargetGroupId,
+    [cmdletbinding()]
+    Param(
+        [parameter(Mandatory=$True)]
+        [String]$TargetGroupId,
 
-    [parameter(Mandatory=$True)]
-    [String]$credentialId,
+        [parameter(Mandatory=$True)]
+        [String]$credentialId,
 
-    [String]$sshCredentialId,
+        [String]$sshCredentialId,
 
-    [parameter(Mandatory=$True)]
-    [ValidateNotNullorEmpty()]
-    [String]$Query,
+        [parameter(Mandatory=$True)]
+        [ValidateNotNullorEmpty()]
+        [String]$Query,
 
-	[String]$QueryName
+    	[String]$QueryName
     )
 
     $Credential = Get-ICCredential -CredentialId $CredentialId
@@ -38,7 +39,11 @@ function New-ICQuery {
     _ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method POST
 }
 
-function Get-ICQuery ([String]$TargetGroupId) {
+function Get-ICQuery {
+    [cmdletbinding()]
+    param(
+        [String]$TargetGroupId
+    )
     $Endpoint = "queries"
     $filter =  @{
         limit = $resultlimit
@@ -53,6 +58,7 @@ function Get-ICQuery ([String]$TargetGroupId) {
 }
 
 function Remove-ICQuery {
+    [cmdletbinding()]
     param(
         [parameter(Mandatory=$true, Position=0)]
         [ValidateNotNullOrEmpty()]
@@ -285,7 +291,11 @@ function Add-ICScanSchedule {
 	_ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method POST
 }
 
-function Get-ICScanSchedule ($TargetGroupId) {
+function Get-ICScanSchedule {
+    [cmdletbinding()]
+    param(
+        [String]$TargetGroupId
+    )
     $Endpoint = "ScheduledJobs"
     $filter =  @{
         order = @("relatedId")

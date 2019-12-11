@@ -1,5 +1,6 @@
 # For Extension Developers
 function Invoke-ICExtension {
+	[cmdletbinding()]
 	param(
 		[parameter(mandatory=$true)]
 	  	[String]$Path,

@@ -1,5 +1,6 @@
 # Setup APIs
 function New-ICTargetGroup {
+    [cmdletbinding()]
     param(
         [parameter(Mandatory=$true, Position=0)]
         [ValidateNotNullOrEmpty()]
@@ -27,6 +28,7 @@ function New-ICTargetGroup {
 }
 
 function New-ICControllerGroup {
+    [cmdletbinding()]
     param(
         [parameter(Mandatory=$true, Position=0)]
         [ValidateNotNullOrEmpty()]
@@ -41,36 +43,45 @@ function New-ICControllerGroup {
     _ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method 'POST'
 }
 
-function Get-ICTargetGroup ([String]$TargetGroupId) {
+function Get-ICTargetGroup {
+    [cmdletbinding()]
+    param(
+        [String]$TargetGroupId
+    )
     $Endpoint = "targets"
     $filter =  @{
         order = @("name", "id")
         limit = $resultlimit
         skip = 0
+        where = @{ and = @() }
     }
     if ($TargetGroupId) {
-        _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$true | where { $_.id -eq $TargetGroupId}
-    } else {
-        _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$true
+        $filter['where']['and'] += @{ id = $TargetGroupId }
     }
+    _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$true
 }
 
-function Get-ICControllerGroup ([String]$ControllerGroupId) {
+function Get-ICControllerGroup {
+    [cmdletbinding()]
+    param(
+        [String]$ControllerGroupId
+    )
     $Endpoint = "controllergroups"
     $filter =  @{
         order = @("name", "id")
         limit = $resultlimit
         skip = 0
+        where = @{ and = @() }
     }
-    if ($TargetGroupId) {
-        _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$true | where { $_.id -eq $ControllerGroupId}
-    } else {
-        _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$true
+    if ($ControllerGroupId) {
+        $filter['where']['and'] += @{ id = $ControllerGroupId }
     }
+    _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$true
 }
 
 
 function Remove-ICTargetGroup {
+    [cmdletbinding()]
     param(
         [parameter(Mandatory=$true, Position=0)]
         [ValidateNotNullOrEmpty()]
@@ -84,6 +95,7 @@ function Remove-ICTargetGroup {
 }
 
 function Remove-ICControllerGroup {
+    [cmdletbinding()]
     param(
         [parameter(Mandatory=$true, Position=0)]
         [ValidateNotNullOrEmpty()]
@@ -98,6 +110,7 @@ function Remove-ICControllerGroup {
 
 
 function New-ICCredential {
+    [cmdletbinding()]
     Param(
         [parameter(Mandatory=$True, Position=0)]
         [String]$Name,
@@ -119,21 +132,26 @@ function New-ICCredential {
     _ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method POST
 }
 
-function Get-ICCredential ($CredentialId) {
+function Get-ICCredential {
+    [cmdletbinding()]
+    param(
+        [String]$CredentialId
+    )
     Write-Verbose "Getting Credential Objects from Infocyte HUNT: $HuntServerAddress"
     $Endpoint = "credentials"
     $filter =  @{
         limit = $resultlimit
         skip = 0
+        where = @{ and = @() }
     }
     if ($CredentialId) {
-        _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter | where { $_.id -eq $CredentialId }
-    } else {
-        _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter
+        $filter['where']['and'] += @{ id = $CredentialId }
     }
+    _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter
 }
 
 function Remove-ICCredential {
+    [cmdletbinding()]
     param(
         [parameter(Mandatory=$true, Position=0)]
         [ValidateNotNullOrEmpty()]
@@ -147,15 +165,19 @@ function Remove-ICCredential {
 }
 
 
-function Get-ICAddress ([String]$TargetGroupId, [HashTable]$Where, [Switch]$NoLimit) {
+function Get-ICAddress {
+    [cmdletbinding()]
+    param(
+        [String]$TargetGroupId,
+        [HashTable]$Where,
+        [Switch]$NoLimit
+    )
     $Endpoint = "Addresses"
     $filter =  @{
     	order = "lastAccessedOn"
     	limit = $resultlimit
     	skip = 0
-        where = @{
-            and = @()
-        }
+        where = @{ and = @() }
     }
     if ($where.count -gt 0) {
         $where.GetEnumerator() | % {
@@ -171,6 +193,7 @@ function Get-ICAddress ([String]$TargetGroupId, [HashTable]$Where, [Switch]$NoLi
 }
 
 function Remove-ICAddress {
+    [cmdletbinding()]
     Param(
         [ValidateNotNullorEmpty()]
         [String]$TargetGroupId
@@ -188,7 +211,14 @@ function Remove-ICAddress {
 }
 
 
-function Get-ICScan ([String]$TargetGroupId, $TargetGroupName, [HashTable]$Where, [Switch]$NoLimit) {
+function Get-ICScan {
+    [cmdletbinding()]
+    param(
+        [String]$TargetGroupId,
+        [String]$TargetGroupName,
+        [HashTable]$Where,
+        [Switch]$NoLimit
+    )
     $Endpoint = "IntegrationScans"
     $filter =  @{
         order = "scanCompletedOn desc"
@@ -217,7 +247,17 @@ function Get-ICScan ([String]$TargetGroupId, $TargetGroupName, [HashTable]$Where
     _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
 }
 
-function Get-ICBox ([Switch]$Last90, [Switch]$Last7, [Switch]$Last30, [Switch]$IncludeDeleted, [Switch]$Global, [String]$targetGroupId, [Switch]$NoLimit) {
+function Get-ICBox {
+    [cmdletbinding()]
+    param(
+        [Switch]$Last7,
+        [Switch]$Last30,
+        [Switch]$Last90,
+        [Switch]$IncludeDeleted,
+        [Switch]$Global,
+        [String]$targetGroupId,
+        [Switch]$NoLimit
+    )
     $Endpoint = "Boxes"
     $filter =  @{
         limit = $resultlimit
@@ -260,13 +300,19 @@ function Get-ICBox ([Switch]$Last90, [Switch]$Last7, [Switch]$Last30, [Switch]$I
     if ($IncludeDeleted) {
         $boxes
     } else {
+        Write-Verbose "Removing deleted Target Groups"
         $boxes | where { $_.targetGroup -ne "Deleted" }
     }
 
 }
 
 
-function Get-ICAgent ([String]$Id, [Switch]$NoLimit) {
+function Get-ICAgent {
+    [cmdletbinding()]
+    param(
+        [String]$Id,
+        [Switch]$NoLimit
+    )
     if ($Id) {
         $Endpoint = "Agents/$Id"
     } else {
@@ -276,6 +322,7 @@ function Get-ICAgent ([String]$Id, [Switch]$NoLimit) {
 }
 
 function Remove-ICAgent {
+    [cmdletbinding()]
     Param(
         [ValidateNotNullorEmpty()]
         [String]$Id
