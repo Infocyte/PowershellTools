@@ -86,12 +86,13 @@ function _ICRestMethod ([String]$url, $body=$null, [String]$method) {
 }
 
 function Invoke-ICAPI {
+    [cmdletbinding()]
     Param(
         [parameter(Mandatory=$true)]
         [ValidateNotNullorEmpty()]
         [String]$Endpoint,
 
-        [parameter(Mandatory=$false, HelpMessage="Provide a hashtable or PSObject and it will be converted to the json body.")]
+        [parameter(Mandatory=$false, HelpMessage="Provide a hashtable or PSObject and it will be converted to the json body or added to json-stringified query params that Loopback wants in GET requests.")]
         $body=$null,
 
         [parameter(Mandatory=$false)]
@@ -101,10 +102,15 @@ function Invoke-ICAPI {
           "DELETE",
           "PATCH"
         )]
-        [String]$Method="GET"
-    )
+        [String]$Method="GET",
 
-    _ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method $Method
+        [Switch]$NoLimit
+    )
+    if ($Method -eq "GET") {
+        _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $body -NoLimit:$NoLimit
+    } else {
+        _ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method $Method
+    }
 }
 
 function Join-Object
