@@ -2,9 +2,9 @@
 # General function for getting various objects (files, processes, memory injects, autostarts, etc.) from HUNT
 function Get-ICObject {
     [cmdletbinding()]
+    [alias("Get-ICData","Get-ICObjects")]
     param(
         [parameter()]
-        [Alias("Get-ICObjects")]
         [ValidateSet(
           "Process",
           "Module",
@@ -21,10 +21,17 @@ function Get-ICObject {
           "Extension"
         )]
         [String]$Type="File",
-        [String]$BoxId,
-        [HashTable]$where,
-        [Switch]$NoLimit
+
+        [String]$BoxId=$Global:ICCurrentBox,
+
+        [HashTable]$where=@{},
+
+        [String[]]$order,
+
+        [Switch]$NoLimit,
+        [Switch]$CountOnly
     )
+
     $Files = @(
         "Process",
         "Module",
@@ -34,117 +41,131 @@ function Get-ICObject {
         "Autostart",
         "Script"
     )
-    $filter =  @{
-        order = "scannedOn desc" # "hostCompletedOn desc"
-        limit = $resultlimit
-        skip = 0
-        where = @{ and = @() }
+    if (-NOT $BoxId) {
+        # Default to 7 day view if not provided
+        Write-Verbose "No BoxId provided. Defaulting to 'Last 7' Days."
+        $BoxId = (Get-ICBox -Last7 -Global).id
     }
-    switch ( $Type ) {
-        "Process"   { $Endpoint = 'BoxProcessInstances' }
-        "Module"    { $Endpoint = 'BoxModuleInstances' }
-        "Driver"    { $Endpoint = 'BoxDriverInstances' }
-        "MemScan"   { $Endpoint = 'BoxMemscanInstances' }
-        "Artifact"      { $Endpoint = 'boxArtifactInstances' }
-        "Autostart"     { $Endpoint = 'boxAutostartInstances' }
-        "Script"        { $Endpoint = 'BoxScriptInstances' }
-        "Extension"     { $Endpoint = 'BoxExtensionInstances' }
-        "Connection"    { $Endpoint = 'BoxConnectionInstances'
-                            $filter.remove('order')
-                            if (-NOT $where) {
-                                $filter.where['and'] += @{ state = "ESTABLISHED"}
-                            }
-                        }
-        "Host"      {   $Endpoint = 'BoxHosts'
-                        $filter['order'] = 'completedOn desc'
-                    }
-        "Account"   {   $Endpoint = 'BoxAccountInstancesByHost'
-                        $filter.remove('order')
-                    }
-        "Application"   {   $Endpoint = 'BoxApplicationInstances'
-                            $filter.remove('order')
-                        }
-        "File" {
-                If (-NOT $Where) {
-                    Write-Warning "Not Accepted: You should provide a filter for this query to reduce strain on the database."
-                    return
-                }
-                $Files | % { Get-ICObject -Type $_ -BoxId $BoxId -where $where -NoLimit:$NoLimit }
-            }
-            Default { }
-    }
-    if ($Endpoint) {
-        if ($BoxId) {
-            $filter['where']['and'] += @{ boxId = $BoxId }
-        } else {
-            $BoxId = (Get-ICBox -Last7 -Global).id
-            $filter['where']['and'] += @{ boxId = $BoxId }
-        }
-        if ($where.count -gt 0) {
-            $where.GetEnumerator() | % {
-                $filter['where']['and'] += @{ $($_.key) = $($_.value) }
-            }
-        }
+    $where['boxId'] = $BoxId
 
-        _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
+    switch ( $Type ) {
+        "Connection" {
+            $Endpoint = 'BoxConnectionInstances'
+            if (-NOT $where) {
+                $where += @{ state = "ESTABLISHED"}
+            }
+        }
+        "Host" {
+            $Endpoint = 'BoxHosts'
+            if (-NOT $order) { $order = 'completedOn desc' }
+        }
+        "Account" {
+            $Endpoint = 'BoxAccountInstancesByHost'
+        }
+        "Application" {
+            $Endpoint = 'BoxApplicationInstances'
+        }
+        "File" {
+            If ($where.count -lt 2) {
+                Write-Warning "Not Accepted: You should provide a filter for this query to reduce strain on the database."
+                return
+            }
+            $cnt = 0
+            $Files | % {
+                if ($CountOnly) {
+                    $c = Get-ICObject -Type $_ -BoxId $BoxId -where $where -CountOnly
+                    Write-Verbose "Found $c $_ Objects"
+                    $cnt += $c
+                } else {
+                    Write-Verbose "Querying $_"
+                    Get-ICObject -Type $_ -BoxId $BoxId -where $where -NoLimit:$NoLimit
+                }
+            }
+            if ($CountOnly) {
+                return $cnt
+            }
+        }
+        Default {
+            $Endpoint = "Box$($Type)Instances"
+            if (-NOT $order) { $order = "scannedOn desc" } # "hostCompletedOn desc"
+        }
     }
+    if ($Type -ne 'File') {
+        Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
+    }
+}
+
+
+function Set-ICBox {
+    [cmdletbinding()]
+    param(
+        [parameter(ValueFromPipelineByPropertyName)]
+        [alias('BoxId')]
+        [String]$Id
+    )
+
+    Write-Host "`$Global:ICCurrentBox is now set to $Id"
+    $Global:ICCurrentBox = $Id
+    return
 }
 
 function Get-ICApplication {
     [cmdletbinding()]
     param(
-        [String]$BoxId,
-        [HashTable]$where,
-        [Switch]$NoLimit
+        [parameter(ValueFromPipelineByPropertyName)]
+        [alias('applicationId')]
+        [String]$Id,
+
+        [String]$BoxId=$Global:ICCurrentBox,
+        [HashTable]$where=@{},
+        [Switch]$NoLimit,
+        [Switch]$CountOnly
     )
 
-    $Endpoint = "BoxApplicationInstances"
-    $filter =  @{
-        limit = $resultlimit
-        skip = 0
-        where = @{ and = @() }
-    }
-
-    if ($BoxId) {
-        $filter['where']['and'] += @{ boxId = $BoxId }
-    } else {
-        $BoxId = (Get-ICBox -Last90 -Global).id
-        $filter['where']['and'] += @{ boxId = $BoxId }
-    }
-    if ($where.count -gt 0) {
-        $where.GetEnumerator() | % {
-            $filter['where']['and'] += @{ $($_.key) = $($_.value) }
+    BEGIN {
+        $Endpoint = "BoxApplicationInstances"
+        if (-NOT $BoxId) {
+            # Default to 7 day view if not provided
+            Write-Verbose "No BoxId provided. Defaulting to 'Last 7' Days."
+            $BoxId = (Get-ICBox -Last7 -Global).id
         }
+        $where['boxId'] = $BoxId
+    }
+    PROCESS {
+        if ($Id) {
+            $where['applicationId'] = $Id
+        }
+        $apps += Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit
+
     }
 
-    # KB filter now redundant since Bothan update
-    # $filter['where']['and'] += @{ name = @{ nilike = "%KB/d%" }}
-    # $filter['where']['and'] += @{ name = @{ nilike = "Update for%" }}
-
-    $apps = _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
-    $apps | Sort-Object hostname, applicationId -unique | Sort-Object scannedOn -Descending
+    END {
+        $apps | Sort-Object hostname, applicationId -unique
+    }
 }
 
 
 function Get-ICVulnerability {
     [cmdletbinding()]
     param(
-        [String]$BoxId,
-        [HashTable]$where,
+        [String]$BoxId=$Global:ICCurrentBox,
+        [HashTable]$where=@{},
         [Switch]$NoLimit
     )
 
     if (-NOT $BoxId) {
+        # Default to 7 day view if not provided
+        Write-Verbose "No BoxId provided. Defaulting to 'Last 7' Days."
         $BoxId = (Get-ICBox -Last7 -Global).id
     }
+    $where['boxId'] = $BoxId
+
+    Write-Verbose "Building Application table..."
     $apps = Get-ICApplications -BoxId $BoxId -where $where -NoLimit:$NoLimit
 
     $Endpoint = "ApplicationAdvisories"
-    $filter =  @{
-        limit = $resultlimit
-        skip = 0
-    }
-    $appvulns = _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit | sort-object applicationId, cveId -unique
+    Write-Verbose "Building Application Advisory table..."
+    $appvulns = Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit | sort-object applicationId, cveId -unique
 
     if ($apps -AND $appvulns) {
         $appids = $apps.applicationid | sort-object -unique
@@ -157,12 +178,7 @@ function Get-ICVulnerability {
             Write-Verbose "Vulnerable App: $($vuln.ApplicationName) cveId: $($vuln.cveId) App id: $($vuln.applicationId)"
 
             if ($vuln.cveId) {
-                $Endpoint = "Cves/$($vuln.cveId)"
-                $filter =  @{
-                    limit = $resultlimit
-                    skip = 0
-                }
-                $cve = _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$true
+                $cve = Get-ICAPI -Endpoint "Cves/$($vuln.cveId)" -where $where
                 if ($cve) {
                     $vuln | Add-Member -MemberType "NoteProperty" -name "rules" -value $cve.rules
                     $vuln | Add-Member -MemberType "NoteProperty" -name "cwes" -value $cve.cwes
@@ -198,126 +214,108 @@ function Get-ICVulnerability {
 # Get Full FileReport on an object by sha1
 function Get-ICFileDetail {
     Param(
-        [parameter(Mandatory=$true)]
+        [parameter(Mandatory=$true, ValueFromPipelineByPropertyName)]
         [ValidateNotNullorEmpty()]
+        [alias('fileRepId')]
         [String]$sha1
     )
-
-    Write-Verbose "Requesting FileReport on file with SHA1: $sha1"
-    $Endpoint = "FileReps/$sha1"
-    _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter
-    #$object | Add-Member -Type NoteProperty -Name 'avpositives' -Value $_.avResults.positives
-    #$object | Add-Member -Type NoteProperty -Name 'avtotal' -Value $_.avResults.total
+    PROCESS {
+        Write-Verbose "Requesting FileReport on file with SHA1: $sha1"
+        Get-ICAPI -Endpoint "FileReps/$sha1"
+    }
 }
 
 # Get Account objects
 function Get-ICAlert {
     [cmdletbinding()]
     param(
+        [parameter(ValueFromPipelineByPropertyName)]
+        [String]$Id,
         [Switch]$IncludeArchived,
-        [HashTable]$Where,
-        [Switch]$NoLimit
+        [HashTable]$where=@{},
+        [String[]]$order='createdOn desc',
+        [Switch]$NoLimit,
+        [Switch]$CountOnly
     )
 
-    $Endpoint = "AlertDetails"
-
-    $filter =  @{
-        limit = $resultlimit
-        skip = 0
-        where = @{
-            and = @()
+    PROCESS {
+        $Endpoint = "AlertDetails"
+        if ($Id) {
+            $Endpoint += "/$Id"
         }
-    }
-    if (-NOT $IncludeArchived) {
-        $filter.where['and'] += @{ archived = $FALSE }
-    }
-    if ($where.count -gt 0) {
-        $where.GetEnumerator() | % {
-            $filter['where']['and'] += @{ $($_.key) = $($_.value) }
+        if (-NOT ($IncludeArchived -OR $Where['archived'])) {
+            $Where += @{ archived = $FALSE }
         }
+        Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
     }
-
-    _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
 }
 
 function Get-ICReport {
     [cmdletbinding()]
     param(
-        [String]$ReportId,
-        [Switch]$NoLimit
+        [parameter(ValueFromPipelineByPropertyName)]
+        [alias('ReportId')]
+        [String]$Id,
+        [HashTable]$where=@{},
+        [String[]]$order=@("createdOn DESC"),
+        [Switch]$NoLimit,
+        [Switch]$CountOnly
     )
 
-    $filter =  @{
-        order = @("createdOn DESC","id")
-        limit = $resultlimit
-        skip = 0
-    }
+    PROCESS {
+        if ($Id) {
+            $Endpoint = "Reports/$Id"
+        } else {
+            $Endpoint = "Reports"
+            $fields = @("id","name","createdOn","type","hostCount")
+        }
 
-    if ($ReportId) {
-        $Endpoint = "Reports/$ReportId"
-    } else {
-        $Endpoint = "Reports"
-        $filter['fields'] = @("id","name","createdOn","type","hostCount")
+        Get-ICAPI -Endpoint $Endpoint -where $where -order $order -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly
     }
-
-    _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
 }
 
 function Get-ICActivityTrace {
     [cmdletbinding()]
     param(
-        [String]$AccountId,
-        [String]$SHA1,
-        [String]$HostId,
-        [DateTime]$StartTime,
-        [DateTime]$EndTime,
-        [Switch]$Enriched,
-        [HashTable]$Where,
-        [Switch]$NoLimit
+        [parameter(ValueFromPipelineByPropertyName)]
+        [String]$accountId,
+
+        [parameter(ValueFromPipelineByPropertyName)]
+        [alias('fileRepId')]
+        [String]$sha1,
+
+        [parameter(ValueFromPipelineByPropertyName)]
+        [String]$hostId,
+
+        [DateTime]$StartTime=(Get-Date).AddDays(-7).ToUniversalTime(),
+        [DateTime]$EndTime = (Get-Date).ToUniversalTime(),
+        [HashTable]$where=@{},
+        [String[]]$order= @("eventTime desc"),
+        [Switch]$NoLimit,
+        [Switch]$CountOnly
     )
 
-    if (-NOT $StartTime) { $StartTime = (Get-Date).AddDays(-7) }
-    if (-NOT $EndTime) { $EndTime = Get-Date }
+    BEGIN {
+        #if (-NOT $StartTime) { $StartTime = (Get-Date).AddDays(-7) }
+        #if (-NOT $EndTime) { $EndTime = Get-Date }
+        $Where['between'] = @(
+            (Get-Date $StartTime -Format "yyyy-MM-dd HH:mm:ss"),
+            (Get-Date $EndTime -Format "yyyy-MM-dd HH:mm:ss")
+        )
+    }
+    PROCESS {
+        $Endpoint = "activity"
 
-    $Endpoint = "activity"
-    $filter =  @{
-        limit = $resultlimit
-        skip = 0
-        order = @("eventTime desc")
-        where = @{
-            and = @(
-                @{
-                    eventTime = @{
-                        between = @(
-                            (Get-Date $StartTime -Format "yyyy-MM-dd HH:mm:ss"),
-                            (Get-Date $EndTime -Format "yyyy-MM-dd HH:mm:ss")
-                        )
-                    }
-                }
-            )
+        if ($SHA1) {
+            $where['fileRepId'] = $SHA1
         }
-    }
-
-    if ($SHA1) {
-        $filter['where']['and'] += @{ fileRepId = $SHA1 }
-    }
-    elseif ($AccountId) {
-        $filter['where']['and'] += @{ accountId = $AccountId }
-    }
-    elseif ($HostId) {
-        $filter['where']['and'] += @{ hostId = $HostId }
-    }
-
-    if ($where.count -gt 0) {
-        $where.GetEnumerator() | % {
-            $filter['where']['and'] += @{ $($_.key) = $($_.value) }
+        if ($AccountId) {
+            $where['accountId'] = $AccountId
         }
+        if ($HostId) {
+            $where['hostId'] = $HostId
+        }
+
+        Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
     }
-
-    if ($enriched) {
-
-    } else {
-        _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
-    }
-
 }

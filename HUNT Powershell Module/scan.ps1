@@ -1,85 +1,15 @@
 # Scan APIs
 
-function New-ICQuery {
-    [cmdletbinding()]
-    Param(
-        [parameter(Mandatory=$True)]
-        [String]$TargetGroupId,
-
-        [parameter(Mandatory=$True)]
-        [String]$credentialId,
-
-        [String]$sshCredentialId,
-
-        [parameter(Mandatory=$True)]
-        [ValidateNotNullorEmpty()]
-        [String]$Query,
-
-    	[String]$QueryName
-    )
-
-    $Credential = Get-ICCredential -CredentialId $CredentialId
-    $TargetGroup = Get-ICTargetGroup -TargetGroupId $TargetGroupId
-	Write-Host "Creating new Query ($query) in TargetGroup $TargetGroup.name  using credential $($Credential.name) [$($Credential.username)]"
-    $Endpoint = "queries"
-    $data = @{
-        value = $query
-        targetId = $TargetGroupId
-    	name = $QueryName
-    }
-    if ($credentialId) {
-        $data['credentialId'] = $CredentialId
-    }
-    if ($sshCredentialId) {
-        $data['sshCredential'] = $sshCredentialId
-    }
-    $body = @{
-        data = $data
-    }
-    _ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method POST
-}
-
-function Get-ICQuery {
-    [cmdletbinding()]
-    param(
-        [String]$TargetGroupId
-    )
-    $Endpoint = "queries"
-    $filter =  @{
-        limit = $resultlimit
-        skip = 0
-    }
-    if ($TargetGroupId) {
-        $filter['where'] = @{ targetId = $TargetGroupId }
-        Write-Verbose "Getting Queries for Target Group Id: $TargetGroupId"
-    }
-    #Write-Verbose "Getting all Queries from TargetGroup $TargetGroup"
-    _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$true
-}
-
-function Remove-ICQuery {
-    [cmdletbinding()]
-    param(
-        [parameter(Mandatory=$true, Position=0)]
-        [ValidateNotNullOrEmpty()]
-        [String]$QueryId
-    )
-
-    $Endpoint = "queries/$QueryId"
-    Write-Warning "Removing query [$HuntServerAddress/api/$Endpoint]."
-    _ICRestMethod -url $HuntServerAddress/api/$Endpoint -method 'DELETE'
-}
-
 function Invoke-ICFindHosts {
 	[cmdletbinding()]
 	param(
-		[parameter(Mandatory)]
+		[parameter(Mandatory=$true)]
 		[ValidateNotNullOrEmpty()]
 		[String]$TargetGroupId,
 
 		[String]$QueryId
 	)
-	$TargetGroup = Get-ICTargetGroup -TargetGroupId $TargetGroupId
+	$TargetGroup = Get-ICTargetGroup -Id $TargetGroupId
 	$Queries = Get-ICQuery -TargetGroupId $TargetGroupId
 	if (-NOT $Queries) {
 		Throw "Target Group not found or does not have any Queries associated with it"
@@ -91,14 +21,13 @@ function Invoke-ICFindHosts {
 	if ($QueryId) {
 		Write-Verbose "Starting Enumeration of $($TargetGroup.name) with Query $QueryId"
 		$body['queries'] += $QueryId
-		_ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method POST
 	} else {
 		$Queries | foreach {
 			Write-Verbose "Starting Enumeration of $($TargetGroup.name) with Query $($Queries.id)"
 			$body['queries'] += $Queries.Id
 		}
-		_ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method POST
 	}
+    Invoke-ICAPI -Endpoint $Endpoint -body $body -method POST
 }
 
 function Invoke-ICScan {
@@ -113,7 +42,7 @@ function Invoke-ICScan {
 
 		[Switch]$PerformDiscovery
 	)
-	$TargetGroup = Get-ICTargetGroup -TargetGroupId $TargetGroupId
+	$TargetGroup = Get-ICTargetGroup -Id $TargetGroupId
 	if (-NOT $TargetGroup) {
 		Throw "TargetGroup with id $TargetGroupId does not exist!"
 	}
@@ -123,7 +52,7 @@ function Invoke-ICScan {
 		$UserTask = Invoke-ICFindHosts -TargetGroupId $TargetGroupId
 		While ($stillactive) {
 			Start-Sleep 10
-			$taskstatus = Get-ICUserTask -UserTaskId $UserTask.userTaskId
+			$taskstatus = Get-ICUserTask -Id $UserTask.userTaskId
 			if ($taskstatus.status -eq "Active") {
 					Write-Host "Waiting on Discovery. Progress: $($taskstatus.progress)%"
 			} elseif ($taskstatus.status -eq "Completed") {
@@ -136,8 +65,8 @@ function Invoke-ICScan {
 	}
 	$Endpoint = "targets/$TargetGroupId/scan"
 	Write-Verbose "Starting Scan of TargetGroup $($TargetGroup.name)"
-  $body = @{ options = $ScanOptions }
-	_ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method POST
+    $body = @{ options = $ScanOptions }
+	Invoke-ICAPI -Endpoint $Endpoint -body $body -method POST
 }
 
 function Invoke-ICScanTarget {
@@ -165,32 +94,33 @@ function Invoke-ICScanTarget {
 
 	# Select Target targetgroup
 	if ($TargetGroupId) {
-		$TargetGroup = Get-ICTargetGroup -TargetGroupId $TargetGroupId
+		$TargetGroup = Get-ICTargetGroup -Id $TargetGroupId
 		if (-NOT $TargetGroup) {
 			Throw "TargetGroup with id $TargetGroupid does not exist!"
 		} else {
-            $body['targetGroup'] = @{id = $targetGroupId}
+            $body['targetGroup'] = @{ id = $targetGroupId}
         }
 	} else {
         Write-Verbose "Using Target Group Name [$TargetGroupName] -- will be created if it does not exist."
-        $body['targetGroup'] = @{name = $TargetGroupName}
+        $body['targetGroup'] = @{ name = $TargetGroupName}
     }
 
 	# Select Credential
 	if ($CredentialId) {
-		$Credential = Get-ICCredential -CredentialId $credentialId
+		$Credential = Get-ICCredential -Id $credentialId
 		if (-NOT $Credential) {
 			Throw "Credential with id $credentialId does not exist!"
 		} else {
-        $body['credential'] = @{ id = $credentialId }
+            $body['credential'] = @{ id = $credentialId }
         }
 	} else {
         # Use Credentialname
         $Credential =  Get-ICCredential | where { $_.name -eq $CredentialName }
 		if (-NOT $CredentialName) {
 			Throw "Credential with name [$CredentialName] does not exist! Please create it or specify a different credential (referenced by id or name)"
-            $body['credential'] = @{ name = $CredentialName }
+            return
   	    }
+        $body['credential'] = @{ name = $CredentialName }
     }
 
     # Select Credential
@@ -207,7 +137,7 @@ function Invoke-ICScanTarget {
 	# Initiating Scan
 	$Endpoint = "targets/scan"
 	Write-Verbose "Starting Scan of target $($target)"
-	_ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method POST
+	Invoke-ICAPI -Endpoint $Endpoint -body $body -method POST
 }
 
 function New-ICScanOptions {
@@ -288,26 +218,23 @@ function Add-ICScanSchedule {
 			Throw "ScanScheduleOptions format is invalid -- use New-ICScanScheduleOptions to create an options object"
 		}
 	}
-	_ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method POST
+	Invoke-ICAPI -Endpoint $Endpoint -body $body -method POST
 }
 
 function Get-ICScanSchedule {
     [cmdletbinding()]
     param(
-        [String]$TargetGroupId
+        [String]$TargetGroupId,
+        [HashTable]$where=@{},
+        [String[]]$order = @("relatedId")
     )
     $Endpoint = "ScheduledJobs"
-    $filter =  @{
-        order = @("relatedId")
-        limit = $resultlimit
-        skip = 0
-    }
 	if ($TargetGroupId) {
 		$TargetGroups = Get-ICTargetGroup -TargetGroupId $TargetGroupId
-		$ScheduledJobs = _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$true | where { $_.relatedId -eq $TargetGroupId}
+		$ScheduledJobs = Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$true | where { $_.relatedId -eq $TargetGroupId}
 	} else {
 		$TargetGroups = Get-ICTargetGroup
-		$ScheduledJobs = _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$true
+		$ScheduledJobs = Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$true
 	}
 
 	$ScheduledJobs | % {
@@ -325,7 +252,7 @@ function Get-ICScanSchedule {
 }
 
 function Remove-ICScanSchedule {
-	[cmdletbinding(DefaultParameterSetName = 'scheduleId')]
+	[cmdletbinding(SupportsShouldProcess, DefaultParameterSetName = 'scheduleId')]
 	param(
 		[parameter(
 			Mandatory,
@@ -359,8 +286,10 @@ function Remove-ICScanSchedule {
 	$tgname = $schedule.targetGroup
 	if (-NOT $tgname) { throw "TargetGroupId not found!"}
 	$Endpoint = "scheduledJobs/$ScheduleId"
-	Write-Host "Unscheduling collection for Target Group $tgname"
-	_ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method DELETE
+    if ($PSCmdlet.ShouldProcess($Id, "Will remove schedule from $tgname")) {
+    	Write-Warning "Unscheduling collection for Target Group $tgname"
+    	Invoke-ICAPI -Endpoint $Endpoint -method DELETE
+    }
 }
 
 function Import-ICSurvey {
@@ -408,8 +337,7 @@ function Import-ICSurvey {
   		try {
   			$objects = Invoke-RestMethod $HuntServerAddress/api/survey -Headers $headers -Method POST -InFile $FilePath -ContentType "application/octet-stream"
   		} catch {
-  			Write-Warning "Error: $_"
-  			throw "ERROR: $($_.Exception.Message)"
+  			throw "$($_.Exception.Message)"
   		}
   		$objects
   	}
@@ -425,22 +353,22 @@ function Import-ICSurvey {
 	}
 	elseif ($TargetGroupId) {
 		# Check TargetGroupId and create new ScanId for that group
-		Write-Host "Checking for existance of target group with TargetGroupId: '$TargetGroupId' and generating new ScanId"
-		$TargetGroups = Get-ICTargetGroup
-		if ($TargetGroups.id -contains $TargetGroupId) {
+		Write-Verbose "Checking for existance of target group with TargetGroupId: '$TargetGroupId' and generating new ScanId"
+		$TargetGroup = Get-ICTargetGroup -id $TargetGroupId
+		if ($TargetGroup) {
 			$TargetGroupName = ($TargetGroups | where { $_.id -eq $TargetGroupId }).name
 		} else {
 			Throw "No Target Group exists with TargetGroupId $TargetGroupId. Specify an existing TargetGroupId to add this survey to or use other parameters to generate one."
 		}
 	}
 	else {
-		Write-Host "No ScanId or TargetGroupId specified. Checking for existance of target group: '$TargetGroupName'"
+		Write-Verbose "No ScanId or TargetGroupId specified. Checking for existance of target group: '$TargetGroupName'"
   	    $TargetGroups = Get-ICTargetGroup
   	    if ($TargetGroups.name -contains $TargetGroupName) {
-  		    Write-Host "$TargetGroupName Exists."
+  		    Write-Verbose "$TargetGroupName Exists."
 			$TargetGroupId = ($targetGroups | where { $_.name -eq $TargetGroupName}).id
   	    } else {
-            Write-Host "$TargetGroupName does not exist. Creating new Target Group '$TargetGroupName'"
+            Write-Warning "$TargetGroupName does not exist. Creating new Target Group '$TargetGroupName'"
             $g = Get-ICControllerGroup
             if ($g.id.count -eq 1) {
                 $ControllerGroupId = $g.id
@@ -454,14 +382,14 @@ function Import-ICSurvey {
 	# Creating ScanId
 	if (-NOT $ScanId) {
 		$ScanName = "Offline-" + (get-date).toString("yyyyMMdd-HHmm")
-		Write-Host "Creating scan named $ScanName [$TargetGroupName-$ScanName]..."
+		Write-Verbose "Creating scan named $ScanName [$TargetGroupName-$ScanName]..."
 		$StartTime = _Get-ICTimeStampUTC
 		$body = @{
 			name = $scanName;
 			targetId = $TargetGroupId;
 			startedOn = $StartTime
 		}
-		$newscan = _ICRestMethod -url $HuntServerAddress/api/scans -body $body -Method 'POST'
+		$newscan = Invoke-ICAPI -Endpoint $Endpoint -body $body -Method 'POST'
 		Start-Sleep 1
 		$ScanId = $newscan.id
 	}
@@ -479,7 +407,7 @@ function Import-ICSurvey {
         }
 		# Process each item in resolved paths
 		foreach ($file in $resolvedPaths) {
- 			Write-Host "Uploading survey [$file]..."
+ 			Write-Verbose "Uploading survey [$file]..."
  			if ((Test-Path $file -type Leaf) -AND ($file -like $surveyext)) {
  				Upload-ICSurveys -FilePath $file -ScanId $ScanId
    		    } else {

@@ -42,7 +42,7 @@ function New-ICToken {
 	} else {
 		$Global:HuntServerAddress = $HuntServer
 	}
-  $url = "$Global:HuntServerAddress/api/users/login"
+  	$url = "$Global:HuntServerAddress/api/users/login"
 
 	if (-NOT $Credential) {
 		# Default Credentials
@@ -80,12 +80,14 @@ function New-ICToken {
 
 # Generate an API token in the web console's profile or admin section.
 # You can save tokens and proxy info to disk as well with the -Save switch.
-function Set-ICToken {
+function Set-ICInstance {
 	[cmdletbinding()]
+	[alias("Set-ICToken")]
 	param(
-		[parameter(Mandatory=$true, HelpMessage="Hunt Instance Address. i.e. 'CloudDemo.infocyte.com'")]
+		[parameter(Mandatory=$true, HelpMessage="Hunt Cloud Instance Name (e.g. 'clouddemo') or Full URL of Server/API (e.g. https://CloudDemo.infocyte.com)'")]
 		[ValidateNotNullOrEmpty()]
-		[String]$HuntServer = "https://localhost:443",
+		[alias("HuntServer")]
+		[String]$Instance,
 
 		[parameter(HelpMessage="API Token from Infocyte App. Omit if using saved credentials.")]
 		[String]$Token,
@@ -97,7 +99,7 @@ function Set-ICToken {
 
 		[Switch]$DisableSSLVerification,
 
-		[parameter(HelpMessage="Will save provided credentials to disk for future use.")]
+		[parameter(HelpMessage="Will save provided token and proxy settings to disk for future use with this Infocyte Instance.")]
 		[Switch]$Save
 	)
 
@@ -106,11 +108,16 @@ function Set-ICToken {
 	}
 	[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-	if ($HuntServer -notlike "https://*") {
-		$Global:HuntServerAddress = "https://" + $HuntServer
+	if ($Instance -match "[:\.]+") {
+		if ($Instance -notlike "https://*") {
+			$Global:HuntServerAddress = "https://$Instance"
+		} else {
+			$Global:HuntServerAddress = $Instance
+		}
 	} else {
-		$Global:HuntServerAddress = $HuntServer
+		$Global:HuntServerAddress = "https://$Instance.infocyte.com"
 	}
+	Write-Host "Setting Global API URL (`$HuntServerAddress) to $Global:HuntServerAddress/api"
 
 	$credentialfile = "$env:appdata\infocyte\credentials.json"
 	$Global:ICCredentials = @{}
@@ -128,7 +135,7 @@ function Set-ICToken {
 		# Set Token to global variable
 		if ($Token.length -eq 64) {
 				$Global:ICToken = $Token
-				Write-Host "Setting Auth Token for $HuntServer to $Token"
+				Write-Host "Setting Auth Token for $Global:HuntServerAddress to $Token"
 		} else {
 			Write-Warning "That token won't work. Must be a 64 character string generated within your profile or admin panel within Infocyte HUNT's web console"
 			return
@@ -146,7 +153,7 @@ function Set-ICToken {
 	}
 
 	if ($Proxy) {
-			Write-Host "Infocyte API functions will now use Proxy: $Proxy"
+			Write-Host "Infocyte API functions will use Proxy: $Proxy"
 			$Global:Proxy = $Proxy
 			if ($ProxyUser -AND $ProxyPass) {
 				Write-Host "Infocyte API functions will now use Proxy User: $ProxyUser"

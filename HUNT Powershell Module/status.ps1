@@ -5,166 +5,160 @@
 function Get-ICJob {
 	[cmdletbinding()]
 	param(
+		[parameter(ValueFromPipelineByPropertyName)]
+		[alias('jobId')]
+		[String]$Id,
+
 		[Switch]$All,
-		[HashTable]$Where,
-		[Switch]$NoLimit
+
+		[HashTable]$where=@{},
+		[String[]]$order = "createdOn",
+		[Switch]$NoLimit,
+		[Switch]$CountOnly
 	)
-	$url = ("$HuntServerAddress/api/jobs")
-	$filter =  @{
-		order = "createdOn"
-		limit = $resultlimit
-		skip = 0
-		where = @{ and = @() }
-	}
 
-	if ($where.count -gt 0) {
-		$where.GetEnumerator() | % {
-			$filter['where']['and'] += @{ $($_.key) = $($_.value) }
+	PROCESS {
+		$endpoint = 'jobs'
+		if ($Id) {
+			$endpoint += "/$Id"
 		}
+		if ($All) {
+			Write-Verbose "Getting All Jobs."
+		} else {
+			Write-Verbose "Getting Active Jobs."
+			if (-NOT $where['state']) {
+				$where['state'] = "active"
+			}
+		}
+		Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
 	}
-
-	if ($All) {
-		Write-Verbose "Getting All Jobs from Infocyte HUNT: $HuntServer"
-	} else {
-		Write-Verbose "Getting Active Jobs from Infocyte HUNT: $HuntServer"
-		$filter['where']['and'] = @{ state = "active" }
-	}
-	_ICGetMethod -url $url -filter $filter -NoLimit:$NoLimit
 }
 
 # Get Infocyte HUNT User Audit Logs
 function Get-ICUserAuditLog {
 	[cmdletbinding()]
 	param(
+		[parameter(ValueFromPipeline)]
+		[String]$Id,
+
+		[HashTable]$where=@{},
+		[String[]]$order = "createdOn",
 		[Switch]$NoLimit,
-		[HashTable]$Where
+		[Switch]$CountOnly
 	)
-	$url = ("$HuntServerAddress/api/useractivities")
-	$filter =  @{
-		order = "createdOn"
-		limit = $resultlimit
-		skip = 0
-		where = @{ and = @() }
-	}
-	if ($where.count -gt 0) {
-		$where.GetEnumerator() | % {
-			$filter['where']['and'] += @{ $($_.key) = $($_.value) }
+	PROCESS {
+		$endpoint = 'useractivities'
+		if ($Id) {
+			$endpoint += "/$Id"
 		}
+		Write-Verbose "Getting User Activity Logs"
+		Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
 	}
-		Write-Verbose "Getting User Activity Logs from Infocyte HUNT: $HuntServer"
-	_ICGetMethod -url $url -filter $filter -NoLimit:$NoLimit
 }
 
 # Get Infocyte HUNT User Tasks. These are the items in the task dropdown in the UI.
 function Get-ICUserTask {
 	[cmdletbinding()]
 	param(
-		[String]$UserTaskId,
+		[parameter(ValueFromPipelineByPropertyName)]
+		[alias('UserTaskId')]
+		[String]$Id,
+
 		[Switch]$Active,
-		[Switch]$All,
-		[HashTable]$Where,
-		[Switch]$NoLimit
+		[Switch]$IncludeArchived,
+
+		[HashTable]$where=@{},
+		[String[]]$order = "endedOn",
+		[Switch]$NoLimit,
+		[Switch]$CountOnly
 	)
 
-	$filter =  @{
-		order = "endedOn"
-		limit = $resultlimit
-		skip = 0
-		where = @{ and = @() }
-	}
-	if ($where.count -gt 0) {
-		$where.GetEnumerator() | % {
-			$filter['where']['and'] += @{ $($_.key) = $($_.value) }
-		}
-	}
-
-	if ($UserTaskId) {
-		$url = ("$HuntServerAddress/api/usertasks/$UserTaskId")
-	} else {
-		if ($All) {
-			Write-Verbose "Getting All User Tasks from Infocyte HUNT: $HuntServer"
-			$url = ("$HuntServerAddress/api/usertasks")
+	PROCESS {
+		$endpoint = "usertasks"
+		if ($Id) {
+			$endpoint += "/$Id"
 		} else {
-			Write-Verbose "Getting Active Tasks from Infocyte HUNT: $HuntServer"
-			$url = ("$HuntServerAddress/api/usertasks/active")
+			if ($IncludeArchived) {
+				Write-Verbose "Getting All User Tasks"
+			} else {
+				Write-Verbose "Getting Active User Tasks"
+				$endpoint += "/active"
+			}
 		}
-	}
-	if ($Active) {
-		Write-Verbose "Getting Running Tasks from Infocyte HUNT: $HuntServer"
-		$filter['where']['and'] += @{ status = "Active" }
-	}
+		if ($Active) {
+			Write-Verbose "Filtering for Running Tasks Only."
+			$where['status'] = "Active"
+		}
 
-	_ICGetMethod -url $url -filter $filter -NoLimit:$NoLimit
+		Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
+	}
 }
 
 function Get-ICUserTaskItem {
 	[cmdletbinding()]
 	param(
-		[parameter(Mandatory=$true, Position=0)]
-		[ValidateNotNullOrEmpty()]
-		[String]$UserTaskId,
+		[parameter(Mandatory=$true, ValueFromPipelineByPropertyName)]
+		[alias('id')]
+		[String]$userTaskId,
 
 		[Switch]$IncludeProgress,
 
-		[HashTable]$Where,
+		[HashTable]$where=@{},
 
-		[Switch]$NoLimit
+		[String[]]$order = "updatedOn",
+
+		[Switch]$NoLimit,
+		[Switch]$CountOnly
 	)
 
-	$filter =  @{
-		limit = $resultlimit
-		skip = 0
-		order = "updatedOn"
-		where = @{
-			and = @( @{ userTaskId = $UserTaskId } )
+	PROCESS {
+		$Endpoint = "userTaskItems"
+		if ($_.id -AND $_.userTaskId) {
+			$where['userTaskId'] = $_.userTaskId
+		} else {
+			$where['userTaskId'] = $userTaskId
 		}
-	}
-	if ($where.count -gt 0) {
-		$where.GetEnumerator() | % {
-			$filter['where']['and'] += @{ $($_.key) = $($_.value) }
-		}
-	}
 
-	Write-Verbose "Getting All User Task Items from Infocyte HUNT: $HuntServer"
-	$url = ("$HuntServerAddress/api/userTaskItems")
-	if ($IncludeProgress) {
-		$items = _ICGetMethod -url $url -filter $filter -NoLimit:$NoLimit
-		$items | foreach {
-			if ($_.id) {
-				$progress = @()
-				Get-ICUserTaskItemProgress -taskItemId $_.id | foreach { $progress += "$($_.createdOn) $($_.text)" }
-				$_ | Add-Member -MemberType "NoteProperty" -name "progress" -value $progress
+		Write-Verbose "Getting All UserTaskItems with userTaskId $userTaskId."
+
+		if ($IncludeProgress -AND (-NOT $CountOnly)) {
+			$items = Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit
+			$items | foreach {
+				if ($_.id) {
+					$progress = @()
+					Get-ICUserTaskItemProgress -taskItemId $_.id | foreach { $progress += "$($_.createdOn) $($_.text)" }
+					$_ | Add-Member -MemberType "NoteProperty" -name "progress" -value $progress
+				}
 			}
+			Write-Output $items
+		} else {
+			Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
 		}
-		$items
-	} else {
-		_ICGetMethod -url $url -filter $filter -NoLimit:$NoLimit
 	}
 }
 
 function Get-ICUserTaskItemProgress {
 	[cmdletbinding()]
 	param(
-		[parameter(Mandatory=$true, Position=0)]
+		[parameter(Mandatory=$true, ValueFromPipelineByPropertyName)]
 		[ValidateNotNullOrEmpty()]
+		[alias('id')]
 		[String]$taskItemId,
-		[HashTable]$Where,
-		[Switch]$NoLimit
+
+		[HashTable]$where=@{},
+		[String[]]$order = @("createdOn desc", "id"),
+		[Switch]$NoLimit,
+		[Switch]$CountOnly
 	)
 
-	$url = ("$HuntServerAddress/api/userTaskItemProgresses")
-	$filter =  @{
-		order = @("createdOn desc", "id")
-		limit = $resultlimit
-		skip = 0
-		where = @{
-			and = @( @{ taskItemId = $taskItemId} )
+	PROCESS {
+		$Endpoint = "userTaskItemProgresses"
+		if ($_.id -AND $_.taskItemId) {
+			# disambuguation
+			$where['taskItemId'] = $_.taskItemId
+		} else {
+			$where['taskItemId'] = $taskItemId
 		}
+		Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
 	}
-	if ($where.count -gt 0) {
-		$where.GetEnumerator() | % {
-			$filter['where']['and'] += @{ $($_.key) = $($_.value) }
-		}
-	}
-	_ICGetMethod -url $url -filter $filter -NoLimit:$NoLimit
 }

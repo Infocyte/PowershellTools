@@ -66,55 +66,57 @@ PowerShellVersion = '5.0'
 
 # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
 FunctionsToExport = @(
-  "Invoke-ICFindHosts",
-  "Invoke-ICScan",
-  "Invoke-ICScanTarget",
-  "Import-ICSurvey",
-  "Get-ICObject",
-  "Get-ICAlert",
-  "Get-ICApplication",
-  "Get-ICVulnerability",
-  "Get-ICActivityTrace",
-  "Get-ICFileDetail",
-  "New-ICToken",
-  "Set-ICToken",
-  "New-ICTargetGroup",
-  "Get-ICTargetGroup",
-  "Remove-ICTargetGroup",
-  "New-ICControllerGroup",
-  "Get-ICControllerGroup",
-  "Remove-ICControllerGroup",
-  "New-ICCredential",
-  "Get-ICCredential",
-  "Remove-ICCredential",
-  "New-ICQuery",
-  "Get-ICQuery",
-  "Remove-ICQuery",
-  "Get-ICAddress",
-  "Remove-ICAddress",
-  "Get-ICScan",
-  "Get-ICUserAuditLog",
-  "Add-ICComment",
-  "Get-ICUserTask",
-  "Get-ICBox",
-  "Get-ICFlagColorCodes",
-  "New-ICFlag",
-  "Get-ICFlag",
-  "Update-ICFlag",
-  "Remove-ICFlag",
-  "New-ICScanOptions",
-  "Add-ICScanSchedule",
-  "Get-ICScanSchedule",
-  "Remove-ICScanSchedule",
-  "Get-ICUserTaskItem",
-  "Get-ICReport",
-  "Get-ICHelp",
-  "Invoke-ICExtension",
-  "New-ICExtension",
-  "Get-ICExtension",
-  "Get-ICAgent",
-  "Remove-ICAgent",
-  "Invoke-ICAPI"
+    "Set-ICInstance",
+    "Get-ICAPI",
+    "Invoke-ICAPI",
+    "Invoke-ICFindHosts",
+    "Invoke-ICScan",
+    "Invoke-ICScanTarget",
+    "Import-ICSurvey",
+    "Get-ICObject",
+    "Get-ICAlert",
+    "Get-ICApplication",
+    "Get-ICVulnerability",
+    "Get-ICActivityTrace",
+    "Get-ICFileDetail",
+    "New-ICToken",
+    "New-ICTargetGroup",
+    "Get-ICTargetGroup",
+    "Remove-ICTargetGroup",
+    "New-ICControllerGroup",
+    "Get-ICControllerGroup",
+    "Remove-ICControllerGroup",
+    "New-ICCredential",
+    "Get-ICCredential",
+    "Remove-ICCredential",
+    "New-ICQuery",
+    "Get-ICQuery",
+    "Remove-ICQuery",
+    "Get-ICAddress",
+    "Remove-ICAddress",
+    "Get-ICScan",
+    "Get-ICUserAuditLog",
+    "Add-ICComment",
+    "Get-ICUserTask",
+    "Get-ICBox",
+    "Set-ICBox",
+    "Get-ICFlagColors",
+    "New-ICFlag",
+    "Get-ICFlag",
+    "Update-ICFlag",
+    "Remove-ICFlag",
+    "New-ICScanOptions",
+    "Add-ICScanSchedule",
+    "Get-ICScanSchedule",
+    "Remove-ICScanSchedule",
+    "Get-ICUserTaskItem",
+    "Get-ICReport",
+    "Get-ICHelp",
+    "Invoke-ICExtension",
+    "New-ICExtension",
+    "Get-ICExtension",
+    "Get-ICAgent",
+    "Remove-ICAgent"
 )
 
 # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
@@ -124,7 +126,7 @@ CmdletsToExport = @()
 VariablesToExport = '*'
 
 # Aliases to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no aliases to export.
-AliasesToExport = @()
+AliasesToExport = '*'
 
 # DSC resources to export from this module
 # DscResourcesToExport = @()
@@ -153,7 +155,7 @@ PrivateData = @{
         # IconUri = ''
 
         # ReleaseNotes of this module
-        ReleaseNotes = '1.1.0 Updated ICObject and modified function names to conform to Powershell best practices'
+        ReleaseNotes = '2.0.0 Complete refactor'
 
     } # End of PSData hashtable
 

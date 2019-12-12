@@ -2,29 +2,100 @@
 function New-ICTargetGroup {
     [cmdletbinding()]
     param(
-        [parameter(Mandatory=$true, Position=0)]
+        [parameter(Mandatory=$true)]
         [ValidateNotNullOrEmpty()]
         [String]$Name,
 
-        [parameter(Mandatory=$false, Position=1)]
+        [parameter(Mandatory=$false)]
         [String]$ControllerGroupId
     )
-
-    if (-NOT $ControllerGroupId) {
-        $g = Get-ICControllerGroup
-        if (($g.id.count -gt 1) -AND (-NOT $ControllerGroupId)) {
-            Write-Error "More than one Controller Group. Please specify ControllerGroupId."
-        }
-        $ControllerGroupId = $g.id
-    }
 
     $Endpoint = "targets"
     $body = @{
         name = $Name
-        controllerGroupId = $ControllerGroupId
     }
-    Write-Host "Creating new target group: $Name [$HuntServerAddress/api/$Endpoint]"
-    _ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method 'POST'
+
+    if ($ControllerGroupId) {
+        $body['controllerGroupId'] = $ControllerGroupId
+    } else {
+        $cg = Get-ICControllerGroup
+        if ($cg.count -gt 1) {
+            Write-Error "More than one Controller Group. Recommend specifying a ControllerGroupId."
+            Write-Warning "$($cg | ft -auto | out-string)"
+            return
+        } else {
+            $body['controllerGroupId'] = $cg.id
+        }
+    }
+
+    $tg = Get-ICTargetGroup -where @{ name = $Name }
+    if ($tg) {
+        Write-Error "There is already a Target Group named $Name"
+    } else {
+        Write-Verbose "Creating new target group: $Name"
+        Invoke-ICAPI -Endpoint $Endpoint -body $body -method POST
+    }
+}
+
+function Get-ICTargetGroup {
+    [cmdletbinding()]
+    param(
+        [parameter(ValueFromPipelineByPropertyName)]
+        [alias('TargetGroupId')]
+        [String]$Id,
+        [Switch]$IncludeArchive,
+
+        [HashTable]$where=@{},
+        [String[]]$order="name",
+        [Switch]$NoLimit,
+        [Switch]$CountOnly
+    )
+
+    PROCESS {
+        if ($IncludeArchive) {
+            $Endpoint = "TargetsArchive"
+        } else {
+            $Endpoint = "targets"
+        }
+
+        Write-Debug "`$_=$_; `$Id=$Id"
+        if ($Id) {
+            $Endpoint += "/$Id"
+        }
+
+        Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
+    }
+}
+
+function Remove-ICTargetGroup {
+    [cmdletbinding(SupportsShouldProcess)]
+    param(
+        [parameter(Mandatory=$true, ValueFromPipelineByPropertyName)]
+        [ValidateNotNullOrEmpty()]
+        [alias('TargetGroupId')]
+        [String]$Id,
+
+        [Switch]$IncludeArchive
+    )
+
+    PROCESS {
+        if ($IncludeArchive) {
+            $Endpoint = "TargetsArchive/$Id"
+        } else {
+            $Endpoint = "targets/$Id"
+        }
+
+        $obj = Get-ICTargetGroup -id $Id
+        if (-NOT $obj) {
+            Write-Error "No target group with id '$Id' exists."
+            return
+        }
+        Write-Warning "Careful. This will remove access to all scan data within this target group and is only reversible for the next 7 days"
+        if ($PSCmdlet.ShouldProcess($tg.name, "Will remove target group: $($obj.name) [$Id]")) {
+            Write-Warning "Removing target group: $($obj.name) [$Id]."
+            Invoke-ICAPI -Endpoint $Endpoint -method 'DELETE'
+        }
+    }
 }
 
 function New-ICControllerGroup {
@@ -36,302 +107,477 @@ function New-ICControllerGroup {
     )
 
     $Endpoint = "controllergroups"
-        $body = @{
+    $body = @{
         name = $Name;
     }
-    Write-Host "Creating new Controller Group: $Name [$HuntServerAddress/api/$Endpoint]"
-    _ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method 'POST'
-}
-
-function Get-ICTargetGroup {
-    [cmdletbinding()]
-    param(
-        [String]$TargetGroupId
-    )
-    $Endpoint = "targets"
-    $filter =  @{
-        order = @("name", "id")
-        limit = $resultlimit
-        skip = 0
-        where = @{ and = @() }
+    $cg = Get-ICControllerGroup -where @{ name = $Name; deleted = $False }
+    if ($cg) {
+        Write-Error "There is already a Controller Group named $Name"
+    } else {
+        Write-Verbose "Creating new Controller Group: $Name [$HuntServerAddress/api/$Endpoint]"
+        Invoke-ICAPI -Endpoint $Endpoint -body $body -method POST
     }
-    if ($TargetGroupId) {
-        $filter['where']['and'] += @{ id = $TargetGroupId }
-    }
-    _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$true
 }
 
 function Get-ICControllerGroup {
     [cmdletbinding()]
     param(
-        [String]$ControllerGroupId
-    )
-    $Endpoint = "controllergroups"
-    $filter =  @{
-        order = @("name", "id")
-        limit = $resultlimit
-        skip = 0
-        where = @{ and = @() }
-    }
-    if ($ControllerGroupId) {
-        $filter['where']['and'] += @{ id = $ControllerGroupId }
-    }
-    _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$true
-}
+        [parameter(ValueFromPipelineByPropertyName)]
+        [alias('ControllerGroupId')]
+        [String]$Id,
 
-
-function Remove-ICTargetGroup {
-    [cmdletbinding()]
-    param(
-        [parameter(Mandatory=$true, Position=0)]
-        [ValidateNotNullOrEmpty()]
-        [String]$TargetGroupId
+        [HashTable]$where=@{},
+        [String[]]$order=@("name", "id"),
+        [Switch]$NoLimit,
+        [Switch]$CountOnly
     )
 
-    $Endpoint = "targets/$TargetGroupId"
-    Write-Warning "Removing target group [$HuntServerAddress/api/$Endpoint]."
-    Write-Warning "This will remove access to all scan data within this target group and is only reversible for the next 7 days"
-    _ICRestMethod -url $HuntServerAddress/api/$Endpoint -method 'DELETE'
+    PROCESS {
+        $Endpoint = "controllergroups"
+        if ($Id) {
+            $Endpoint += "/$id"
+        }
+        Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
+    }
 }
 
 function Remove-ICControllerGroup {
-    [cmdletbinding()]
+    [cmdletbinding(SupportsShouldProcess)]
     param(
-        [parameter(Mandatory=$true, Position=0)]
+        [parameter(Mandatory=$true,ValueFromPipelineByPropertyName)]
         [ValidateNotNullOrEmpty()]
-        [String]$ControllerGroupId
+        [alias('ControllerGroupId')]
+        [String]$Id
     )
 
-    $Endpoint = "controllergroups/$ControllerGroupId"
-    Write-Warning "Removing Controller Group [$HuntServerAddress/api/$Endpoint]."
-    # Write-Warning "This will remove access to all scan data within this target group and is only reversible for the next 7 days"
-    _ICRestMethod -url $HuntServerAddress/api/$Endpoint -method 'DELETE'
+    PROCESS {
+        $Endpoint = "controllergroups/$Id"
+        $obj = Get-ICControllerGroup -id $Id
+        if (-NOT $obj) {
+            Write-Error "No Controller Group with id '$Id' exists."
+            return
+        }
+        if ($PSCmdlet.ShouldProcess($obj.name, "Will remove target group: $($obj.name) [$Id]")) {
+            Write-Warning "Removing Controller Group $Id."
+            Invoke-ICAPI -Endpoint $Endpoint -method 'DELETE'
+        }
+    }
 }
 
 
 function New-ICCredential {
     [cmdletbinding()]
     Param(
-        [parameter(Mandatory=$True, Position=0)]
+        [parameter(Mandatory=$True)]
         [String]$Name,
 
         [parameter(Mandatory=$True)]
-        [PSCredential]$Cred
+        [PSCredential]$Cred,
+
+        [parameter()]
+        [ValidateSet("windowsLocal","windowsDomain","aws","ssh","login","linuxSudo")]
+        [String]$AccountType="login"
     )
 
     $Endpoint = "credentials"
-    $data = @{
+    $body = @{
         name = $Name
         username = $Cred.Username
         password = $Cred.GetNetworkCredential().Password
+        byok = $False
+        login = $AccountType
     }
-    $body = @{
-        data = $data
+    $c = Get-ICCredential -where @{ name = $Name; deleted = $False }
+    if ($c) {
+        Write-Error "There is already a credential object named $Name"
+    } else {
+        Write-Verbose "Adding new Credential $Name [$($Cred.Username)] to the Credential Manager"
+        Invoke-ICAPI -Endpoint $Endpoint -body $body -method POST
     }
-    Write-Host "Adding new Credential $Name [$($Cred.Username)] to the Credential Manager"
-    _ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method POST
 }
 
 function Get-ICCredential {
     [cmdletbinding()]
     param(
-        [String]$CredentialId
+        [parameter(ValueFromPipelineByPropertyName)]
+        [alias('CredentialId')]
+        [String]$id,
+
+        [HashTable]$where=@{},
+        [String[]]$order,
+        [Switch]$NoLimit,
+        [Switch]$CountOnly
     )
-    Write-Verbose "Getting Credential Objects from Infocyte HUNT: $HuntServerAddress"
-    $Endpoint = "credentials"
-    $filter =  @{
-        limit = $resultlimit
-        skip = 0
-        where = @{ and = @() }
+
+    PROCESS {
+        $Endpoint = "credentials"
+        if ($id) {
+            $Endpoint += "/$id"
+        }
+        Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
     }
-    if ($CredentialId) {
-        $filter['where']['and'] += @{ id = $CredentialId }
-    }
-    _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter
 }
 
 function Remove-ICCredential {
-    [cmdletbinding()]
+    [cmdletbinding(SupportsShouldProcess)]
     param(
-        [parameter(Mandatory=$true, Position=0)]
+        [parameter(Mandatory=$true, ValueFromPipelineByPropertyName)]
         [ValidateNotNullOrEmpty()]
-        [String]$CredentialId
+        [alias('CredentialId')]
+        [String]$Id
     )
 
-    $Endpoint = "credentials/$CredentialId"
-    Write-Warning "Removing credential [$HuntServerAddress/api/$Endpoint]."
-    _ICRestMethod -url $HuntServerAddress/api/$Endpoint -method 'DELETE'
-
+    PROCESS {
+        $Endpoint = "credentials/$Id"
+        $obj = Get-ICCredential -id $Id
+        if (-NOT $obj) {
+            Write-Error "No target group with id '$Id' exists."
+            return
+        }
+        if ($PSCmdlet.ShouldProcess($obj.name, "Will remove Credential Object: $($obj.name) [$Id]")) {
+            Write-Warning "Removing Credential $($obj.name) [$Id]."
+            Invoke-ICAPI -Endpoint $Endpoint -method 'DELETE'
+        }
+    }
 }
-
 
 function Get-ICAddress {
     [cmdletbinding()]
     param(
-        [String]$TargetGroupId,
-        [HashTable]$Where,
-        [Switch]$NoLimit
-    )
-    $Endpoint = "Addresses"
-    $filter =  @{
-    	order = "lastAccessedOn"
-    	limit = $resultlimit
-    	skip = 0
-        where = @{ and = @() }
-    }
-    if ($where.count -gt 0) {
-        $where.GetEnumerator() | % {
-            $filter['where']['and'] += @{ $($_.key) = $($_.value) }
-        }
-    }
+        [parameter(ValueFromPipelineByPropertyName)]
+        [alias('AddressId')]
+        [String]$Id,
 
-    if ($TargetGroupId) {
-        $filter['where']['and'] += @{ targetId = $TargetGroupId }
-        Write-Verbose "Getting all addresses from TargetGroup $TargetGroupId"
+        [parameter(ValueFromPipelineByPropertyName)]
+        [alias('targetId')]
+        [String]$TargetGroupId,
+
+        [HashTable]$where=@{},
+        [String[]]$order="lastAccessedOn",
+        [Switch]$NoLimit,
+        [Switch]$CountOnly
+    )
+
+    PROCESS {
+        $Endpoint = "Addresses"
+        if ($Id) {
+            Write-Verbose "Getting Address with id: $Id"
+            $Endpoint += "/$Id"
+        }
+        elseif ($TargetGroupId) {
+            $where += @{ targetId = $Id }
+            Write-Verbose "Getting all Addresses from TargetGroup: $Id"
+        }
+        Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
     }
-    _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
 }
 
 function Remove-ICAddress {
-    [cmdletbinding()]
+    [cmdletbinding(SupportsShouldProcess)]
     Param(
-        [ValidateNotNullorEmpty()]
+        [parameter(ValueFromPipelineByPropertyName)]
+        [alias('AddressId')]
+        [String]$id,
+
+        [parameter(ValueFromPipelineByPropertyName)]
+        [alias('targetId')]
         [String]$TargetGroupId
     )
 
-    Write-Warning "Clearing all Addresses from TargetGroup $TargetGroupId"
-    $Endpoint = "Addresses"
-    $where = @{
-        targetId = $TargetGroupId
+    PROCESS {
+        $Endpoint = "Addresses"
+
+        if ($id) {
+            $obj = Get-ICAddress -id $Id
+            if (-NOT $obj) {
+                Write-Error "No Address with id '$Id' exists."
+                return
+            }
+            if ($PSCmdlet.ShouldProcess($obj.hostname, "Will remove Address: $($obj.hostname) [$Id]")) {
+                Write-Warning "Removing Address $($obj.hostname) [$Id]."
+                $Endpoint = "Addresses/$id"
+            }
+        }
+        elseif ($TargetGroupId) {
+            $obj = Get-ICTargetGroup -id $TargetGroupId
+            if (-NOT $obj) {
+                Write-Error "No Target Group with id '$TargetGroupId' exists."
+                return
+            }
+            if ($PSCmdlet.ShouldProcess($obj.name , "Clearing ALL Addresses from Target Group: $($obj.name) [$TargetGroupId]")) {
+                Write-Warning "Clearing all Addresses from TargetGroup: $($obj.name) [$TargetGroupId]"
+                $body['where'] = @{ targetId = $TargetGroupId }
+            }
+        }
+        else {
+            Write-Error "No inputs selected."
+            return
+        }
+
+        Invoke-ICAPI -Endpoint $Endpoint -body $body -method DELETE
     }
-    $body = @{
-        where = $where
-    }
-    _ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method DELETE
 }
 
 
 function Get-ICScan {
     [cmdletbinding()]
     param(
-        [String]$TargetGroupId,
-        [String]$TargetGroupName,
-        [HashTable]$Where,
-        [Switch]$NoLimit
-    )
-    $Endpoint = "IntegrationScans"
-    $filter =  @{
-        order = "scanCompletedOn desc"
-        limit = $resultlimit
-        skip = 0
-        where = @{
-            and = @()
-        }
-    }
-    if ($where.count -gt 0) {
-        $where | % {
-            $filter['where']['and'] += $_
-        }
-    }
+        [parameter(ValueFromPipelineByPropertyName)]
+        [alias('scanId')]
+        [String]$Id,
 
-    if ($TargetGroupId) {
-        $tgname = (Get-ICTargetGroup -TargetGroupId $TargetGroupId).name
-        $filter['where']['and'] += @{ targetList = $tgname }
-        Write-Verbose "Getting Scans against Target Group $TargetGroup [$TargetGroupId] from $HuntServerAddress"
-    } elseif ($TargetGroupName) {
-        $filter['where']['and'] += @{ targetList = $TargetGroupName }
-        Write-Verbose "Getting Scans against $TargetGroupName from $HuntServerAddress"
-    } else {
-        Write-Verbose "Getting Scans from $HuntServerAddress"
+        [parameter(ValueFromPipelineByPropertyName)]
+        [alias('targetId')]
+        [String]$TargetGroupId,
+
+        [String]$TargetGroupName,
+
+        [HashTable]$where=@{},
+        [String[]]$order = "scanCompletedOn desc",
+        [Switch]$NoLimit,
+        [Switch]$CountOnly
+    )
+
+    PROCESS {
+        $Endpoint = "IntegrationScans"
+
+        if ($Id) {
+            Write-Verbose "Getting Scan with Id $Id"
+            $where['scanId'] = $Id
+        }
+        elseif ($TargetGroupId) {
+            $tg = Get-ICTargetGroup -Id $TargetGroupId
+            if ($tg) {
+                Write-Verbose "Getting Scans against Target Group $TargetGroup [$TargetGroupId]"
+                $where += @{ targetList = $tg.name }
+            } else {
+                Write-Error "TargetGroup with Id $TargetGroupId does not exist."
+                return
+            }
+        }
+        elseif ($TargetGroupName) {
+            $tg = Get-ICTargetGroup -where @{ name = $TargetGroupName }
+            if ($tg) {
+                Write-Verbose "Getting Scans against Target Group $TargetGroupName [$($tg.id)]"
+                $where += @{ targetList = $TargetGroupName }
+            } else {
+                Write-Error "TargetGroup with name $TargetGroupName does not exist."
+                return
+            }
+        }
+        Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
     }
-    _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
 }
 
 function Get-ICBox {
     [cmdletbinding()]
     param(
+        [parameter(ValueFromPipelineByPropertyName)]
+        [alias('BoxId')]
+        [String]$Id,
+
+        [parameter(ValueFromPipelineByPropertyName)]
+        [alias('targetId')]
+        [String]$targetGroupId,
+
+        [Switch]$Global,
         [Switch]$Last7,
         [Switch]$Last30,
         [Switch]$Last90,
+
         [Switch]$IncludeDeleted,
-        [Switch]$Global,
-        [String]$targetGroupId,
         [Switch]$NoLimit
     )
-    $Endpoint = "Boxes"
-    $filter =  @{
-        limit = $resultlimit
-        skip = 0
-        where = @{ and = @() }
-    }
 
-    if ($Last90) {
-        $filter.where['and'] += @{ name = "Last 90 days" }
-    }
-    elseif ($Last30) {
-        $filter.where['and'] += @{ name = "Last 30 days" }
-    }
-    elseif ($Last7) {
-        $filter.where['and'] += @{ name = "Last 7 days" }
-    }
-
-    if ($targetGroupId) {
-        $filter.where['and'] += @{ targetId = $targetGroupId }
-    }
-    elseif ($Global) {
-        $filter.where['and'] += @{ targetId = $null }
-    }
-
-    $boxes = _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
-    $TargetGroups = Get-ICTargetGroup
-    $boxes | % {
-        if ($_.targetId) {
-            $tgid = $_.targetId
-            $tg = $TargetGroups | where { $_.id -eq $tgid }
-            if ($tg) {
-                $_ | Add-Member -MemberType "NoteProperty" -name "targetGroup" -value $tg.name
-            } else {
-                $_ | Add-Member -MemberType "NoteProperty" -name "targetGroup" -value "Deleted"
-            }
+    PROCESS {
+        $Endpoint = "Boxes"
+        if ($Id -AND (-NOT $_.targetId) ) {
+            $Endpoint += "/$Id"
         } else {
-            $_ | Add-Member -MemberType "NoteProperty" -name "targetGroup" -value "All"
+            if ($Last90) {
+                $where += @{ name = "Last 90 days" }
+            }
+            elseif ($Last30) {
+                $where += @{ name = "Last 30 days" }
+            }
+            elseif ($Last7) {
+                $where += @{ name = "Last 7 days" }
+            }
+
+            if ($targetGroupId) {
+                $where += @{ targetId = $targetGroupId }
+            }
+            elseif ($Global) {
+                $where += @{ targetId = $null }
+            }
+        }
+
+        $boxes = Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit
+        if (-NOT $boxes -AND $Id) {
+            Write-Error "No Box with id $Id"
+            return
+        }
+        $TargetGroups = Get-ICTargetGroup -NoLimit:$NoLimit
+        $boxes | % {
+            if ($_.targetId) {
+                $tgid = $_.targetId
+                $tg = $TargetGroups | where { $_.id -eq $tgid }
+                if ($tg) {
+                    $_ | Add-Member -MemberType "NoteProperty" -name "targetGroup" -value $tg.name
+                } else {
+                    $_ | Add-Member -MemberType "NoteProperty" -name "targetGroup" -value "Deleted"
+                }
+            } else {
+                $_ | Add-Member -MemberType "NoteProperty" -name "targetGroup" -value "All"
+            }
+        }
+        if ($IncludeDeleted) {
+            Write-Verbose "Including deleted Target Groups"
+            $boxes
+        } else {
+            $boxes | where { $_.targetGroup -ne "Deleted" }
         }
     }
-    if ($IncludeDeleted) {
-        $boxes
-    } else {
-        Write-Verbose "Removing deleted Target Groups"
-        $boxes | where { $_.targetGroup -ne "Deleted" }
-    }
-
 }
 
 
 function Get-ICAgent {
     [cmdletbinding()]
     param(
+        [parameter(ValueFromPipelineByPropertyName)]
+        [alias('AgentId')]
         [String]$Id,
-        [Switch]$NoLimit
+
+        [HashTable]$where=@{},
+        [String[]]$order,
+        [Switch]$NoLimit,
+        [Switch]$CountOnly
     )
-    if ($Id) {
-        $Endpoint = "Agents/$Id"
-    } else {
-        $Endpoint = "Agents"
+
+    PROCESS {
+        if ($Id) {
+            $Endpoint = "Agents/$Id"
+        } else {
+            $Endpoint = "Agents"
+        }
+        Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
     }
-    _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $filter -NoLimit:$NoLimit
 }
 
 function Remove-ICAgent {
-    [cmdletbinding()]
+    [cmdletbinding(SupportsShouldProcess)]
     Param(
+        [parameter(ValueFromPipelineByPropertyName)]
         [ValidateNotNullorEmpty()]
+        [alias('AgentId')]
         [String]$Id
     )
 
-    Write-Warning "Uninstalling Agent $Id"
-    $Endpoint = "Agents/$Id"
-    _ICRestMethod -url "$HuntServerAddress/api/$Endpoint/uninstall" -method POST
-    Start-Sleep 2
-    _ICRestMethod -url "$HuntServerAddress/api/$Endpoint" -method DELETE
-    Write-Host "Agent Uninstalled and Deleted."
+    PROCESS {
+        $Endpoint = "Agents/$Id"
+        $obj = Get-ICAgent -id $Id
+        if (-NOT $obj) {
+            Write-Error "No Agent with id '$Id' exists."
+            return
+        }
+        if ($PSCmdlet.ShouldProcess($obj.hostname, "Will uninstall agent: $($obj.hostname) [$Id]")) {
+            Write-Warning "Uninstalling Agent $Endpoint $($obj.hostname) [$Id]."
+            Invoke-ICAPI -Endpoint "$Endpoint/uninstall" -method POST
+            Start-Sleep 2
+            Invoke-ICAPI -Endpoint $Endpoint -method DELETE
+            Write-Host "Agent Uninstalled and Deleted."
+        }
+    }
+}
+
+function New-ICQuery {
+    [cmdletbinding()]
+    Param(
+        [parameter(Mandatory=$True)]
+        [ValidateNotNullorEmpty()]
+        [alias('QueryName')]
+        [String]$Name,
+
+        [parameter(Mandatory=$True)]
+        [String]$TargetGroupId,
+
+        [parameter(Mandatory=$True)]
+        [String]$credentialId,
+
+        [String]$sshCredentialId,
+
+        [parameter(Mandatory=$True)]
+        [ValidateNotNullorEmpty()]
+        [String]$Query
+    )
+
+    $Credential = Get-ICCredential -Id $CredentialId
+    if (-NOT $Credential) {
+        Throw "Credential with CredentialId $CredentialId does not exist."
+    }
+    $TargetGroup = Get-ICTargetGroup -Id $TargetGroupId
+    if (-NOT $TargetGroup) {
+        Throw "Credential with TargetGroup $TargetGroupId does not exist."
+    }
+	Write-Verbose "Creating new Query $Name ($query) in TargetGroup $($TargetGroup.name) using credential $($Credential.name) [$($Credential.username)]"
+    $Endpoint = "queries"
+    $body = @{
+        name = $Name
+        value = $query
+        targetId = $TargetGroupId
+        credentialId = $CredentialId
+    }
+    if ($sshCredentialId) {
+        $body['sshCredential'] = $sshCredentialId
+    }
+    Invoke-ICAPI -Endpoint $Endpoint -body $body -method POST
+}
+
+function Get-ICQuery {
+    [cmdletbinding()]
+    param(
+        [parameter(ValueFromPipelineByPropertyName)]
+        [alias('QueryId')]
+        [String]$Id,
+
+        [parameter(ValueFromPipelineByPropertyName)]
+        [alias('targetId')]
+        [String]$TargetGroupId,
+
+        [HashTable]$where=@{},
+        [String[]]$order,
+        [Switch]$NoLimit,
+        [Switch]$CountOnly
+    )
+
+    PROCESS {
+        $Endpoint = "queries"
+        if ($Id -AND (-NOT $_.targetId)) {
+            Write-Verbose "Getting Query: $Id"
+            $Endpoint += "/$Id"
+        }
+        elseif ($TargetGroupId) {
+            Write-Verbose "Getting Queries for Target Group Id: $TargetGroupId"
+            $where += @{ targetId = $TargetGroupId }
+        }
+        Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$true -CountOnly:$CountOnly
+    }
+}
+
+function Remove-ICQuery {
+    [cmdletbinding(SupportsShouldProcess)]
+    param(
+        [parameter(Mandatory=$true, ValueFromPipelineByPropertyName)]
+        [ValidateNotNullOrEmpty()]
+        [alias('QueryId')]
+        [String]$Id
+    )
+
+    PROCESS {
+        $Endpoint = "queries/$Id"
+        if ($PSCmdlet.ShouldProcess($Id, "Will remove this query")) {
+            Write-Warning "Removing query $Id"
+            Invoke-ICAPI -Endpoint $Endpoint -method 'DELETE'
+        }
+    }
 }

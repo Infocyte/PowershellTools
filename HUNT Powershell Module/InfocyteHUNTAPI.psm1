@@ -14,9 +14,9 @@ function Get-ICHelp {
     Write-Host "Help:"
     Write-Host -ForegroundColor Cyan "`tGet-ICHelp`n"
     Write-Host "Development Functions:"
-    Write-Host -ForegroundColor Cyan "`tInvoke-ICExtension`n"
+    Write-Host -ForegroundColor Cyan "`tInvoke-ICExtension, Get-ICAPI, Invoke-ICAPI`n"
     Write-Host "Authentication Functions:"
-    Write-Host -ForegroundColor Cyan "`tNew-ICToken (depreciated / On-Prem only), Set-ICToken`n"
+    Write-Host -ForegroundColor Cyan "`tNew-ICToken (depreciated / On-Prem only), Set-ICInstance (or Set-ICToken)`n"
     Write-Host "Target Group Management Functions:"
     Write-Host -ForegroundColor Cyan "`tNew-ICTargetGroup, Get-ICTargetGroup, Remove-ICTargetGroup, New-ICCredential,
         Get-ICCredential, Remove-ICCredential, New-ICQuery, Get-ICQuery, Remove-ICQuery,
@@ -32,7 +32,7 @@ function Get-ICHelp {
     Write-Host "Offline Scan Import Functions:"
     Write-Host -ForegroundColor Cyan "`tImport-ICSurvey`n"
     Write-Host "Admin Functions:"
-    Write-Host -ForegroundColor Cyan "`tNew-ICExtension, Get-ICExtension, Get-ICFlagColourCodes,
+    Write-Host -ForegroundColor Cyan "`tNew-ICExtension, Get-ICExtension, Get-ICUsers, Get-ICFlagColors,
         New-ICFlag, Update-ICFlag, Remove-ICFlag, Add-ICComment`n"
     Write-Host "`n"
     Write-Host "FAQ:"
@@ -44,15 +44,17 @@ function Get-ICHelp {
     Write-Host -ForegroundColor Cyan "targetGroupId" -NoNewLine
     Write-Host ")"
     Write-Host "- Time Boxes are Last 7, 30, and 90 Day filters for all data within range"
-    Write-Host "- Results are capped at $resultlimit results unless you use -NoLimit on functions that support it`n"
+    Write-Host "- GET Results are capped at $resultlimit results unless you use -NoLimit`n"
     Write-Host "Example:"
-    Write-Host -ForegroundColor Cyan 'PS> Set-ICToken -HuntServer "https://myserver.infocyte.com" -Token ASDFASDASFASDASF'
+    Write-Host -ForegroundColor Cyan 'PS> Set-ICInstance -Instance "clouddemo" -Token ASDFASDASFASDASF -Save'
     Write-Host -ForegroundColor Cyan 'PS> $Box = Get-ICBox -Last30 | where { $_.TargetGroup -eq "Brooklyn Office"}'
-    Write-Host -ForegroundColor Cyan 'PS> Get-ICObject -Type Process -BoxId $Box.Id'
+    Write-Host -ForegroundColor Cyan 'PS> Get-ICObject -Type Process -BoxId $Box.Id -NoLimit'
 
-    Write-Host 'Using custom loopback filters: $where = [Hashtable]@{ term1 = "asdf1"; term2 = "asdf2" }'
+
+    Write-Host 'Using custom loopback filters: [HashTable]$where = @{ term1 = "asdf1"; term2 = "asdf2" }'
     Write-Host 'Note: Best time format is ISO 8601 or Get-Dates type code "o". i.e. 2019-05-03T00:37:40.0056344-05:00'
     Write-Host 'For more information on filtering, see loopbacks website here: https://loopback.io/doc/en/lb2/Where-filter.html'
+    Write-Host -ForegroundColor Cyan 'PS> Get-ICObject -Type File -BoxId $Box.Id -where @{ path = @{ regexp = "/roaming/i" } }'
     Write-Host -ForegroundColor Cyan 'PS> $customfilter = @{ threatName = "Unknown"; modifiedOn = @{ gt = $((Get-Date).AddDays(-10).GetDateTimeFormats('o')) }; size = @{ lt = 1000000 } }'
     Write-Host -ForegroundColor Cyan 'PS> Get-ICObject -Type Artifact -BoxId $Box.Id -where $customfilter'
 
@@ -62,7 +64,6 @@ function Get-ICHelp {
     Write-Host "Offline Scan Processing Example (Default Target Group = OfflineScans):"
     Write-Host -ForegroundColor Cyan 'PS> Get-ICTargetGroup'
     Write-Host -ForegroundColor Cyan 'PS> Get-ChildItem C:\FolderOfSurveyResults\ -filter *.json.gz | Import-ICSurvey -Path .\surveyresult.json.gz -TargetGroupId b3fe4271-356e-42c0-8d7d-01041665a59b'
-    Write-Host -ForegroundColor Cyan 'PS> Get-ICObject -Type File -BoxId $Box.Id -where @{ path = @{ regexp = "/roaming/i" } }'
 }
 Get-ICHelp
 
