@@ -41,11 +41,13 @@ function Get-ICTargetGroup {
     [cmdletbinding()]
     param(
         [parameter(ValueFromPipelineByPropertyName)]
-        [alias('TargetGroupId')]
+        [alias('TargetGroupId','targetId')]
         [String]$Id,
         [Switch]$IncludeArchive,
 
+        [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
+        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
         [String[]]$order="name",
         [Switch]$NoLimit,
         [Switch]$CountOnly
@@ -58,7 +60,6 @@ function Get-ICTargetGroup {
             $Endpoint = "targets"
         }
 
-        Write-Debug "`$_=$_; `$Id=$Id"
         if ($Id) {
             $Endpoint += "/$Id"
         }
@@ -72,13 +73,26 @@ function Remove-ICTargetGroup {
     param(
         [parameter(Mandatory=$true, ValueFromPipelineByPropertyName)]
         [ValidateNotNullOrEmpty()]
-        [alias('TargetGroupId')]
+        [alias('TargetGroupId','targetId')]
         [String]$Id,
 
         [Switch]$IncludeArchive
     )
 
     PROCESS {
+        if ($Id -AND $_.Id -AND $_.targetId) {
+            $obj = Get-ICTargetGroup -id $Id
+            if (-NOT $obj) {
+                Write-Error "No target group with id '$Id' exists. Trying targetId."
+                $obj = Get-ICTargetGroup -id $_.targetId
+                if (-NOT $obj) {
+                    Write-Error "No target group with id '$Id' exists."
+                    return
+                }
+                $Id = $_.targetId
+            }
+        }
+
         if ($IncludeArchive) {
             $Endpoint = "TargetsArchive/$Id"
         } else {
@@ -123,11 +137,13 @@ function Get-ICControllerGroup {
     [cmdletbinding()]
     param(
         [parameter(ValueFromPipelineByPropertyName)]
-        [alias('ControllerGroupId')]
+        [alias('controllerGroupId')]
         [String]$Id,
 
+        [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
-        [String[]]$order=@("name", "id"),
+        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
+        [String[]]$order="name",
         [Switch]$NoLimit,
         [Switch]$CountOnly
     )
@@ -200,10 +216,12 @@ function Get-ICCredential {
     [cmdletbinding()]
     param(
         [parameter(ValueFromPipelineByPropertyName)]
-        [alias('CredentialId')]
+        [alias('credentialId')]
         [String]$id,
 
+        [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
+        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
         [String[]]$order,
         [Switch]$NoLimit,
         [Switch]$CountOnly
@@ -223,7 +241,7 @@ function Remove-ICCredential {
     param(
         [parameter(Mandatory=$true, ValueFromPipelineByPropertyName)]
         [ValidateNotNullOrEmpty()]
-        [alias('CredentialId')]
+        [alias('credentialId')]
         [String]$Id
     )
 
@@ -245,14 +263,16 @@ function Get-ICAddress {
     [cmdletbinding()]
     param(
         [parameter(ValueFromPipelineByPropertyName)]
-        [alias('AddressId')]
+        [alias('addressId')]
         [String]$Id,
 
         [parameter(ValueFromPipelineByPropertyName)]
         [alias('targetId')]
         [String]$TargetGroupId,
 
+        [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
+        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
         [String[]]$order="lastAccessedOn",
         [Switch]$NoLimit,
         [Switch]$CountOnly
@@ -260,7 +280,7 @@ function Get-ICAddress {
 
     PROCESS {
         $Endpoint = "Addresses"
-        if ($Id) {
+        if ($Id -AND (-NOT $_.targetId)) {
             Write-Verbose "Getting Address with id: $Id"
             $Endpoint += "/$Id"
         }
@@ -287,7 +307,7 @@ function Remove-ICAddress {
     PROCESS {
         $Endpoint = "Addresses"
 
-        if ($id) {
+        if ($Id -AND (-NOT $_.targetId)) {
             $obj = Get-ICAddress -id $Id
             if (-NOT $obj) {
                 Write-Error "No Address with id '$Id' exists."
@@ -330,125 +350,48 @@ function Get-ICScan {
         [alias('targetId')]
         [String]$TargetGroupId,
 
-        [String]$TargetGroupName,
-
+        [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
-        [String[]]$order = "scanCompletedOn desc",
+        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
+        [String[]]$order = "completedOn desc",
         [Switch]$NoLimit,
         [Switch]$CountOnly
     )
 
     PROCESS {
-        $Endpoint = "IntegrationScans"
+        $Endpoint = "scans"
 
-        if ($Id) {
+        if ($Id -AND (-NOT $_.targetId)) {
             Write-Verbose "Getting Scan with Id $Id"
-            $where['scanId'] = $Id
+            $CountOnly = $false
+            $order = $null
+            $Endpoint += "/$Id"
         }
         elseif ($TargetGroupId) {
             $tg = Get-ICTargetGroup -Id $TargetGroupId
             if ($tg) {
                 Write-Verbose "Getting Scans against Target Group $TargetGroup [$TargetGroupId]"
-                $where += @{ targetList = $tg.name }
+                $where += @{ targetId = TargetGroupId }
             } else {
                 Write-Error "TargetGroup with Id $TargetGroupId does not exist."
                 return
             }
         }
-        elseif ($TargetGroupName) {
-            $tg = Get-ICTargetGroup -where @{ name = $TargetGroupName }
-            if ($tg) {
-                Write-Verbose "Getting Scans against Target Group $TargetGroupName [$($tg.id)]"
-                $where += @{ targetList = $TargetGroupName }
-            } else {
-                Write-Error "TargetGroup with name $TargetGroupName does not exist."
-                return
-            }
-        }
+
         Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
     }
 }
-
-function Get-ICBox {
-    [cmdletbinding()]
-    param(
-        [parameter(ValueFromPipelineByPropertyName)]
-        [alias('BoxId')]
-        [String]$Id,
-
-        [parameter(ValueFromPipelineByPropertyName)]
-        [alias('targetId')]
-        [String]$targetGroupId,
-
-        [Switch]$Global,
-        [Switch]$Last7,
-        [Switch]$Last30,
-        [Switch]$Last90,
-
-        [Switch]$IncludeDeleted,
-        [Switch]$NoLimit
-    )
-
-    PROCESS {
-        $Endpoint = "Boxes"
-        if ($Id -AND (-NOT $_.targetId) ) {
-            $Endpoint += "/$Id"
-        } else {
-            if ($Last90) {
-                $where += @{ name = "Last 90 days" }
-            }
-            elseif ($Last30) {
-                $where += @{ name = "Last 30 days" }
-            }
-            elseif ($Last7) {
-                $where += @{ name = "Last 7 days" }
-            }
-
-            if ($targetGroupId) {
-                $where += @{ targetId = $targetGroupId }
-            }
-            elseif ($Global) {
-                $where += @{ targetId = $null }
-            }
-        }
-
-        $boxes = Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit
-        if (-NOT $boxes -AND $Id) {
-            Write-Error "No Box with id $Id"
-            return
-        }
-        $TargetGroups = Get-ICTargetGroup -NoLimit:$NoLimit
-        $boxes | % {
-            if ($_.targetId) {
-                $tgid = $_.targetId
-                $tg = $TargetGroups | where { $_.id -eq $tgid }
-                if ($tg) {
-                    $_ | Add-Member -MemberType "NoteProperty" -name "targetGroup" -value $tg.name
-                } else {
-                    $_ | Add-Member -MemberType "NoteProperty" -name "targetGroup" -value "Deleted"
-                }
-            } else {
-                $_ | Add-Member -MemberType "NoteProperty" -name "targetGroup" -value "All"
-            }
-        }
-        if ($IncludeDeleted) {
-            Write-Verbose "Including deleted Target Groups"
-            $boxes
-        } else {
-            $boxes | where { $_.targetGroup -ne "Deleted" }
-        }
-    }
-}
-
 
 function Get-ICAgent {
     [cmdletbinding()]
     param(
         [parameter(ValueFromPipelineByPropertyName)]
-        [alias('AgentId')]
+        [alias('agentId')]
         [String]$Id,
 
+        [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
+        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
         [String[]]$order,
         [Switch]$NoLimit,
         [Switch]$CountOnly
@@ -456,6 +399,8 @@ function Get-ICAgent {
 
     PROCESS {
         if ($Id) {
+            $Order = $null
+            $CountOnly = $False
             $Endpoint = "Agents/$Id"
         } else {
             $Endpoint = "Agents"
@@ -499,6 +444,7 @@ function New-ICQuery {
         [String]$Name,
 
         [parameter(Mandatory=$True)]
+        [alias('targetId')]
         [String]$TargetGroupId,
 
         [parameter(Mandatory=$True)]
@@ -537,14 +483,16 @@ function Get-ICQuery {
     [cmdletbinding()]
     param(
         [parameter(ValueFromPipelineByPropertyName)]
-        [alias('QueryId')]
+        [alias('queryId')]
         [String]$Id,
 
         [parameter(ValueFromPipelineByPropertyName)]
         [alias('targetId')]
         [String]$TargetGroupId,
 
+        [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
+        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
         [String[]]$order,
         [Switch]$NoLimit,
         [Switch]$CountOnly
@@ -569,7 +517,7 @@ function Remove-ICQuery {
     param(
         [parameter(Mandatory=$true, ValueFromPipelineByPropertyName)]
         [ValidateNotNullOrEmpty()]
-        [alias('QueryId')]
+        [alias('queryId')]
         [String]$Id
     )
 

@@ -52,11 +52,14 @@ function Get-ICFlag {
         [alias('flagId')]
         [String]$Id,
 
+        [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
+        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
         [String[]]$order,
         [Switch]$NoLimit,
         [Switch]$CountOnly
     )
+
     PROCESS {
         if ($FlagId) {
             $Endpoint = "flags/$FlagId"
@@ -156,7 +159,10 @@ function Get-ICExtension {
 
         [Switch]$IncludeBody,
 
+        [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
+        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
+        [String[]]$order,
 
         [Switch]$NoLimit,
         [Switch]$CountOnly
@@ -165,14 +171,15 @@ function Get-ICExtension {
     PROCESS {
         if ($Id) {
             $Endpoint = "extensions/$Id"
+            $CountOnly = $false
+            $order = $null
             if ($IncludeBody) {
-                $CountOnly = $false
                 $Endpoint += "/latestVersion"
             }
         } else {
             $Endpoint = "extensions"
         }
-        Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit -CountOnly:$CountOnly
+        Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
     }
 }
 
@@ -185,7 +192,8 @@ function New-ICExtension {
 
         [parameter(mandatory=$true)]
         [ValidateNotNullorEmpty()]
-        [String]$ScriptBody,
+        [alias('ScriptBody','ExtensionBody')]
+        [String]$Body,
 
         [parameter()]
         [ValidateSet("collection","action")]
@@ -193,10 +201,10 @@ function New-ICExtension {
     )
 
     $Endpoint = "extensions"
-    $body = @{
+    $b = @{
         name = $Name
         type = $Type
-        body = $ScriptBody
+        body = $Body
         active = $true
     }
     Write-Host "Adding new Extension named: $name"
@@ -204,7 +212,7 @@ function New-ICExtension {
     if ($e) {
         Write-Error "There is already an extension named $Name"
     } else {
-        Invoke-ICAPI -Endpoint $Endpoint -body $body -method POST
+        Invoke-ICAPI -Endpoint $Endpoint -body $b -method POST
     }
 }
 
@@ -219,7 +227,8 @@ function Update-ICExtension {
         [String]$Name,
 
         [parameter()]
-        [String]$ScriptBody,
+        [alias('ScriptBody','ExtensionBody')]
+        [String]$Body,
 
         [parameter()]
         [ValidateSet("collection","action")]
@@ -231,14 +240,14 @@ function Update-ICExtension {
     PROCESS {
         $Endpoint = "extensions"
         Write-Host "Updating Extension: $Id"
-        $body = @{
+        $b = @{
             id = $Id
             active = $Active
         }
-        if ($Name) { $body['name'] = $Name }
-        if ($ScriptBody) { $body['body'] = $ScriptBody }
-        if ($Type) { $body['type'] = $Type }
+        if ($Name) { $b['name'] = $Name }
+        if ($Body) { $b['body'] = $Body }
+        if ($Type) { $b['type'] = $Type }
 
-        Invoke-ICAPI -Endpoint $Endpoint -body $body -method PATCH
+        Invoke-ICAPI -Endpoint $Endpoint -body $b -method PATCH
     }
 }

@@ -317,10 +317,9 @@ function Import-ICSurvey {
 		[string[]]$LiteralPath,
 
 		[String]$ScanId,
-
 		[String]$TargetGroupId,
-
-      	[String]$TargetGroupName = "OfflineScans"
+		[alias('TargetGroupName')]
+      	[String]$DefaultTargetGroupName = "OfflineScans"
     )
 
     BEGIN {
@@ -335,23 +334,24 @@ function Import-ICSurvey {
 				scanid = $ScanId
 		    }
   		try {
-  			$objects = Invoke-RestMethod $HuntServerAddress/api/survey -Headers $headers -Method POST -InFile $FilePath -ContentType "application/octet-stream"
+  			Invoke-RestMethod $HuntServerAddress/api/survey -Headers $headers -Method POST -InFile $FilePath -ContentType "application/octet-stream"
   		} catch {
   			throw "$($_.Exception.Message)"
   		}
-  		$objects
   	}
 
 	if ($ScanId) {
 		# Check for existing ScanId and use it
-		$scans = Get-ICScan -NoLimit
-		if ($scans.id -contains $ScanId) {
-			$TargetGroupName = ($Scans | where { $_.scanId -eq $ScanId}).targetList
+		$scan = Get-ICScan -Id $ScanId
+		if ($scan) {
+			$ScanName = $scan.name
+			$TargetGroupName = $Scan.targetList
 		} else {
-			Throw "No scan exists with ScanId $ScanId. Specify an existing ScanId to add this survey result to or use other parameters to generate one."
+			Write-Warning "No scan exists with ScanId $ScanId. Generating one."
 		}
 	}
-	elseif ($TargetGroupId) {
+
+	if ($TargetGroupId) {
 		# Check TargetGroupId and create new ScanId for that group
 		Write-Verbose "Checking for existance of target group with TargetGroupId: '$TargetGroupId' and generating new ScanId"
 		$TargetGroup = Get-ICTargetGroup -id $TargetGroupId
@@ -380,7 +380,7 @@ function Import-ICSurvey {
 	}
 
 	# Creating ScanId
-	if (-NOT $ScanId) {
+	if (-NOT $ScanName) {
 		$ScanName = "Offline-" + (get-date).toString("yyyyMMdd-HHmm")
 		Write-Verbose "Creating scan named $ScanName [$TargetGroupName-$ScanName]..."
 		$StartTime = _Get-ICTimeStampUTC
@@ -390,12 +390,10 @@ function Import-ICSurvey {
 			startedOn = $StartTime
 		}
 		$newscan = Invoke-ICAPI -Endpoint $Endpoint -body $body -Method 'POST'
-		Start-Sleep 1
 		$ScanId = $newscan.id
 	}
 
-
-	   Write-Host "Importing Survey Results into $TargetGroupName-$ScanName [ScanId: $ScanId] [TargetGroupId: $TargetGroupId]"
+	Write-Host "Importing Survey Results into $TargetGroupName-$ScanName [ScanId: $ScanId] [TargetGroupId: $TargetGroupId]"
     }
 
     PROCESS {

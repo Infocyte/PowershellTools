@@ -11,7 +11,9 @@ function Get-ICJob {
 
 		[Switch]$All,
 
-		[HashTable]$where=@{},
+		[parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
+        [HashTable]$where=@{},
+        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
 		[String[]]$order = "createdOn",
 		[Switch]$NoLimit,
 		[Switch]$CountOnly
@@ -20,6 +22,8 @@ function Get-ICJob {
 	PROCESS {
 		$endpoint = 'jobs'
 		if ($Id) {
+			$CountOnly = $false
+			$order = $null
 			$endpoint += "/$Id"
 		}
 		if ($All) {
@@ -41,14 +45,18 @@ function Get-ICUserAuditLog {
 		[parameter(ValueFromPipeline)]
 		[String]$Id,
 
-		[HashTable]$where=@{},
-		[String[]]$order = "createdOn",
+		[parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
+        [HashTable]$where=@{},
+        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
+		[String[]]$order = "createdOn DESC",
 		[Switch]$NoLimit,
 		[Switch]$CountOnly
 	)
 	PROCESS {
 		$endpoint = 'useractivities'
 		if ($Id) {
+			$CountOnly = $false
+			$order = $null
 			$endpoint += "/$Id"
 		}
 		Write-Verbose "Getting User Activity Logs"
@@ -67,8 +75,10 @@ function Get-ICUserTask {
 		[Switch]$Active,
 		[Switch]$IncludeArchived,
 
-		[HashTable]$where=@{},
-		[String[]]$order = "endedOn",
+		[parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
+        [HashTable]$where=@{},
+        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
+		[String[]]$order = "endedOn Desc",
 		[Switch]$NoLimit,
 		[Switch]$CountOnly
 	)
@@ -76,6 +86,8 @@ function Get-ICUserTask {
 	PROCESS {
 		$endpoint = "usertasks"
 		if ($Id) {
+			$CountOnly = $false
+			$order = $null
 			$endpoint += "/$Id"
 		} else {
 			if ($IncludeArchived) {
@@ -84,10 +96,10 @@ function Get-ICUserTask {
 				Write-Verbose "Getting Active User Tasks"
 				$endpoint += "/active"
 			}
-		}
-		if ($Active) {
-			Write-Verbose "Filtering for Running Tasks Only."
-			$where['status'] = "Active"
+			if ($Active) {
+				Write-Verbose "Filtering for Running Tasks Only."
+				$where['status'] = "Active"
+			}
 		}
 
 		Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
@@ -103,10 +115,10 @@ function Get-ICUserTaskItem {
 
 		[Switch]$IncludeProgress,
 
-		[HashTable]$where=@{},
-
-		[String[]]$order = "updatedOn",
-
+		[parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
+        [HashTable]$where=@{},
+        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
+		[String[]]$order = "updatedOn Desc",
 		[Switch]$NoLimit,
 		[Switch]$CountOnly
 	)
@@ -114,6 +126,7 @@ function Get-ICUserTaskItem {
 	PROCESS {
 		$Endpoint = "userTaskItems"
 		if ($_.id -AND $_.userTaskId) {
+			# disambuguation
 			$where['userTaskId'] = $_.userTaskId
 		} else {
 			$where['userTaskId'] = $userTaskId
@@ -145,8 +158,10 @@ function Get-ICUserTaskItemProgress {
 		[alias('id')]
 		[String]$taskItemId,
 
-		[HashTable]$where=@{},
-		[String[]]$order = @("createdOn desc", "id"),
+		[parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
+        [HashTable]$where=@{},
+        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
+		[String[]]$order = "createdOn desc",
 		[Switch]$NoLimit,
 		[Switch]$CountOnly
 	)

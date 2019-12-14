@@ -172,6 +172,17 @@ function Set-ICInstance {
 		}
 	}
 
+	# Set initial default boxId (change with Set-ICBox) and test connection
+	$box = Get-ICBox -Last7 -Global
+	if ($box) {
+		$Global:ICCurrentBox = $box.id
+		Write-Host "`$Global:ICCurrentBox is now set to $($box.targetGroup)-$($box.name) [$($box.id)]"
+	} else {
+		Write-Error "Your connection to $Global:HuntServerAddress failed!"
+		Write-Warning "`nInfocyte API URI: $Global:HuntServerAddress`nToken: $Global:ICToken`nProxy: $Global:Proxy`nProxyUser: $($Global:ICCredentials["ProxyUser"])"
+	}
+
+
 	if ($Save) {
 		Write-Host "Saving Token and Proxy settings to credential file: $credentialfile"
 		$Global:ICCredentials[$Global:HuntServerAddress] = $Global:ICToken
