@@ -1,5 +1,4 @@
 
-
 function Get-ICFlagColors {
     Write-Host -ForegroundColor Red "red"
     Write-Host -ForegroundColor Blue "blue"
@@ -61,8 +60,8 @@ function Get-ICFlag {
     )
 
     PROCESS {
-        if ($FlagId) {
-            $Endpoint = "flags/$FlagId"
+        if ($Id) {
+            $Endpoint = "flags/$Id"
         } else {
             $Endpoint = "flags"
         }
@@ -196,23 +195,29 @@ function New-ICExtension {
         [String]$Body,
 
         [parameter()]
+        [String]$Description,
+
+        [parameter()]
         [ValidateSet("collection","action")]
-        [String]$Type='action'
+        [String]$Type='action',
+
+        [Switch]$Active
     )
 
     $Endpoint = "extensions"
-    $b = @{
+    $bd = @{
         name = $Name
         type = $Type
         body = $Body
-        active = $true
+        description = $Description
+        active = $Active
     }
     Write-Host "Adding new Extension named: $name"
-    $e = Get-ICExtension -where @{ name = $Name; deleted = $False }
-    if ($e) {
+    $ext = Get-ICExtension -where @{ name = $Name; deleted = $False }
+    if ($ext) {
         Write-Error "There is already an extension named $Name"
     } else {
-        Invoke-ICAPI -Endpoint $Endpoint -body $b -method POST
+        Invoke-ICAPI -Endpoint $Endpoint -body $bd -method POST
     }
 }
 
@@ -231,6 +236,9 @@ function Update-ICExtension {
         [String]$Body,
 
         [parameter()]
+        [String]$Description,
+
+        [parameter()]
         [ValidateSet("collection","action")]
         [String]$Type,
 
@@ -239,15 +247,45 @@ function Update-ICExtension {
 
     PROCESS {
         $Endpoint = "extensions"
-        Write-Host "Updating Extension: $Id"
+        $ext = Get-ICExtension -id $Id
+        if ($ext) {
+            Write-Verbose "Extension found: `n$($ext | converto-json)"
+        } else {
+            Write-Error "Extension with id $id not found!"
+            return
+        }
         $b = @{
             id = $Id
-            active = $Active
         }
-        if ($Name) { $b['name'] = $Name }
-        if ($Body) { $b['body'] = $Body }
-        if ($Type) { $b['type'] = $Type }
+        if ($Name) { $b['name'] = $Name } else { $b['name'] = $ext.name}
+        if ($Body) { $b['body'] = $Body } else { $b['body'] = $ext.body }
+        if ($Description) { $b['description'] = $Description } else { $b['description'] = $ext.description }
+        if ($Type) { $b['type'] = $Type } else { $b['type'] = $ext.type }
+        if ($Active) { $b['active'] = $Active } else { $b['active'] = $ext.active }
 
-        Invoke-ICAPI -Endpoint $Endpoint -body $b -method PATCH
+        Write-Host "Updating Extension: $ext [$Id]"
+        Invoke-ICAPI -Endpoint $Endpoint -body $b -method POST
+    }
+}
+
+function Remove-ICExtension {
+    [cmdletbinding(SupportsShouldProcess)]
+    Param(
+        [parameter(Mandatory=$true, ValueFromPipelineByPropertyName)]
+        [ValidateNotNullorEmpty()]
+        [alias('extensionId')]
+        [String]$Id
+    )
+    PROCESS {
+        $Endpoint = "extensions/$Id"
+        $ext = Get-ICExtension -id $Id
+        if (-NOT $ext) {
+            Write-Error "Extension with id $id not found!"
+            return
+        }
+        if ($PSCmdlet.ShouldProcess($Id, "Will remove $($ext.name) with extensionId '$Id'")) {
+            Write-Host "Removing $($ext.name) with extensionId '$Id'"
+            Invoke-ICAPI -Endpoint $Endpoint -method DELETE
+        }
     }
 }

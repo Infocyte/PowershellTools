@@ -1,13 +1,58 @@
 # Scan APIs
 
+
+function Get-ICScan {
+    [cmdletbinding()]
+    param(
+        [parameter(ValueFromPipelineByPropertyName)]
+        [alias('scanId')]
+        [String]$Id,
+
+        [parameter(ValueFromPipelineByPropertyName)]
+        [alias('targetId')]
+        [String]$TargetGroupId,
+
+        [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
+        [HashTable]$where=@{},
+        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
+        [String[]]$order = "completedOn desc",
+        [Switch]$NoLimit,
+        [Switch]$CountOnly
+    )
+
+    PROCESS {
+        $Endpoint = "scans"
+
+        if ($Id -AND (-NOT $_.targetId)) {
+            Write-Verbose "Getting Scan with Id $Id"
+            $CountOnly = $false
+            $order = $null
+            $Endpoint += "/$Id"
+        }
+        elseif ($TargetGroupId) {
+            $tg = Get-ICTargetGroup -Id $TargetGroupId
+            if ($tg) {
+                Write-Verbose "Getting Scans against Target Group $TargetGroup [$TargetGroupId]"
+                $where += @{ targetId = TargetGroupId }
+            } else {
+                Write-Error "TargetGroup with Id $TargetGroupId does not exist."
+                return
+            }
+        }
+
+        Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
+    }
+}
+
 function Invoke-ICFindHosts {
 	[cmdletbinding()]
 	param(
 		[parameter(Mandatory=$true)]
 		[ValidateNotNullOrEmpty()]
+		[alias('targetId')]
 		[String]$TargetGroupId,
 
-		[String]$QueryId
+		[String]$queryId
 	)
 	$TargetGroup = Get-ICTargetGroup -Id $TargetGroupId
 	$Queries = Get-ICQuery -TargetGroupId $TargetGroupId
@@ -54,9 +99,9 @@ function Invoke-ICScan {
 			Start-Sleep 10
 			$taskstatus = Get-ICUserTask -Id $UserTask.userTaskId
 			if ($taskstatus.status -eq "Active") {
-					Write-Host "Waiting on Discovery. Progress: $($taskstatus.progress)%"
+				Write-Host "Waiting on Discovery. Progress: $($taskstatus.progress)%"
 			} elseif ($taskstatus.status -eq "Completed") {
-					$stillactive = $false
+				$stillactive = $false
 			} else {
 				Throw "Something went wrong in enumeration. Last Status: $($taskstatus.status)"
 			}
@@ -64,7 +109,7 @@ function Invoke-ICScan {
 
 	}
 	$Endpoint = "targets/$TargetGroupId/scan"
-	Write-Verbose "Starting Scan of TargetGroup $($TargetGroup.name)"
+	Write-Host "Starting Scan of TargetGroup $($TargetGroup.name)"
     $body = @{ options = $ScanOptions }
 	Invoke-ICAPI -Endpoint $Endpoint -body $body -method POST
 }
@@ -72,7 +117,7 @@ function Invoke-ICScan {
 function Invoke-ICScanTarget {
 	[cmdletbinding()]
 	param(
-		[parameter(Mandatory=$true)]
+		[parameter(Mandatory=$true, ValueFromPipeline)]
 		[ValidateNotNullOrEmpty()]
 		[String]$target,
 
@@ -87,75 +132,81 @@ function Invoke-ICScanTarget {
 
         [PSObject]$ScanOptions
 	)
+	PROCESS {
+		if (-NOT $target -AND $_) {
+			Write-Debug "Taking input from raw pipeline (`$_): $_."
+			$target = $_
+		}
+		$body = @{
+	        target = $target
+	    }
 
-    $body = @{
-        target = $target
-    }
-
-	# Select Target targetgroup
-	if ($TargetGroupId) {
-		$TargetGroup = Get-ICTargetGroup -Id $TargetGroupId
-		if (-NOT $TargetGroup) {
-			Throw "TargetGroup with id $TargetGroupid does not exist!"
+		# Select Target targetgroup
+		if ($TargetGroupId) {
+			$TargetGroup = Get-ICTargetGroup -Id $TargetGroupId
+			if (-NOT $TargetGroup) {
+				Throw "TargetGroup with id $TargetGroupid does not exist!"
+			} else {
+	            $body['targetGroup'] = @{ id = $targetGroupId}
+	        }
 		} else {
-            $body['targetGroup'] = @{ id = $targetGroupId}
-        }
-	} else {
-        Write-Verbose "Using Target Group Name [$TargetGroupName] -- will be created if it does not exist."
-        $body['targetGroup'] = @{ name = $TargetGroupName}
-    }
+	        Write-Verbose "Using Target Group Name [$TargetGroupName] -- will be created if it does not exist."
+	        $body['targetGroup'] = @{ name = $TargetGroupName}
+	    }
 
-	# Select Credential
-	if ($CredentialId) {
-		$Credential = Get-ICCredential -Id $credentialId
-		if (-NOT $Credential) {
-			Throw "Credential with id $credentialId does not exist!"
+		# Select Credential
+		if ($CredentialId) {
+			$Credential = Get-ICCredential -Id $credentialId
+			if (-NOT $Credential) {
+				Throw "Credential with id $credentialId does not exist!"
+			} else {
+	            $body['credential'] = @{ id = $credentialId }
+	        }
 		} else {
-            $body['credential'] = @{ id = $credentialId }
-        }
-	} else {
-        # Use Credentialname
-        $Credential =  Get-ICCredential | where { $_.name -eq $CredentialName }
-		if (-NOT $CredentialName) {
-			Throw "Credential with name [$CredentialName] does not exist! Please create it or specify a different credential (referenced by id or name)"
-            return
-  	    }
-        $body['credential'] = @{ name = $CredentialName }
-    }
+	        # Use Credentialname
+	        $Credential =  Get-ICCredential | where { $_.name -eq $CredentialName }
+			if (-NOT $CredentialName) {
+				Throw "Credential with name [$CredentialName] does not exist! Please create it or specify a different credential (referenced by id or name)"
+	            return
+	  	    }
+	        $body['credential'] = @{ name = $CredentialName }
+	    }
 
-    # Select Credential
-    if ($sshCredentialId) {
-        $body['sshcredential'] = @{ id = $credentialId }
-    } elseif ($sshCredentialName) {
-        $body['sshcredential'] = @{ name = $sshCredentialName }
-    }
+	    # Select Credential
+	    if ($sshCredentialId) {
+	        $body['sshcredential'] = @{ id = $credentialId }
+	    } elseif ($sshCredentialName) {
+	        $body['sshcredential'] = @{ name = $sshCredentialName }
+	    }
 
-    if ($ScanOptions) {
-    	$body['options'] = $ScanOptions
-    }
+	    if ($ScanOptions) {
+	    	$body['options'] = $ScanOptions
+	    }
 
-	# Initiating Scan
-	$Endpoint = "targets/scan"
-	Write-Verbose "Starting Scan of target $($target)"
-	Invoke-ICAPI -Endpoint $Endpoint -body $body -method POST
+		# Initiating Scan
+		$Endpoint = "targets/scan"
+		Write-Verbose "Starting Scan of target $($target)"
+		Invoke-ICAPI -Endpoint $Endpoint -body $body -method POST
+	}
 }
 
 function New-ICScanOptions {
     param(
-        [parameter(ValueFromPipeLine=$true)]
+        [parameter(ValueFromPipeLine)]
+		[ValidatePattern("[A-Z0-9]{8}-([A-Z0-9]{4}-){3}[A-Z0-9]{12}")]
         [String[]]$ExtensionIds,
 
         [Switch]$ExtensionsOnly
     )
     BEGIN {
-        $Ids = @()
+        $ExtIds = @()
     }
     PROCESS {
-        $Ids += $_
+        $ExtIds += $_
     }
     END {
-        if (-NOT $Ids) {
-            $Ids = $ExtensionIds
+        if (-NOT $ExtIds) {
+            $ExtIds = $ExtensionIds
         }
     	Write-Host 'ScanOption object properties should be set ($True or $False) and then passed into Invoke-ICScan or Add-ICScanSchedule'
         if ($ExtensionsOnly) {
@@ -172,7 +223,7 @@ function New-ICScanOptions {
     		EnableArtifact = $default
     		EnableAutostart = $default
     		EnableApplication = $default
-    		EnableHook = $default
+    		EnableHook = $false
     		EnableNetwork = $default
             EnableEventLog = $default
     		EnableLogDelete = $true
@@ -224,6 +275,7 @@ function Add-ICScanSchedule {
 function Get-ICScanSchedule {
     [cmdletbinding()]
     param(
+		[String]$Id,
         [String]$TargetGroupId,
         [HashTable]$where=@{},
         [String[]]$order = @("relatedId")
@@ -261,35 +313,38 @@ function Remove-ICScanSchedule {
 			ValueFromPipeline,
 			ValueFromPipelineByPropertyName
 		)]
-		[ValidateNotNullOrEmpty()]
-		[string]$scheduleId,
+		[ValidatePattern("[A-Z0-9]{8}-([A-Z0-9]{4}-){3}[A-Z0-9]{12}")]
+		[alias('scheduleId')]
+		[string]$Id,
 
-		[parameter(
-			Mandatory,
-			ParameterSetName  = 'TargetGroupId'
-		)]
+		[parameter(Mandatory, ParameterSetName  = 'targetGroupId')]
 		[ValidateNotNullOrEmpty()]
 		[Alias("targetId")]
 		$targetGroupId
 	)
-
-	$Schedules = Get-ICScanchedule
-	if ($ScheduleId) {
-		$schedule = $Schedules | where { $_.id -eq $ScheduleId}
+	PROCESS {
+		if (-NOT $Id -AND $_ ) {
+			Write-Debug "Taking input from raw pipeline (`$_): $_."
+			$Id = $_
+		}
+		$Schedules = Get-ICScanSchedule
+		if ($Id) {
+			$schedule = $Schedules | where { $_.id -eq $Id}
+		}
+		elseif ($TargetGroupId) {
+			$schedule = $Schedules | where { $_.relatedId -eq $TargetGroupId}
+			$ScheduleId	= $schedule.id
+		} else {
+			throw "Incorrect input!"
+		}
+		$tgname = $schedule.targetGroup
+		if (-NOT $tgname) { throw "TargetGroupId not found!"}
+		$Endpoint = "scheduledJobs/$ScheduleId"
+	    if ($PSCmdlet.ShouldProcess($Id, "Will remove schedule from $tgname")) {
+	    	Write-Warning "Unscheduling collection for Target Group $tgname"
+	    	Invoke-ICAPI -Endpoint $Endpoint -method DELETE
+	    }
 	}
-	elseif ($TargetGroupId) {
-		$schedule = $Schedules | where { $_.relatedId -eq $TargetGroupId}
-		$ScheduleId	= $schedule.id
-	} else {
-		throw "Incorrect input!"
-	}
-	$tgname = $schedule.targetGroup
-	if (-NOT $tgname) { throw "TargetGroupId not found!"}
-	$Endpoint = "scheduledJobs/$ScheduleId"
-    if ($PSCmdlet.ShouldProcess($Id, "Will remove schedule from $tgname")) {
-    	Write-Warning "Unscheduling collection for Target Group $tgname"
-    	Invoke-ICAPI -Endpoint $Endpoint -method DELETE
-    }
 }
 
 function Import-ICSurvey {

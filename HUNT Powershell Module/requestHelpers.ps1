@@ -60,30 +60,39 @@ function Get-ICAPI {
     }
 
     if ($Endpoint -match "/count$") {
+        # if it matches /count or an id guid, there is no count
         $CountOnly = $true
         # JSON Stringify the where on body
         $body['where'] = $where | ConvertTo-JSON -Depth 10 -Compress
     }
     elseif ($CountOnly) {
         $url += "/count"
-        # JSON Stringify the where on body
         $body['where'] = $where | ConvertTo-JSON -Depth 10 -Compress
+    }
+    elseif ($Endpoint -match "[A-Z0-9]{8}-([A-Z0-9]{4}-){3}[A-Z0-9]{12}$") {
+        # Querying a single object. Don't try to count.
+        $body['filter'] = $filter | ConvertTo-JSON -Depth 10 -Compress
+        $total = 1
     }
     else {
         $body['where'] = $where | ConvertTo-JSON -Depth 10 -Compress
         $tcnt = Invoke-RestMethod "$url/count" -body $body -Method GET -ContentType 'application/json' -Proxy $Global:Proxy -ProxyCredential $Global:ProxyCredential
         $total = [int]$tcnt.'count'
         if ($NoLimit -AND ($total -ge $Globallimit)) {
-            Write-Warning "Your filter will return $total objects! If you continue you will be limited to $GlobalLimit results"
-            Write-Warning "Performance on the database degrades when trying to pull a lot of objects."
-            Write-Warning "Try refining your query further with a 'where' filter or ask Infocyte for a data export by emailing support@infocyte.com."
-            Read-Host -Prompt "Press any key to continue or CTRL+C to quit"
+            Write-Warning "Your filter will return $total objects! You are limited to $GlobalLimit results per query."
+            Write-Host -ForegroundColor Yellow -BackgroundColor Black "`tDatabase performance can be severely degraded in large queries."
+            Write-Host -ForegroundColor Yellow -BackgroundColor Black "`tTry refining your query further with a 'where' filter or"
+            Write-Host -ForegroundColor Yellow -BackgroundColor Black "`task Infocyte for a data export by emailing support@infocyte.com."
+            Read-Host -Prompt " Press any key to continue pulling first $GlobalLimit or CTRL+C to quit"
         }
         elseif ($NoLimit) {
             Write-Verbose "Retrieving $total objects that match this filter."
         }
-        else {
-            Write-Warning "Found $total objects with this filter. Returning first $resultlimit. Use a tighter 'where' filter or the -NoLimit switch to get more."
+        elseif ($total -gt $resultlimit) {
+            Write-Warning "Found $total objects with this filter. Returning first $resultlimit."
+            Write-Host -ForegroundColor Yellow -BackgroundColor Black "`tUse a tighter 'where' filter or the -NoLimit switch to get more."
+        } else {
+            Write-Verbose "Found $total objects with this filter."
         }
         # JSON Stringify the filter on body
         $body.remove('where') | Out-Null
@@ -109,7 +118,7 @@ function Get-ICAPI {
             Write-Debug "Last Request: $($e.ToString("#.#"))ms"
         } catch {
             Write-Error "ERROR: $($_.Exception.Message)"
-            #return
+            return
         }
 
         if ($CountOnly) {
@@ -134,9 +143,7 @@ function Get-ICAPI {
                 $more = $false
             }
             elseif ($count -ge $Globallimit) {
-                Write-Warning "Reached Global Limit: $GlobalLimit"
-                Write-Warning "Performance on the database seriously degrades when trying to pull more than $Globallimit objects"
-                Write-Warning "Try refining your query with a 'where' filter."
+                Write-Warning "Reached Global Limit of $GlobalLimit results."
                 $more = $false
             }
             # Set up next Page
@@ -145,6 +152,7 @@ function Get-ICAPI {
             $filter['skip'] = $skip
             $body['filter'] = $filter | ConvertTo-JSON -Depth 10 -Compress
         } else {
+            # No more results
             $more = $false
         }
     }
@@ -202,10 +210,10 @@ function Invoke-ICAPI {
 	}
     if ($Method -like "DELETE") {
         if ($Result.'count') {
-            Write-Verbose "DELETE action was successful.[$($Result.'count')]"
+            Write-Host "DELETE action was successful.[$($Result.'count')]"
             return $true
         } else {
-            Write-Warning "DELETE action returned [$Result]"
+            Write-Warning "DELETE action returned unexpected result: $Result"
             return
         }
     }
@@ -213,7 +221,8 @@ function Invoke-ICAPI {
 	if ($Result) {
 		Write-Output $Result
 	} else {
-		return $null
+        Write-Verbose "Nothing returned from call."
+		return
 	}
 }
 

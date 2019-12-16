@@ -338,50 +338,6 @@ function Remove-ICAddress {
     }
 }
 
-
-function Get-ICScan {
-    [cmdletbinding()]
-    param(
-        [parameter(ValueFromPipelineByPropertyName)]
-        [alias('scanId')]
-        [String]$Id,
-
-        [parameter(ValueFromPipelineByPropertyName)]
-        [alias('targetId')]
-        [String]$TargetGroupId,
-
-        [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
-        [HashTable]$where=@{},
-        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
-        [String[]]$order = "completedOn desc",
-        [Switch]$NoLimit,
-        [Switch]$CountOnly
-    )
-
-    PROCESS {
-        $Endpoint = "scans"
-
-        if ($Id -AND (-NOT $_.targetId)) {
-            Write-Verbose "Getting Scan with Id $Id"
-            $CountOnly = $false
-            $order = $null
-            $Endpoint += "/$Id"
-        }
-        elseif ($TargetGroupId) {
-            $tg = Get-ICTargetGroup -Id $TargetGroupId
-            if ($tg) {
-                Write-Verbose "Getting Scans against Target Group $TargetGroup [$TargetGroupId]"
-                $where += @{ targetId = TargetGroupId }
-            } else {
-                Write-Error "TargetGroup with Id $TargetGroupId does not exist."
-                return
-            }
-        }
-
-        Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
-    }
-}
-
 function Get-ICAgent {
     [cmdletbinding()]
     param(

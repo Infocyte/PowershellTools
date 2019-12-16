@@ -36,6 +36,9 @@ function Get-ICObject {
         [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
         [String[]]$order,
 
+        [parameter(HelpMessage="The field or fields to return.")]
+        [String[]]$fields,
+
         [Switch]$NoLimit
     )
 
@@ -91,7 +94,7 @@ function Get-ICObject {
                     $cnt += $c
                 } else {
                     Write-Verbose "Querying $_"
-                    Get-ICObject -Type $_ -BoxId $BoxId -where $where -NoLimit:$NoLimit -AllInstances:$AllInstances
+                    Get-ICObject -Type $_ -BoxId $BoxId -where $where -fields $fields -NoLimit:$NoLimit -AllInstances:$AllInstances
                 }
             }
             if ($CountOnly) {
@@ -109,10 +112,9 @@ function Get-ICObject {
     if ($Type -ne 'File') {
         if ($Id) {
             $CountOnly = $false
-            $order = $Null
             $Endpoint += "/$id"
         }
-        Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
+        Get-ICAPI -Endpoint $Endpoint -where $where -order $order -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly
     }
 }
 
@@ -191,12 +193,16 @@ function Get-ICVulnerability {
 # Get Full FileReport on an object by sha1
 function Get-ICFileDetail {
     Param(
-        [parameter(Mandatory=$true, ValueFromPipelineByPropertyName)]
-        [ValidateNotNullorEmpty()]
+        [parameter(Mandatory=$true, ValueFromPipeline, ValueFromPipelineByPropertyName)]
+        [ValidatePattern("\b[0-9a-f]{40}\b")]
         [alias('fileRepId')]
         [String]$sha1
     )
     PROCESS {
+        if (-NOT $sha1 -AND $_) {
+            Write-Debug "Taking input from raw pipeline (`$_): $_."
+            $sha1 = $_
+        }
         Write-Verbose "Requesting FileReport on file with SHA1: $sha1"
         Get-ICAPI -Endpoint "FileReps/$sha1"
     }
@@ -206,8 +212,10 @@ function Get-ICFileDetail {
 function Get-ICAlert {
     [cmdletbinding()]
     param(
-        [parameter(ValueFromPipelineByPropertyName)]
+        [parameter(ValueFromPipeline, ValueFromPipelineByPropertyName)]
+        [ValidatePattern("[A-Z0-9]{8}-([A-Z0-9]{4}-){3}[A-Z0-9]{12}")]
         [String]$Id,
+
         [Switch]$IncludeArchived,
         [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
@@ -218,8 +226,14 @@ function Get-ICAlert {
     )
 
     PROCESS {
+        if (-NOT $Id -AND $_ ) {
+            Write-Debug "Taking input from raw pipeline (`$_): $_."
+            $Id = $_
+        }
         $Endpoint = "AlertDetails"
         if ($Id) {
+            $CountOnly = $false
+
             $Endpoint += "/$Id"
         }
         if (-NOT ($IncludeArchived -OR $Where['archived'])) {
@@ -233,8 +247,10 @@ function Get-ICReport {
     [cmdletbinding()]
     param(
         [parameter(ValueFromPipelineByPropertyName)]
-        [alias('ReportId')]
+        [ValidatePattern("[A-Z0-9]{8}-([A-Z0-9]{4}-){3}[A-Z0-9]{12}")]
+        [alias('reportId')]
         [String]$Id,
+
         [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
         [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
@@ -245,6 +261,7 @@ function Get-ICReport {
 
     PROCESS {
         if ($Id) {
+            $CountOnly = $False
             $Endpoint = "Reports/$Id"
         } else {
             $Endpoint = "Reports"
@@ -258,6 +275,9 @@ function Get-ICReport {
 function Get-ICActivityTrace {
     [cmdletbinding()]
     param(
+        [parameter()]
+        [String]$Id,
+
         [parameter(ValueFromPipelineByPropertyName)]
         [String]$accountId,
 
@@ -286,17 +306,53 @@ function Get-ICActivityTrace {
     }
     PROCESS {
         $Endpoint = "activity"
+        if ($Id) {
+            $CountOnly = $false
+            $Endpoint += "/$Id"
+        } else {
+            if ($SHA1) {
+                $where['fileRepId'] = $SHA1
+            }
+            if ($AccountId) {
+                $where['accountId'] = $AccountId
+            }
+            if ($HostId) {
+                $where['hostId'] = $HostId
+            }
+        }
+        Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
+    }
+}
 
-        if ($SHA1) {
-            $where['fileRepId'] = $SHA1
-        }
-        if ($AccountId) {
-            $where['accountId'] = $AccountId
-        }
-        if ($HostId) {
-            $where['hostId'] = $HostId
-        }
+function Get-ICDwellTime {
+    [cmdletbinding()]
+    param(
+        [parameter()]
+        [String]$Id,
 
+        [parameter(ValueFromPipeline, ValueFromPipelineByPropertyName)]
+        [ValidatePattern("[0-9a-f]{40}")]
+        [alias('fileRepId')]
+        [String]$Sha1,
+
+        [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
+        [HashTable]$where=@{},
+        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
+        [String[]]$order="dwellDays DESC",
+        [Switch]$NoLimit,
+        [Switch]$CountOnly
+    )
+
+    PROCESS {
+        $Endpoint = "fileDwellTimes"
+        if ($Id) {
+            $CountOnly = $False
+            $Endpoint += "/$Id"
+        } else {
+            if ($sha1) {
+                $where['fileRepId'] = $Sha1
+            }
+        }
         Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
     }
 }
@@ -304,11 +360,12 @@ function Get-ICActivityTrace {
 function Get-ICBox {
     [cmdletbinding()]
     param(
-        [parameter(ValueFromPipelineByPropertyName)]
+        [parameter()]
+        [ValidatePattern("[A-Z0-9]{8}-([A-Z0-9]{4}-){3}[A-Z0-9]{12}")]
         [alias('BoxId')]
         [String]$Id,
 
-        [parameter(ValueFromPipelineByPropertyName)]
+        [parameter()]
         [alias('targetId')]
         [String]$targetGroupId,
 
@@ -317,65 +374,67 @@ function Get-ICBox {
         [Switch]$Last30,
         [Switch]$Last90,
 
-        [Switch]$IncludeDeleted,
+        [Switch]$IncludeArchive,
         [Switch]$NoLimit
     )
 
-    PROCESS {
-        $Endpoint = "Boxes"
-        if ($Id -AND (-NOT $_.targetId) ) {
-            $Endpoint += "/$Id"
-        } else {
-            if ($Last90) {
-                $where += @{ name = "Last 90 days" }
-            }
-            elseif ($Last30) {
-                $where += @{ name = "Last 30 days" }
-            }
-            elseif ($Last7) {
-                $where += @{ name = "Last 7 days" }
-            }
-
-            if ($targetGroupId) {
-                $where += @{ targetId = $targetGroupId }
-            }
-            elseif ($Global) {
-                $where += @{ targetId = $null }
-            }
+    $Endpoint = "Boxes"
+    if ($Id) {
+        $Endpoint += "/$Id"
+    } else {
+        if ($Last90) {
+            $where += @{ name = "Last 90 days" }
+        }
+        elseif ($Last30) {
+            $where += @{ name = "Last 30 days" }
+        }
+        elseif ($Last7) {
+            $where += @{ name = "Last 7 days" }
         }
 
-        $boxes = Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit
-        if (-NOT $boxes -AND $Id) {
-            Write-Error "No Box with id $Id"
-            return
+        if ($targetGroupId) {
+            $where += @{ targetId = $targetGroupId }
         }
-        $TargetGroups = Get-ICTargetGroup -NoLimit:$NoLimit
-        $boxes | % {
-            if ($_.targetId) {
-                $tgid = $_.targetId
-                $tg = $TargetGroups | where { $_.id -eq $tgid }
-                if ($tg) {
-                    $_ | Add-Member -MemberType "NoteProperty" -name "targetGroup" -value $tg.name
-                } else {
-                    $_ | Add-Member -MemberType "NoteProperty" -name "targetGroup" -value "Deleted"
-                }
+        elseif ($Global) {
+            $where += @{ targetId = $null }
+        }
+    }
+
+    $boxes = Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit
+    if ($Id -AND -NOT $boxes) {
+        Write-Error "No Box with id $Id"
+        return
+    }
+    $TargetGroups = Get-ICTargetGroup -IncludeArchive -NoLimit:$NoLimit
+    $boxes | % {
+        if ($_.targetId) {
+            $tgid = $_.targetId
+            $tg = $TargetGroups | where { $_.id -eq $tgid }
+            if ($tg) {
+                $_ | Add-Member -MemberType "NoteProperty" -name "targetGroup" -value $tg.name
+                $_ | Add-Member -MemberType "NoteProperty" -name "lastScannedOn" -value $tg.lastScannedOn
+                $_ | Add-Member -MemberType "NoteProperty" -name "deleted" -value $tg.deleted
             } else {
-                $_ | Add-Member -MemberType "NoteProperty" -name "targetGroup" -value "All"
+                $_ | Add-Member -MemberType "NoteProperty" -name "targetGroup" -value "Deleted"
+                $_ | Add-Member -MemberType "NoteProperty" -name "deleted" -value $true
             }
-        }
-        if ($IncludeDeleted) {
-            Write-Verbose "Including deleted Target Groups"
-            $boxes
         } else {
-            $boxes | where { $_.targetGroup -ne "Deleted" }
+            $_ | Add-Member -MemberType "NoteProperty" -name "targetGroup" -value "All"
         }
+    }
+    if ($IncludeArchive) {
+        $boxes
+    } else {
+        Write-Verbose "Including deleted Target Groups..."
+        $boxes | where { -NOT $_.deleted -AND $_.targetGroup -ne "Deleted" }
     }
 }
 
 function Set-ICBox {
     [cmdletbinding()]
     param(
-        [parameter(ValueFromPipelineByPropertyName)]
+        [parameter(Mandatory=$true)]
+        [ValidatePattern("[A-Z0-9]{8}-([A-Z0-9]{4}-){3}[A-Z0-9]{12}")]
         [alias('BoxId')]
         [String]$Id
     )

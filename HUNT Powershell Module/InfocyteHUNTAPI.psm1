@@ -8,32 +8,47 @@ if ($PSVersionTable.PSVersion.Major -lt 5) {
 }
 
 function Get-ICHelp {
-    Write-Host "Pass your Hunt Server credentials into Set-ICToken to connect to an instance of HUNT.
-        This will store your login token and server into a global variable for use by the other commands"
+    Write-Host "Pass your Infocyte API Token into Set-ICToken to connect to an instance of Infocyte."
+    Write-Host "`tThis will store your login token and server into a global variable for use by the other commands"
     Write-Host "`n"
     Write-Host "Help:"
     Write-Host -ForegroundColor Cyan "`tGet-ICHelp`n"
-    Write-Host "Development Functions:"
-    Write-Host -ForegroundColor Cyan "`tInvoke-ICExtension, Get-ICAPI, Invoke-ICAPI`n"
+
     Write-Host "Authentication Functions:"
-    Write-Host -ForegroundColor Cyan "`tNew-ICToken (depreciated / On-Prem only), Set-ICInstance (or Set-ICToken)`n"
+    Write-Host -ForegroundColor Cyan "`tNew-ICToken (On-Prem ONLY), Set-ICToken (alias: Set-ICInstance)`n"
+
+    Write-Host "Development Functions:"
+    Write-Host -ForegroundColor Cyan "`tTest-ICExtension, Get-ICAPI, Invoke-ICAPI`n"
+
+    Write-Host "Admin/Misc Functions:"
+    Write-Host -ForegroundColor Cyan "`tNew-ICFlag, Update-ICFlag, Remove-ICFlag, Get-ICFlagColors,`n"
+    Write-Host -ForegroundColor Cyan "`tGet-ICUsers, Get-ICUserAuditLog,"
+    Write-Host -ForegroundColor Cyan "`tNew-ICExtension, Get-ICExtension,"
+    Write-Host -ForegroundColor Cyan "`tAdd-ICComment"
+
     Write-Host "Target Group Management Functions:"
-    Write-Host -ForegroundColor Cyan "`tNew-ICTargetGroup, Get-ICTargetGroup, Remove-ICTargetGroup, New-ICCredential,
-        Get-ICCredential, Remove-ICCredential, New-ICQuery, Get-ICQuery, Remove-ICQuery,
-        Get-ICAddress, Remove-ICAddress, Get-ICAgent, Remove-ICAgent`n"
-    Write-Host "HUNT Server Status Functions:"
-    Write-Host -ForegroundColor Cyan "`tGet-ICUserAuditLog, Get-ICUserTask, Get-ICUserTaskItem`n"
-    Write-Host "Data Export Functions:"
-    Write-Host -ForegroundColor Cyan "`tGet-ICBox, Get-ICScan, Get-ICObject, Get-ICApplication, Get-ICVulnerability,
-        Get-ICAlert, Get-ICActivityTrace, Get-ICFileDetail`n"
+    Write-Host -ForegroundColor Cyan "`tNew-ICTargetGroup, Get-ICTargetGroup, Remove-ICTargetGroup,"
+    Write-Host -ForegroundColor Cyan "`tNew-ICCredential, Get-ICCredential, Remove-ICCredential,"
+    Write-Host -ForegroundColor Cyan "`tNew-ICQuery, Get-ICQuery, Remove-ICQuery,"
+    Write-Host -ForegroundColor Cyan "`tGet-ICAddress, Remove-ICAddress,"
+    Write-Host -ForegroundColor Cyan "`tGet-ICAgent, Remove-ICAgent`n"
+
+    Write-Host "Analysis Data Retrieval Functions:"
+    Write-Host -ForegroundColor Cyan "`tGet-ICBox, Set-ICBox,"
+    Write-Host -ForegroundColor Cyan "`tGet-ICObject (alias: Get-ICData), Get-ICVulnerability,"
+    Write-Host -ForegroundColor Cyan "`tGet-ICAlert, Get-ICFileDetail, Get-ICActivityTrace`n"
+
     Write-Host "Scanning Functions:"
-    Write-Host -ForegroundColor Cyan "`tInvoke-ICScan, Invoke-ICScanTarget, Invoke-ICFindHosts, New-ICScanOptions,
-        Add-ICScanSchedule, Get-ICScanSchedule, Remove-ICScanSchedule`n"
+    Write-Host -ForegroundColor Cyan "`tInvoke-ICFindHosts, New-ICScanOptions,"
+    Write-Host -ForegroundColor Cyan "`tGet-ICScan, Invoke-ICScan, Invoke-ICScanTarget,"
+    Write-Host -ForegroundColor Cyan "`tAdd-ICScanSchedule, Get-ICScanSchedule, Remove-ICScanSchedule`n"
+
+    Write-Host "Task Status Functions:"
+    Write-Host -ForegroundColor Cyan "`tGet-ICUserTask, Get-ICUserTaskItem`n"
+
     Write-Host "Offline Scan Import Functions:"
     Write-Host -ForegroundColor Cyan "`tImport-ICSurvey`n"
-    Write-Host "Admin Functions:"
-    Write-Host -ForegroundColor Cyan "`tNew-ICExtension, Get-ICExtension, Get-ICUsers, Get-ICFlagColors,
-        New-ICFlag, Update-ICFlag, Remove-ICFlag, Add-ICComment`n"
+
     Write-Host "`n"
     Write-Host "FAQ:"
     Write-Host "- Most data within HUNT are tagged and filterable by Scan (" -NoNewLine
