@@ -259,7 +259,7 @@ function Get-ICAddress {
         [String]$Id,
 
         [parameter(ValueFromPipeLine=$true)]
-        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  TargetGroupId should be a guid."} })]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('targetId')]
         [String]$TargetGroupId,
 

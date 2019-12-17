@@ -105,14 +105,13 @@ function Get-ICUserTaskItem {
 	param(
 		[parameter(Mandatory,
 			ParameterSetName="userTaskItem")]
-		[alias('userTaskItemId')]
 		[String]$Id,
 
 		[parameter(Mandatory,
 			ParameterSetName="userTasks",
 			ValueFromPipeline,
 			ValueFromPipelineByPropertyName)]
-		[ValidatePattern("[A-Z0-9]{8}-([A-Z0-9]{4}-){3}[A-Z0-9]{12}")]
+		[ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
 		[String]$userTaskId,
 
 		[parameter()]
@@ -129,25 +128,11 @@ function Get-ICUserTaskItem {
 
 	PROCESS {
 		$Endpoint = "userTaskItems"
-
+		$PsCmdlet.ParameterSetName
 		if ($PsCmdlet.ParameterSetName -eq 'userTaskItem') {
 			$Endpoint += "/$Id"
+			Write-Verbose "Getting UserTaskItem with userTaskItemId $Id."
 		} else {
-			Write-Verbose $userTaskId
-			if ($userTaskId.GetType().name -eq "PSCustomObject") {
-				Write-Debug "Taking input from raw pipeline (`$_): $_."
-
-				if ($_.userTaskId -match "[A-Z0-9]{8}-([A-Z0-9]{4}-){3}[A-Z0-9]{12}") {
-					$userTaskId = $_.userTaskId
-				}
-				elseif ($_.id -match "[A-Z0-9]{8}-([A-Z0-9]{4}-){3}[A-Z0-9]{12}") {
-					$userTaskId = $_.id
-				}
-				else {
-					Write-Error "Can't parse pipeline input for a userTaskId."
-					return
-				}
-			}
 			$where['userTaskId'] = $userTaskId
 			Write-Verbose "Getting All UserTaskItems with userTaskId $userTaskId."
 		}
@@ -163,10 +148,10 @@ function Get-ICUserTaskItem {
 			$items = Get-ICAPI -Endpoint $Endpoint -where $where -order $order -fields $fields -NoLimit:$NoLimit
 			$items | foreach {
 				$n += 1
-				try { $pc = $n/$cnt } catch { $pc = -1 }
+				try { $pc = [math]::floor($n*100/$cnt) } catch { $pc = -1 }
 				if ($_.id) {
 					$progress = @()
-					Write-Progress -Id 2 -Activity "Enriching with Task Progress Information" -status "[$n of $cnt] Getting progress on $($_.name)" -PercentComplete $pc
+					Write-Progress -Id 1 -Activity "Enriching with Task Progress Information" -status "Getting progress on $($_.name) [$n of $cnt]" -PercentComplete $pc
 					Get-ICUserTaskItemProgress -taskItemId $_.id -fields "createdOn","text" -order "createdOn desc" | foreach {
 						$progress += New-Object PSObject -Property @{
 							createdOn = $_.createdOn

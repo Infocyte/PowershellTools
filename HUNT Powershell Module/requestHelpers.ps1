@@ -117,11 +117,13 @@ function Get-ICAPI {
 
     while ($more) {
         try {
-            $pc = $skip/$total
+            $pc = [math]::floor($skip*100/$total)
         } catch {
             $pc = -1
         }
-        Write-Progress -Id 1 -Activity "Getting Data from Infocyte API" -status "Requesting data from $url [$skip of $total]" -PercentComplete $pc
+        if ($total -gt 25) {
+            Write-Progress -Id 2 -ParentId 1 -Activity "Getting Data from Infocyte API" -status "Requesting data from $url [$skip of $total]" -PercentComplete $pc
+        }
         Write-Debug "Sending $url this Body as 'application/json':`n$($body|convertto-json)"
         $at = $timer.Elapsed
         try {
@@ -173,8 +175,9 @@ function Get-ICAPI {
     $TotalTime = $timer.Elapsed
     $AveTime = ($times | Measure-Object -Average).Average
     $MaxTime = ($times | Measure-Object -Maximum).Maximum
-
-    Write-Progress -Id 1 -Activity "Getting Data from Infocyte API" -Completed
+    if ($total -gt 25) {
+        Write-Progress -Id 2 -ParentId 1 -Activity "Getting Data from Infocyte API" -Completed
+    }
     Write-Verbose "Received $count objects from $url in $($TotalTime.TotalSeconds.ToString("#.####")) Seconds (Page Request times: Ave= $($AveTime.ToString("#"))ms, Max= $($MaxTime.ToString("#"))ms)"
 }
 
