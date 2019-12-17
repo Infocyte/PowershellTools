@@ -1,3 +1,6 @@
+#Variables
+$GUID_REGEX = "^[A-Z0-9]{8}-([A-Z0-9]{4}-){3}[A-Z0-9]{12}$"
+
 Write-Host "Importing Infocyte HUNT API Powershell Module"
 $PS = $PSVersionTable.PSVersion.tostring()
 if ($PSVersionTable.PSVersion.Major -lt 5) {
@@ -24,7 +27,7 @@ function Get-ICHelp {
     Write-Host -ForegroundColor Cyan "`tNew-ICFlag, Update-ICFlag, Remove-ICFlag, Get-ICFlagColors,`n"
     Write-Host -ForegroundColor Cyan "`tGet-ICUsers, Get-ICUserAuditLog,"
     Write-Host -ForegroundColor Cyan "`tNew-ICExtension, Get-ICExtension,"
-    Write-Host -ForegroundColor Cyan "`tAdd-ICComment"
+    Write-Host -ForegroundColor Cyan "`tAdd-ICComment", "Get-ICDwellTime"
 
     Write-Host "Target Group Management Functions:"
     Write-Host -ForegroundColor Cyan "`tNew-ICTargetGroup, Get-ICTargetGroup, Remove-ICTargetGroup,"
@@ -83,7 +86,6 @@ function Get-ICHelp {
 Get-ICHelp
 
 # Read in all ps1 files
-
 . "$PSScriptRoot\requestHelpers.ps1"
 . "$PSScriptRoot\auth.ps1"
 . "$PSScriptRoot\data.ps1"

@@ -65,19 +65,30 @@ function Get-ICAPI {
         # JSON Stringify the where on body
         $body['where'] = $where | ConvertTo-JSON -Depth 10 -Compress
     }
-    elseif ($CountOnly) {
-        $url += "/count"
-        $body['where'] = $where | ConvertTo-JSON -Depth 10 -Compress
-    }
-    elseif ($Endpoint -match "[A-Z0-9]{8}-([A-Z0-9]{4}-){3}[A-Z0-9]{12}$") {
+    elseif ($Endpoint -match "[A-Z0-9]{8}-([A-Z0-9]{4}-){3}[A-Z0-9]{12}$" -OR
+            $Endpoint -match "[0-9a-f]{40}$" -OR
+            $Endpoint -match "/.*\d+$") {
         # Querying a single object. Don't try to count.
+        Write-Debug "$Endpoint matches id filter. Adding filter."
         $body['filter'] = $filter | ConvertTo-JSON -Depth 10 -Compress
         $total = 1
     }
-    else {
+    elseif ($CountOnly) {
+        $url += "/count"
+        Write-Debug "Counting using /count"
         $body['where'] = $where | ConvertTo-JSON -Depth 10 -Compress
-        $tcnt = Invoke-RestMethod "$url/count" -body $body -Method GET -ContentType 'application/json' -Proxy $Global:Proxy -ProxyCredential $Global:ProxyCredential
-        $total = [int]$tcnt.'count'
+    }
+    else {
+        Write-Debug "Counting results first"
+        $body['where'] = $where | ConvertTo-JSON -Depth 10 -Compress
+        Write-Debug "Body:`n$($body|convertto-json)"
+        try {
+            $tcnt = Invoke-RestMethod "$url/count" -body $body -Method GET -ContentType 'application/json' -Proxy $Global:Proxy -ProxyCredential $Global:ProxyCredential
+            $total = [int]$tcnt.'count'
+        } catch {
+            Write-Verbose "Couldn't get a count from $url/count"
+            $total = "Unknown"
+        }
         if ($NoLimit -AND ($total -ge $Globallimit)) {
             Write-Warning "Your filter will return $total objects! You are limited to $GlobalLimit results per query."
             Write-Host -ForegroundColor Yellow -BackgroundColor Black "`tDatabase performance can be severely degraded in large queries."
@@ -88,7 +99,7 @@ function Get-ICAPI {
         elseif ($NoLimit) {
             Write-Verbose "Retrieving $total objects that match this filter."
         }
-        elseif ($total -gt $resultlimit) {
+        elseif ($total -gt $resultlimit -AND $total -ne "Unknown") {
             Write-Warning "Found $total objects with this filter. Returning first $resultlimit."
             Write-Host -ForegroundColor Yellow -BackgroundColor Black "`tUse a tighter 'where' filter or the -NoLimit switch to get more."
         } else {
@@ -109,28 +120,28 @@ function Get-ICAPI {
             $pc = -1
         }
         Write-Progress -Id 1 -Activity "Getting Data from Infocyte API" -status "Requesting data from $url [$skip of $total]" -PercentComplete $pc
+        Write-Debug "Sending $url this Body as 'application/json':`n$($body|convertto-json)"
+        $at = $timer.Elapsed
         try {
-            $at = $timer.Elapsed
             $Objects = Invoke-RestMethod $url -body $body -Method GET -ContentType 'application/json' -Proxy $Global:Proxy -ProxyCredential $Global:ProxyCredential
-            $bt = $timer.Elapsed
-            $e = ($bt - $at).TotalMilliseconds
-            $times += $e
-            Write-Debug "Last Request: $($e.ToString("#.#"))ms"
         } catch {
             Write-Error "ERROR: $($_.Exception.Message)"
             return
         }
+        $bt = $timer.Elapsed
+        $e = ($bt - $at).TotalMilliseconds
+        $times += $e
+        Write-Debug "Last Request: $($e.ToString("#.#"))ms"
 
         if ($CountOnly) {
-            $count = [int]$Objects.'count'
-            Write-Debug "Found $count objects at $url."
-            return $count
+            write-debug $Objects
+            return [int]$Objects.count
         }
-
         if ($Objects) {
             if ($Objects.count) {
                 $count += $Objects.count
             } else {
+                write-debug "Couldn't count $objects. Using 1."
                 $count += 1
             }
 
@@ -152,7 +163,7 @@ function Get-ICAPI {
             $filter['skip'] = $skip
             $body['filter'] = $filter | ConvertTo-JSON -Depth 10 -Compress
         } else {
-            # No more results
+            Write-Debug "No results from last call."
             $more = $false
         }
     }
@@ -198,11 +209,14 @@ function Invoke-ICAPI {
     $url = "$($Global:HuntServerAddress)/api/$Endpoint"
     Write-verbose "Sending $method command to $url"
     Write-verbose "Body: `n$($body | ConvertTo-JSON -Depth 10)"
+    if ($body) {
+        $json = $body | ConvertTo-JSON -Depth 10 -Compress
+    }
 	try {
-		$Result = Invoke-RestMethod -Uri $url -headers $headers -body $body -Method $method -Proxy $Global:Proxy -ProxyCredential $Global:ProxyCredential
+		$Result = Invoke-RestMethod -Uri $url -headers $headers -body $json -Method $method -ContentType 'application/json' -Proxy $Global:Proxy -ProxyCredential $Global:ProxyCredential
 	} catch {
         if ($($_.Exception.Message) -match "422") {
-            Write-Warning "Cannot process request. There may be an index collision on one of the provided fields."
+            Write-Warning "Cannot process request."
             Write-Error "$($_.Exception.Message)"
         } else {
             Write-Error "$($_.Exception.Message)"
@@ -210,7 +224,6 @@ function Invoke-ICAPI {
 	}
     if ($Method -like "DELETE") {
         if ($Result.'count') {
-            Write-Host "DELETE action was successful.[$($Result.'count')]"
             return $true
         } else {
             Write-Warning "DELETE action returned unexpected result: $Result"

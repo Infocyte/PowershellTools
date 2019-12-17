@@ -4,7 +4,7 @@ function Get-ICObject {
     [cmdletbinding()]
     [alias("Get-ICData","Get-ICObjects")]
     param(
-        [parameter(ValueFromPipelineByPropertyName)]
+        [parameter(ValueFromPipeline)]
         [String]$Id,
 
         [parameter(HelpMessage="Data is currently seperated into object-type tables. 'File' will perform a recursive call of all files.")]
@@ -52,7 +52,6 @@ function Get-ICObject {
         "Script"
     )
 
-
     if ($where -AND $where['boxId']) {
         $where['boxId'] = $BoxId
     } else {
@@ -79,6 +78,53 @@ function Get-ICObject {
                 $Endpoint = 'BoxAccountInstancesByHost'
             } else {
                 $Endpoint = 'BoxAccounts'
+            }
+        }
+        "Extension" {
+            if (-NOT $Id) {
+                $fields = @("id", "extensionId", "extensionVersionId","ip","boxId","sha256",
+                "hostScanId","success","threatStatus","compromised","startedOn","endedOn",
+                "createdOn","name","hostId","scanId","scannedOn","hostname","output")
+            }
+            if ($AllInstances) {
+                $Endpoint = 'BoxExtensionInstances'
+
+            } else {
+                $fields = @("extensionId", "extensionVersionId","boxId","sha256",
+                "hostScanId","success","threatStatus","compromised","name","hostId","scanId")
+                Write-Verbose "Aggregate Extensions."
+                $extensioninstances = Get-ICObject -Type "Extension" -BoxId $BoxId -where $where -fields $fields -AllInstances
+                $results = @()
+                $extensioninstances | select $fields | Group-Object extensionId | % {
+                    $props = @{
+                        Id = $_.name # extensionId
+                        name = $_.group[0].name
+                        boxId = $_.group[0].boxId
+                        count = $_.count
+                        hosts = ($_.group | select hostId -unique).hostId.count
+                        success = 0
+                        compromised = $false
+                        Good = 0
+                        'Low Risk' = 0
+                        Unknown = 0
+                        Suspicious = 0
+                        Bad = 0
+                    }
+                    $_.Group | %{
+                        if ($_.success) { $props['success'] += 1}
+                    }
+
+                    $_.group | Group-Object threatStatus | % {
+                        $props[$_.Name] = $_.count
+                    }
+
+                    if ($_.group.compromised -contains $true) {
+                        $props['compromised'] = $true
+                    }
+                    $props['completion'] = ($($props.hosts)/$($_.count)).tostring("P")
+                    $results += New-Object PSObject -property $props
+                }
+                return $results
             }
         }
         "File" {
@@ -121,9 +167,13 @@ function Get-ICObject {
 function Get-ICVulnerability {
     [cmdletbinding()]
     param(
+        [parameter(ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
+        [alias('applicationId')]
+        [String]$Id,
+
+        [Switch]$AllInstances,
         [parameter(HelpMessage={"Boxes are the 7, 30, and 90 day views of target group or global data. Use Set-ICBox to set your default. CurrentDefault: $Global:ICCurrentBox"})]
         [String]$BoxId=$Global:ICCurrentBox,
-        [Switch]$CountOnly,
         [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
         [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
@@ -131,54 +181,94 @@ function Get-ICVulnerability {
         [Switch]$NoLimit
     )
 
-    if ($where -AND $where['boxId']) {
-        $where['boxId'] = $BoxId
-    } else {
-        $where += @{ boxId = $BoxId }
+    BEGIN {
+        if ($where -AND $where['boxId']) {
+            $where['boxId'] = $BoxId
+        } else {
+            $where += @{ boxId = $BoxId }
+        }
+
+        Write-Verbose "Building Application table..."
+        $Apps = @()
     }
 
-    $Endpoint = "ApplicationAdvisories"
-    Write-Verbose "Building Application Advisory table with $where filter..."
-    $appvulns = Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit | sort-object applicationId, cveId -unique
-
-    Write-Verbose "Building Application table..."
-    $apps = Get-ICObjects -Type Application -BoxId $BoxId -where $where -NoLimit:$NoLimit
-
-    if ($apps -AND $appvulns) {
-        $appids = $apps.applicationid | sort-object -unique
-        $appvulns = $appvulns | where { $appids -contains $_.applicationId }
-        $apps = $apps | where { $appvulns.applicationId -contains $_.applicationId }
-    } else {
-        Write-Verbose "No Results found."
-        return
+    PROCESS{
+        if ($Id) {
+            if ($AllInstances) {
+                Write-verbose "Querying for application instances with applicationId: $Id"
+                $a = Get-ICObjects -Type Application -where @{ applicationId = $id } -BoxId $BoxId -AllInstances:$AllInstances
+            } else {
+                Write-verbose "Querying for applications with applicationId: $Id"
+                $a = Get-ICObjects -Id $id -Type Application -BoxId $BoxId
+                if ($a) {
+                    $a | % {
+                        $appid = $_.id
+                        $_ | Add-Member -MemberType "NoteProperty" -name "applicationId" -value $appid
+                    }
+                    Write-Debug $a
+                }
+            }
+            if ($a) {
+                $apps += $a
+            } else {
+                Write-Error "No application found with applicationId: $Id in BoxId: $BoxId"
+                return
+            }
+        } else {
+            if ($AllInstances) {
+                $apps = Get-ICObjects -Type Application -BoxId $BoxId -where $where -NoLimit:$NoLimit -AllInstances:$AllInstances
+            } else {
+                $apps = Get-ICObjects -Type Application -BoxId $BoxId -where $where -NoLimit:$NoLimit
+                $apps | % {
+                    $appid = $_.id
+                    $_ | Add-Member -MemberType "NoteProperty" -name "applicationId" -value $appid
+               }
+            }
+        }
     }
 
-    Write-Verbose "Found $($appids.count) applications and $($appvulns.count) associated advisories. Enriching details for export..."
-    $appvulns | % {
-        $vuln = $_
-        Write-Verbose "Vulnerable App: $($vuln.ApplicationName) cveId: $($vuln.cveId) App id: $($vuln.applicationId)"
-        if ($vuln.cveId) {
-            $cve = Get-ICAPI -Endpoint "Cves/$($vuln.cveId)" -where $where
-            if ($cve) {
-                $vuln | Add-Member -MemberType "NoteProperty" -name "rules" -value $cve.rules
-                $vuln | Add-Member -MemberType "NoteProperty" -name "cwes" -value $cve.cwes
-                $vuln | Add-Member -MemberType "NoteProperty" -name "reference" -value $cve.reference.url
-                if ([bool]($cve.cveimpact.PSobject.Properties.name -match "baseMetricV3")) {
-                    $vuln | Add-Member -MemberType "NoteProperty" -name "cvsstype" -value 3.0
-                    $vuln | Add-Member -MemberType "NoteProperty" -name "severity" -value $cve.impact.baseMetricV3.severity
-                    $vuln | Add-Member -MemberType "NoteProperty" -name "impactScore" -value $cve.impact.baseMetricV3.impactScore
-                    $vuln | Add-Member -MemberType "NoteProperty" -name "exploitabilityScore" -value $cve.impact.baseMetricV3.exploitabilityScore
-                    $vuln | Add-Member -MemberType "NoteProperty" -name "attackVector" -value $cve.impact.baseMetricV3.cvssv3.attackVector
-                    $vuln | Add-Member -MemberType "NoteProperty" -name "attackComplexity" -value $cve.impact.baseMetricV3.cvssv3.attackComplexity
-                    $vuln | Add-Member -MemberType "NoteProperty" -name "authentication" -value $cve.impact.baseMetricV3.cvssv3.authentication
-                } else {
-                    $vuln | Add-Member -MemberType "NoteProperty" -name "cvsstype" -value 2.0
-                    $vuln | Add-Member -MemberType "NoteProperty" -name "severity" -value $cve.impact.baseMetricV2.severity
-                    $vuln | Add-Member -MemberType "NoteProperty" -name "impactScore" -value $cve.impact.baseMetricV2.impactScore
-                    $vuln | Add-Member -MemberType "NoteProperty" -name "exploitabilityScore" -value $cve.impact.baseMetricV2.exploitabilityScore
-                    $vuln | Add-Member -MemberType "NoteProperty" -name "attackVector" -value $cve.impact.baseMetricV2.cvssv2.accessVector
-                    $vuln | Add-Member -MemberType "NoteProperty" -name "attackComplexity" -value $cve.impact.baseMetricV2.cvssv2.accessComplexity
-                    $vuln | Add-Member -MemberType "NoteProperty" -name "authentication" -value $cve.impact.baseMetricV2.cvssv2.authentication
+    END {
+        $where.remove('boxId') | Out-Null
+        $Endpoint = "ApplicationAdvisories"
+        Write-Verbose "Building Application Advisory bridge table with filter: $($where|convertto-json -compress)"
+        $appvulns = Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$true | sort-object applicationId, cveId -unique
+
+        if ($apps -AND $appvulns) {
+            $appids = $apps.applicationid | sort-object -unique
+            $appvulns = $appvulns | where { $appids -contains $_.applicationId }
+            $apps = $apps | where { $appvulns.applicationId -contains $_.applicationId }
+        } else {
+            Write-Verbose "No Results found."
+            return
+        }
+
+        Write-Verbose "Found $($appids.count) applications and $($appvulns.count) associated advisories. Enriching details for export...`n"
+        $appvulns | % {
+            $vuln = $_
+            Write-Verbose "==Vulnerable App: $($vuln.ApplicationName) cveId: $($vuln.cveId) App id: $($vuln.applicationId)"
+            if ($vuln.cveId) {
+                $cve = Get-ICAPI -Endpoint "Cves/$($vuln.cveId)" -where $where
+                if ($cve) {
+                    $vuln | Add-Member -MemberType "NoteProperty" -name "rules" -value $cve.rules
+                    $vuln | Add-Member -MemberType "NoteProperty" -name "cwes" -value $cve.cwes
+                    $vuln | Add-Member -MemberType "NoteProperty" -name "reference" -value $cve.reference.url
+                    if ([bool]($cve.cveimpact.PSobject.Properties.name -match "baseMetricV3")) {
+                        $vuln | Add-Member -MemberType "NoteProperty" -name "cvsstype" -value 3.0
+                        $vuln | Add-Member -MemberType "NoteProperty" -name "severity" -value $cve.impact.baseMetricV3.severity
+                        $vuln | Add-Member -MemberType "NoteProperty" -name "impactScore" -value $cve.impact.baseMetricV3.impactScore
+                        $vuln | Add-Member -MemberType "NoteProperty" -name "exploitabilityScore" -value $cve.impact.baseMetricV3.exploitabilityScore
+                        $vuln | Add-Member -MemberType "NoteProperty" -name "attackVector" -value $cve.impact.baseMetricV3.cvssv3.attackVector
+                        $vuln | Add-Member -MemberType "NoteProperty" -name "attackComplexity" -value $cve.impact.baseMetricV3.cvssv3.attackComplexity
+                        $vuln | Add-Member -MemberType "NoteProperty" -name "authentication" -value $cve.impact.baseMetricV3.cvssv3.authentication
+                    } else {
+                        $vuln | Add-Member -MemberType "NoteProperty" -name "cvsstype" -value 2.0
+                        $vuln | Add-Member -MemberType "NoteProperty" -name "severity" -value $cve.impact.baseMetricV2.severity
+                        $vuln | Add-Member -MemberType "NoteProperty" -name "impactScore" -value $cve.impact.baseMetricV2.impactScore
+                        $vuln | Add-Member -MemberType "NoteProperty" -name "exploitabilityScore" -value $cve.impact.baseMetricV2.exploitabilityScore
+                        $vuln | Add-Member -MemberType "NoteProperty" -name "attackVector" -value $cve.impact.baseMetricV2.cvssv2.accessVector
+                        $vuln | Add-Member -MemberType "NoteProperty" -name "attackComplexity" -value $cve.impact.baseMetricV2.cvssv2.accessComplexity
+                        $vuln | Add-Member -MemberType "NoteProperty" -name "authentication" -value $cve.impact.baseMetricV2.cvssv2.authentication
+                    }
                 }
             }
         }
@@ -194,14 +284,13 @@ function Get-ICVulnerability {
 function Get-ICFileDetail {
     Param(
         [parameter(Mandatory=$true, ValueFromPipeline, ValueFromPipelineByPropertyName)]
-        [ValidatePattern("\b[0-9a-f]{40}\b")]
         [alias('fileRepId')]
         [String]$sha1
     )
     PROCESS {
-        if (-NOT $sha1 -AND $_) {
-            Write-Debug "Taking input from raw pipeline (`$_): $_."
-            $sha1 = $_
+        if ($sha1 -notmatch "\b[0-9a-f]{40}\b") {
+            Write-Error "Incorrect input format. Requires a sha1 (fileRepId) of 40 characters."
+            return
         }
         Write-Verbose "Requesting FileReport on file with SHA1: $sha1"
         Get-ICAPI -Endpoint "FileReps/$sha1"
@@ -212,8 +301,8 @@ function Get-ICFileDetail {
 function Get-ICAlert {
     [cmdletbinding()]
     param(
-        [parameter(ValueFromPipeline, ValueFromPipelineByPropertyName)]
-        [ValidatePattern("[A-Z0-9]{8}-([A-Z0-9]{4}-){3}[A-Z0-9]{12}")]
+        [parameter(ValueFromPipeline)]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [String]$Id,
 
         [Switch]$IncludeArchived,
@@ -226,14 +315,9 @@ function Get-ICAlert {
     )
 
     PROCESS {
-        if (-NOT $Id -AND $_ ) {
-            Write-Debug "Taking input from raw pipeline (`$_): $_."
-            $Id = $_
-        }
         $Endpoint = "AlertDetails"
         if ($Id) {
             $CountOnly = $false
-
             $Endpoint += "/$Id"
         }
         if (-NOT ($IncludeArchived -OR $Where['archived'])) {
@@ -246,8 +330,7 @@ function Get-ICAlert {
 function Get-ICReport {
     [cmdletbinding()]
     param(
-        [parameter(ValueFromPipelineByPropertyName)]
-        [ValidatePattern("[A-Z0-9]{8}-([A-Z0-9]{4}-){3}[A-Z0-9]{12}")]
+        [parameter(ValueFromPipeline=$true)]
         [alias('reportId')]
         [String]$Id,
 
@@ -275,17 +358,17 @@ function Get-ICReport {
 function Get-ICActivityTrace {
     [cmdletbinding()]
     param(
-        [parameter()]
+        [parameter(ValueFromPipeline=$true)]
         [String]$Id,
 
-        [parameter(ValueFromPipelineByPropertyName)]
+        [parameter(ValueFromPipelineByPropertyName=$true)]
         [String]$accountId,
 
-        [parameter(ValueFromPipelineByPropertyName)]
+        [parameter(ValueFromPipelineByPropertyName=$true)]
         [alias('fileRepId')]
         [String]$sha1,
 
-        [parameter(ValueFromPipelineByPropertyName)]
+        [parameter(ValueFromPipelineByPropertyName=$true)]
         [String]$hostId,
 
         [DateTime]$StartTime=(Get-Date).AddDays(-7).ToUniversalTime(),
@@ -297,11 +380,9 @@ function Get-ICActivityTrace {
     )
 
     BEGIN {
-        #if (-NOT $StartTime) { $StartTime = (Get-Date).AddDays(-7) }
-        #if (-NOT $EndTime) { $EndTime = Get-Date }
         $Where['between'] = @(
-            (Get-Date $StartTime -Format "yyyy-MM-dd HH:mm:ss"),
-            (Get-Date $EndTime -Format "yyyy-MM-dd HH:mm:ss")
+            (Get-Date $StartTime -Format "o"),
+            (Get-Date $EndTime -Format "o")
         )
     }
     PROCESS {
@@ -330,8 +411,7 @@ function Get-ICDwellTime {
         [parameter()]
         [String]$Id,
 
-        [parameter(ValueFromPipeline, ValueFromPipelineByPropertyName)]
-        [ValidatePattern("[0-9a-f]{40}")]
+        [parameter(ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
         [alias('fileRepId')]
         [String]$Sha1,
 
@@ -349,8 +429,12 @@ function Get-ICDwellTime {
             $CountOnly = $False
             $Endpoint += "/$Id"
         } else {
-            if ($sha1) {
+            if ($sha1 -match "\b[0-9a-f]{40}\b") {
                 $where['fileRepId'] = $Sha1
+            }
+            else {
+                Write-Error "Incorrect input format. Requires a sha1 (fileRepId) of 40 characters."
+                return
             }
         }
         Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
@@ -361,7 +445,7 @@ function Get-ICBox {
     [cmdletbinding()]
     param(
         [parameter()]
-        [ValidatePattern("[A-Z0-9]{8}-([A-Z0-9]{4}-){3}[A-Z0-9]{12}")]
+        [ValidatePattern("^[A-Z0-9]{8}-([A-Z0-9]{4}-){3}[A-Z0-9]{12}$")]
         [alias('BoxId')]
         [String]$Id,
 
@@ -433,13 +517,17 @@ function Get-ICBox {
 function Set-ICBox {
     [cmdletbinding()]
     param(
-        [parameter(Mandatory=$true)]
-        [ValidatePattern("[A-Z0-9]{8}-([A-Z0-9]{4}-){3}[A-Z0-9]{12}")]
+        [parameter(Mandatory=$true, ValueFromPipeLine=$true)]
+        [ValidatePattern("^[A-Z0-9]{8}-([A-Z0-9]{4}-){3}[A-Z0-9]{12}$")]
         [alias('BoxId')]
         [String]$Id
     )
-    $box = Get-ICbox -id $Id
-    Write-Host "`$Global:ICCurrentBox is now set to $($box.targetGroup)-$($box.name) [$Id]"
-    $Global:ICCurrentBox = $Id
-    return
+    PROCESS {
+        $box = Get-ICbox -id $Id
+        if ($box) {
+            Write-Host "`$Global:ICCurrentBox is now set to $($box.targetGroup)-$($box.name) [$Id]"
+            $Global:ICCurrentBox = $Id
+            return $true
+        }
+    }
 }

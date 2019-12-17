@@ -7,7 +7,10 @@ function New-ICTargetGroup {
         [String]$Name,
 
         [parameter(Mandatory=$false)]
-        [String]$ControllerGroupId
+        [String]$ControllerGroupId,
+
+        [parameter(HelpMessage="Use first available ControllerGroupId if not provided.")]
+        [Switch]$Force
     )
 
     $Endpoint = "targets"
@@ -19,9 +22,12 @@ function New-ICTargetGroup {
         $body['controllerGroupId'] = $ControllerGroupId
     } else {
         $cg = Get-ICControllerGroup
-        if ($cg.count -gt 1) {
+        if ($cg.count -gt 1 -AND $Force) {
+            $body['controllerGroupId'] = ($cg | Sort-Object createdOn -Desc)[0].id
+        }
+        elseif ($cg.count -gt 1) {
             Write-Error "More than one Controller Group. Recommend specifying a ControllerGroupId."
-            Write-Warning "$($cg | ft -auto | out-string)"
+            Write-Warning "Available Options: `n$($cg | ft -auto | out-string)"
             return
         } else {
             $body['controllerGroupId'] = $cg.id
@@ -40,7 +46,7 @@ function New-ICTargetGroup {
 function Get-ICTargetGroup {
     [cmdletbinding()]
     param(
-        [parameter(ValueFromPipelineByPropertyName)]
+        [parameter(ValueFromPipeline=$true)]
         [alias('TargetGroupId','targetId')]
         [String]$Id,
         [Switch]$IncludeArchive,
@@ -69,9 +75,9 @@ function Get-ICTargetGroup {
 }
 
 function Remove-ICTargetGroup {
-    [cmdletbinding(SupportsShouldProcess)]
+    [cmdletbinding(SupportsShouldProcess=$true)]
     param(
-        [parameter(Mandatory=$true, ValueFromPipelineByPropertyName)]
+        [parameter(Mandatory=$true, ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
         [ValidateNotNullOrEmpty()]
         [alias('TargetGroupId','targetId')]
         [String]$Id,
@@ -80,30 +86,17 @@ function Remove-ICTargetGroup {
     )
 
     PROCESS {
-        if ($Id -AND $_.Id -AND $_.targetId) {
-            $obj = Get-ICTargetGroup -id $Id
-            if (-NOT $obj) {
-                Write-Error "No target group with id '$Id' exists. Trying targetId."
-                $obj = Get-ICTargetGroup -id $_.targetId
-                if (-NOT $obj) {
-                    Write-Error "No target group with id '$Id' exists."
-                    return
-                }
-                $Id = $_.targetId
-            }
+        $obj = Get-ICTargetGroup -id $Id
+        if (-NOT $obj) {
+            Write-Error "No target group with id '$Id' exists."
+            return
         }
-
         if ($IncludeArchive) {
             $Endpoint = "TargetsArchive/$Id"
         } else {
             $Endpoint = "targets/$Id"
         }
 
-        $obj = Get-ICTargetGroup -id $Id
-        if (-NOT $obj) {
-            Write-Error "No target group with id '$Id' exists."
-            return
-        }
         Write-Warning "Careful. This will remove access to all scan data within this target group and is only reversible for the next 7 days"
         if ($PSCmdlet.ShouldProcess($tg.name, "Will remove target group: $($obj.name) [$Id]")) {
             Write-Warning "Removing target group: $($obj.name) [$Id]."
@@ -115,7 +108,7 @@ function Remove-ICTargetGroup {
 function New-ICControllerGroup {
     [cmdletbinding()]
     param(
-        [parameter(Mandatory=$true, Position=0)]
+        [parameter(Mandatory=$true)]
         [ValidateNotNullOrEmpty()]
         [String]$Name
     )
@@ -136,7 +129,7 @@ function New-ICControllerGroup {
 function Get-ICControllerGroup {
     [cmdletbinding()]
     param(
-        [parameter(ValueFromPipelineByPropertyName)]
+        [parameter(ValueFromPipeline=$true)]
         [alias('controllerGroupId')]
         [String]$Id,
 
@@ -158,9 +151,9 @@ function Get-ICControllerGroup {
 }
 
 function Remove-ICControllerGroup {
-    [cmdletbinding(SupportsShouldProcess)]
+    [cmdletbinding(SupportsShouldProcess=$true)]
     param(
-        [parameter(Mandatory=$true,ValueFromPipelineByPropertyName)]
+        [parameter(Mandatory=$true, ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
         [ValidateNotNullOrEmpty()]
         [alias('ControllerGroupId')]
         [String]$Id
@@ -179,7 +172,6 @@ function Remove-ICControllerGroup {
         }
     }
 }
-
 
 function New-ICCredential {
     [cmdletbinding()]
@@ -215,7 +207,7 @@ function New-ICCredential {
 function Get-ICCredential {
     [cmdletbinding()]
     param(
-        [parameter(ValueFromPipelineByPropertyName)]
+        [parameter(ValueFromPipeline=$true)]
         [alias('credentialId')]
         [String]$id,
 
@@ -237,9 +229,9 @@ function Get-ICCredential {
 }
 
 function Remove-ICCredential {
-    [cmdletbinding(SupportsShouldProcess)]
+    [cmdletbinding(SupportsShouldProcess=$true)]
     param(
-        [parameter(Mandatory=$true, ValueFromPipelineByPropertyName)]
+        [parameter(Mandatory=$true, ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
         [ValidateNotNullOrEmpty()]
         [alias('credentialId')]
         [String]$Id
@@ -262,11 +254,12 @@ function Remove-ICCredential {
 function Get-ICAddress {
     [cmdletbinding()]
     param(
-        [parameter(ValueFromPipelineByPropertyName)]
+        [parameter()]
         [alias('addressId')]
         [String]$Id,
 
-        [parameter(ValueFromPipelineByPropertyName)]
+        [parameter(ValueFromPipeLine=$true)]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  TargetGroupId should be a guid."} })]
         [alias('targetId')]
         [String]$TargetGroupId,
 
@@ -280,26 +273,28 @@ function Get-ICAddress {
 
     PROCESS {
         $Endpoint = "Addresses"
-        if ($Id -AND (-NOT $_.targetId)) {
+
+        if ($Id) {
             Write-Verbose "Getting Address with id: $Id"
             $Endpoint += "/$Id"
         }
         elseif ($TargetGroupId) {
-            $where += @{ targetId = $Id }
-            Write-Verbose "Getting all Addresses from TargetGroup: $Id"
+            Write-Verbose "Getting all Addresses from TargetGroup: $TargetGroupId"
+            $where += @{ targetId = $TargetGroupId }
         }
+
         Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
     }
 }
 
 function Remove-ICAddress {
-    [cmdletbinding(SupportsShouldProcess)]
+    [cmdletbinding(SupportsShouldProcess=$true)]
     Param(
-        [parameter(ValueFromPipelineByPropertyName)]
+        [parameter(ValueFromPipeLine=$true)]
         [alias('AddressId')]
         [String]$id,
 
-        [parameter(ValueFromPipelineByPropertyName)]
+        [parameter(ValueFromPipelineByPropertyName=$true)]
         [alias('targetId')]
         [String]$TargetGroupId
     )
@@ -307,7 +302,7 @@ function Remove-ICAddress {
     PROCESS {
         $Endpoint = "Addresses"
 
-        if ($Id -AND (-NOT $_.targetId)) {
+        if ($Id) {
             $obj = Get-ICAddress -id $Id
             if (-NOT $obj) {
                 Write-Error "No Address with id '$Id' exists."
@@ -330,7 +325,7 @@ function Remove-ICAddress {
             }
         }
         else {
-            Write-Error "No inputs selected."
+            Write-Error "Provide either an addressId or a targetGroupId."
             return
         }
 
@@ -341,7 +336,7 @@ function Remove-ICAddress {
 function Get-ICAgent {
     [cmdletbinding()]
     param(
-        [parameter(ValueFromPipelineByPropertyName)]
+        [parameter(ValueFromPipeline=$true)]
         [alias('agentId')]
         [String]$Id,
 
@@ -366,9 +361,9 @@ function Get-ICAgent {
 }
 
 function Remove-ICAgent {
-    [cmdletbinding(SupportsShouldProcess)]
+    [cmdletbinding(SupportsShouldProcess=$true)]
     Param(
-        [parameter(ValueFromPipelineByPropertyName)]
+        [parameter(Mandatory=$true, ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
         [ValidateNotNullorEmpty()]
         [alias('AgentId')]
         [String]$Id
@@ -438,11 +433,11 @@ function New-ICQuery {
 function Get-ICQuery {
     [cmdletbinding()]
     param(
-        [parameter(ValueFromPipelineByPropertyName)]
+        [parameter(ValueFromPipeline=$true)]
         [alias('queryId')]
         [String]$Id,
 
-        [parameter(ValueFromPipelineByPropertyName)]
+        [parameter(ValueFromPipelineByPropertyName=$true)]
         [alias('targetId')]
         [String]$TargetGroupId,
 
@@ -456,7 +451,7 @@ function Get-ICQuery {
 
     PROCESS {
         $Endpoint = "queries"
-        if ($Id -AND (-NOT $_.targetId)) {
+        if ($Id) {
             Write-Verbose "Getting Query: $Id"
             $Endpoint += "/$Id"
         }
@@ -469,9 +464,9 @@ function Get-ICQuery {
 }
 
 function Remove-ICQuery {
-    [cmdletbinding(SupportsShouldProcess)]
+    [cmdletbinding(SupportsShouldProcess=$true)]
     param(
-        [parameter(Mandatory=$true, ValueFromPipelineByPropertyName)]
+        [parameter(Mandatory=$true, ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
         [ValidateNotNullOrEmpty()]
         [alias('queryId')]
         [String]$Id

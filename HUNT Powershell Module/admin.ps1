@@ -47,7 +47,7 @@ function New-ICFlag {
 function Get-ICFlag {
     [cmdletbinding()]
     param(
-        [parameter(ValueFromPipelineByPropertyName)]
+        [parameter(ValueFromPipeline=$true)]
         [alias('flagId')]
         [String]$Id,
 
@@ -70,7 +70,7 @@ function Get-ICFlag {
 }
 
 function Update-ICFlag  {
-    [cmdletbinding()]
+    [cmdletbinding(SupportsShouldProcess=$true)]
     Param(
         [parameter(Mandatory=$true, ValueFromPipelineByPropertyName)]
         [ValidateNotNullorEmpty()]
@@ -88,40 +88,47 @@ function Update-ICFlag  {
         [int]$Weight
     )
     PROCESS {
-        $Endpoint = "flags/$Id"
-
-        Write-Verbose "Updating flag $Id with Color: $Color, named: $Name, Weight: $Weight"
         $body = @{}
         $n = 0
+        $Endpoint = "flags/$Id"
+        $obj = Get-ICFlag -id $Id
+        if (-NOT $obj) {
+            Write-Error "Flag not found with id: $id"
+        }
         if ($Name) { $body['name'] = $Name; $n+=1 }
         if ($Color) { $body['color'] = $Color; $n+=1 }
         if ($Weight) { $body['weight'] = $Weight; $n+=1 }
         if ($n -eq 0) { Write-Error "Not Enough Parameters"; return }
 
-        Invoke-ICAPI -Endpoint $Endpoint -body $body -method PUT
+        Write-Verbose "Updating flag $Id with:`n$($body|convertto-json)"
+        if ($PSCmdlet.ShouldProcess($($obj.name), "Will update flag $($obj.name) [$Id]")) {
+            Invoke-ICAPI -Endpoint $Endpoint -body $body -method PUT
+        }
     }
 }
 
 function Remove-ICFlag {
-    [cmdletbinding(SupportsShouldProcess)]
+    [cmdletbinding(SupportsShouldProcess=$true)]
     Param(
-        [parameter(Mandatory=$true, ValueFromPipelineByPropertyName)]
+        [parameter(Mandatory=$true, ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
         [ValidateNotNullorEmpty()]
         [alias('flagId')]
         [String]$id
     )
     PROCESS {
         $Endpoint = "flags/$Id"
-        $Flags = Get-ICFlags | where { ($_.weight -eq 0) -OR ($_.weight -eq 10)}
-        if ($Flags) { Write-Warning "Cannot Delete Verified Good or Verified Bad flags. They are a special case and would break the user interface" }
-        $obj = Get-Flags -Id $Id
-        if (-NOT $obj) {
+        $obj = Get-Flags -Id $Id -where { }
+        if ($obj) {
+            if ($obj | where { ($_.name -eq "Verified Good") -OR ($_.name -eq "Verified Bad")}) {
+                Write-Warning "Cannot Delete 'Verified Good' or 'Verified Bad' flags. They are a special case and would break the user interface"
+                return
+            }
+            if ($PSCmdlet.ShouldProcess($obj.name, "Will remove $($obj.name) [$($obj.color)] with flagId '$Id'")) {
+                Write-Host "Removing $($obj.name) [$($obj.color)] with flagId '$Id'"
+                Invoke-ICAPI -Endpoint $Endpoint -method DELETE
+            }
+        } else {
             Write-Error "No Agent with id '$Id' exists."
-            return
-        }
-        if ($PSCmdlet.ShouldProcess($obj.name, "Will remove $($obj.name) [$($obj.color)] with flagId '$Id'")) {
-            Write-Host "Removing $($obj.name) [$($obj.color)] with flagId '$Id'"
-            Invoke-ICAPI -Endpoint $Endpoint -method DELETE
         }
     }
 }
@@ -152,7 +159,7 @@ function Add-ICComment {
 function Get-ICExtension {
     [cmdletbinding()]
     Param(
-        [parameter(ValueFromPipelineByPropertyName)]
+        [parameter(ValueFromPipeline=$true)]
         [alias('extensionId')]
         [String]$Id,
 
@@ -222,9 +229,9 @@ function New-ICExtension {
 }
 
 function Update-ICExtension {
-    [cmdletbinding()]
+    [cmdletbinding(SupportsShouldProcess=$true)]
     Param(
-        [parameter(mandatory=$true, ValueFromPipelineByPropertyName)]
+        [parameter(Mandatory=$true, ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
         [alias('extensionId')]
         [String]$Id,
 
@@ -247,9 +254,9 @@ function Update-ICExtension {
 
     PROCESS {
         $Endpoint = "extensions"
-        $ext = Get-ICExtension -id $Id
-        if ($ext) {
-            Write-Verbose "Extension found: `n$($ext | converto-json)"
+        $obj = Get-ICExtension -id $Id
+        if ($obj) {
+            Write-Verbose "Extension found: `n$($obj | converto-json)"
         } else {
             Write-Error "Extension with id $id not found!"
             return
@@ -263,15 +270,18 @@ function Update-ICExtension {
         if ($Type) { $b['type'] = $Type } else { $b['type'] = $ext.type }
         if ($Active) { $b['active'] = $Active } else { $b['active'] = $ext.active }
 
-        Write-Host "Updating Extension: $ext [$Id]"
-        Invoke-ICAPI -Endpoint $Endpoint -body $b -method POST
+        Write-Host "Updating Extension: $($obj.name) [$Id] with `n$($b|convertto-json)"
+        if ($PSCmdlet.ShouldProcess($($obj.name), "Will update extension $($obj.name) [$Id]")) {
+
+            Invoke-ICAPI -Endpoint $Endpoint -body $b -method POST
+        }
     }
 }
 
 function Remove-ICExtension {
-    [cmdletbinding(SupportsShouldProcess)]
+    [cmdletbinding(SupportsShouldProcess=$true)]
     Param(
-        [parameter(Mandatory=$true, ValueFromPipelineByPropertyName)]
+        [parameter(Mandatory=$true, ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
         [ValidateNotNullorEmpty()]
         [alias('extensionId')]
         [String]$Id

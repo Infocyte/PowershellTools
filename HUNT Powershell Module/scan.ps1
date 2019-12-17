@@ -52,7 +52,8 @@ function Invoke-ICFindHosts {
 		[alias('targetId')]
 		[String]$TargetGroupId,
 
-		[String]$queryId
+        [parameter()]
+		[String[]]$queryId
 	)
 	$TargetGroup = Get-ICTargetGroup -Id $TargetGroupId
 	$Queries = Get-ICQuery -TargetGroupId $TargetGroupId
@@ -63,14 +64,15 @@ function Invoke-ICFindHosts {
 	$body = @{
 		queries = @()
 	}
-	if ($QueryId) {
-		Write-Verbose "Starting Enumeration of $($TargetGroup.name) with Query $QueryId"
-		$body['queries'] += $QueryId
+    if ($QueryId) {
+        $QueryId | foreach {
+    		$body['queries'] += $_
+        }
 	} else {
 		$Queries | foreach {
-			Write-Verbose "Starting Enumeration of $($TargetGroup.name) with Query $($Queries.id)"
 			$body['queries'] += $Queries.Id
 		}
+        Write-Verbose "Starting Enumeration of $($TargetGroup.name) with all associated queries.`n$($body['queries'] | convertto-json)"
 	}
     Invoke-ICAPI -Endpoint $Endpoint -body $body -method POST
 }
@@ -85,13 +87,13 @@ function Invoke-ICScan {
 
 		[PSObject]$ScanOptions,
 
-		[Switch]$PerformDiscovery
+		[Switch]$FindHosts
 	)
 	$TargetGroup = Get-ICTargetGroup -Id $TargetGroupId
 	if (-NOT $TargetGroup) {
 		Throw "TargetGroup with id $TargetGroupId does not exist!"
 	}
-	if ($PerformDiscovery) {
+	if ($FindHosts) {
 		Write-Host "Performing discovery on $($TargetGroup.name)"
 		$stillactive = $true
 		$UserTask = Invoke-ICFindHosts -TargetGroupId $TargetGroupId
@@ -110,7 +112,9 @@ function Invoke-ICScan {
 	}
 	$Endpoint = "targets/$TargetGroupId/scan"
 	Write-Host "Starting Scan of TargetGroup $($TargetGroup.name)"
-    $body = @{ options = $ScanOptions }
+    if ($ScanOptions) {
+        $body = @{ options = $ScanOptions }
+    }
 	Invoke-ICAPI -Endpoint $Endpoint -body $body -method POST
 }
 
@@ -125,7 +129,7 @@ function Invoke-ICScanTarget {
 		[String]$TargetGroupName = "OnDemand",
 
 		[String]$CredentialId,
-		[String]$CredentialName = "DefaultCredential",
+		[String]$CredentialName,
 
         [String]$sshCredentialId,
 		[String]$sshCredentialName,
@@ -151,7 +155,11 @@ function Invoke-ICScanTarget {
 	        }
 		} else {
 	        Write-Verbose "Using Target Group Name [$TargetGroupName] -- will be created if it does not exist."
-	        $body['targetGroup'] = @{ name = $TargetGroupName}
+            $tg = Get-ICTargetGroup -where @{ name = $TargetGroupName}
+            if (-NOT $tg) {
+                $tg = New-ICTargetGroup -Name $TargetGroupName -Force
+            }
+	        $body['targetGroup'] = @{ id = $tg.id }
 	    }
 
 		# Select Credential
@@ -162,14 +170,15 @@ function Invoke-ICScanTarget {
 			} else {
 	            $body['credential'] = @{ id = $credentialId }
 	        }
-		} else {
+		} elseif ($CredentialName) {
 	        # Use Credentialname
 	        $Credential =  Get-ICCredential | where { $_.name -eq $CredentialName }
-			if (-NOT $CredentialName) {
-				Throw "Credential with name [$CredentialName] does not exist! Please create it or specify a different credential (referenced by id or name)"
-	            return
+			if ($Credential) {
+				$body['credential'] = @{ name = $CredentialName }
+				Write-Error "Credential with name [$CredentialName] does not exist!"
+				Write-Warning "Please create it or specify a different credential (referenced by id or name)"
+				return
 	  	    }
-	        $body['credential'] = @{ name = $CredentialName }
 	    }
 
 	    # Select Credential

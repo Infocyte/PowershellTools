@@ -83,7 +83,7 @@ function Set-ICToken {
 	[cmdletbinding()]
 	[alias("Set-ICInstance")]
 	param(
-		[parameter(Mandatory=$true, HelpMessage="Hunt Cloud Instance Name (e.g. 'clouddemo') or Full URL of Server/API (e.g. https://CloudDemo.infocyte.com)'")]
+		[parameter(Mandatory=$true, HelpMessage="Infocyte Cloud Instance Name (e.g. 'clouddemo') or Full URL of Server/API (e.g. https://CloudDemo.infocyte.com)'")]
 		[ValidateNotNullOrEmpty()]
 		[alias("HuntServer")]
 		[String]$Instance,
@@ -105,6 +105,7 @@ function Set-ICToken {
 	if ($DisableSSLVerification) {
 		_DisableSSLVerification
 	}
+	Write-Verbose "Setting Security Protocol to TLS1.2"
 	[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 	if ($Instance -match "[:\.]+") {

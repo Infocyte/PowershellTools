@@ -71,9 +71,7 @@ function Get-ICUserTask {
 		[parameter(ValueFromPipelineByPropertyName)]
 		[alias('UserTaskId')]
 		[String]$Id,
-
-		[Switch]$Active,
-		[Switch]$IncludeArchived,
+		[Switch]$All,
 
 		[parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
@@ -90,62 +88,97 @@ function Get-ICUserTask {
 			$order = $null
 			$endpoint += "/$Id"
 		} else {
-			if ($IncludeArchived) {
-				Write-Verbose "Getting All User Tasks"
-			} else {
-				Write-Verbose "Getting Active User Tasks"
-				$endpoint += "/active"
-			}
-			if ($Active) {
-				Write-Verbose "Filtering for Running Tasks Only."
-				$where['status'] = "Active"
+			if (-NOT $All -AND -NOT $where) {
+				Write-Verbose "Filtering for running and recently ended tasks (Default)."
+				$where['or'] = @(
+					@{ status = "Active" },
+					@{ endedOn = @{ gte = (Get-Date).ToUniversalTime().AddDays(-1).ToString() } }
+				)
 			}
 		}
-
 		Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
 	}
 }
 
 function Get-ICUserTaskItem {
-	[cmdletbinding()]
+	[cmdletbinding(DefaultParameterSetName='userTasks')]
 	param(
-		[parameter(Mandatory=$true, ValueFromPipelineByPropertyName)]
-		[alias('id')]
+		[parameter(Mandatory,
+			ParameterSetName="userTaskItem")]
+		[alias('userTaskItemId')]
+		[String]$Id,
+
+		[parameter(Mandatory,
+			ParameterSetName="userTasks",
+			ValueFromPipeline,
+			ValueFromPipelineByPropertyName)]
+		[ValidatePattern("[A-Z0-9]{8}-([A-Z0-9]{4}-){3}[A-Z0-9]{12}")]
 		[String]$userTaskId,
 
+		[parameter()]
 		[Switch]$IncludeProgress,
 
 		[parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
         [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
 		[String[]]$order = "updatedOn Desc",
+		[String[]]$fields,
 		[Switch]$NoLimit,
 		[Switch]$CountOnly
 	)
 
 	PROCESS {
 		$Endpoint = "userTaskItems"
-		if ($_.id -AND $_.userTaskId) {
-			# disambuguation
-			$where['userTaskId'] = $_.userTaskId
+
+		if ($PsCmdlet.ParameterSetName -eq 'userTaskItem') {
+			$Endpoint += "/$Id"
 		} else {
+			Write-Verbose $userTaskId
+			if ($userTaskId.GetType().name -eq "PSCustomObject") {
+				Write-Debug "Taking input from raw pipeline (`$_): $_."
+
+				if ($_.userTaskId -match "[A-Z0-9]{8}-([A-Z0-9]{4}-){3}[A-Z0-9]{12}") {
+					$userTaskId = $_.userTaskId
+				}
+				elseif ($_.id -match "[A-Z0-9]{8}-([A-Z0-9]{4}-){3}[A-Z0-9]{12}") {
+					$userTaskId = $_.id
+				}
+				else {
+					Write-Error "Can't parse pipeline input for a userTaskId."
+					return
+				}
+			}
 			$where['userTaskId'] = $userTaskId
+			Write-Verbose "Getting All UserTaskItems with userTaskId $userTaskId."
 		}
 
-		Write-Verbose "Getting All UserTaskItems with userTaskId $userTaskId."
-
 		if ($IncludeProgress -AND (-NOT $CountOnly)) {
-			$items = Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit
+			$n = 1
+			if ($Id) {
+				$cnt = 1
+			} else {
+				$cnt = Get-ICAPI -Endpoint $Endpoint -where $where -CountOnly
+			}
+			Write-Verbose "Found $cnt userTaskItems. Getting progress for each."
+			$items = Get-ICAPI -Endpoint $Endpoint -where $where -order $order -fields $fields -NoLimit:$NoLimit
 			$items | foreach {
+				$n += 1
+				try { $pc = $n/$cnt } catch { $pc = -1 }
 				if ($_.id) {
 					$progress = @()
-					Get-ICUserTaskItemProgress -taskItemId $_.id | foreach { $progress += "$($_.createdOn) $($_.text)" }
+					Write-Progress -Id 2 -Activity "Enriching with Task Progress Information" -status "[$n of $cnt] Getting progress on $($_.name)" -PercentComplete $pc
+					Get-ICUserTaskItemProgress -taskItemId $_.id -fields "createdOn","text" -order "createdOn desc" | foreach {
+						$progress += New-Object PSObject -Property @{
+							createdOn = $_.createdOn
+							text = $_.text
+						}
+					}
 					$_ | Add-Member -MemberType "NoteProperty" -name "progress" -value $progress
 				}
 			}
 			Write-Output $items
 		} else {
-			Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
+			Get-ICAPI -Endpoint $Endpoint -where $where -order $order -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly
 		}
 	}
 }
@@ -162,6 +195,7 @@ function Get-ICUserTaskItemProgress {
         [HashTable]$where=@{},
         [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
 		[String[]]$order = "createdOn desc",
+		[String[]]$fields,
 		[Switch]$NoLimit,
 		[Switch]$CountOnly
 	)
@@ -174,6 +208,6 @@ function Get-ICUserTaskItemProgress {
 		} else {
 			$where['taskItemId'] = $taskItemId
 		}
-		Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
+		Get-ICAPI -Endpoint $Endpoint -where $where -order $order -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly
 	}
 }
