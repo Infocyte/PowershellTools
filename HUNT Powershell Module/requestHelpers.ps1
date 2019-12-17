@@ -96,7 +96,7 @@ function Get-ICAPI {
             Write-Host -ForegroundColor Yellow -BackgroundColor Black "`tDatabase performance can be severely degraded in large queries."
             Write-Host -ForegroundColor Yellow -BackgroundColor Black "`tTry refining your query further with a 'where' filter or"
             Write-Host -ForegroundColor Yellow -BackgroundColor Black "`task Infocyte for a data export by emailing support@infocyte.com."
-            Read-Host -Prompt " Press any key to continue pulling first $GlobalLimit or CTRL+C to quit"
+            Read-Host -Prompt " Press any key to continue pulling first $GlobalLimit or CTRL+C to quit" | out-null
         }
         elseif ($NoLimit) {
             Write-Verbose "Retrieving $total objects that match this filter."
