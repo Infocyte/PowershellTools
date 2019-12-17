@@ -5,166 +5,209 @@
 function Get-ICJob {
 	[cmdletbinding()]
 	param(
+		[parameter(ValueFromPipelineByPropertyName)]
+		[alias('jobId')]
+		[String]$Id,
+
 		[Switch]$All,
-		[HashTable]$Where,
-		[Switch]$NoLimit
+
+		[parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
+        [HashTable]$where=@{},
+        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
+		[String[]]$order = "createdOn",
+		[Switch]$NoLimit,
+		[Switch]$CountOnly
 	)
-	$url = ("$HuntServerAddress/api/jobs")
-	$filter =  @{
-		order = "createdOn"
-		limit = $resultlimit
-		skip = 0
-		where = @{ and = @() }
-	}
 
-	if ($where.count -gt 0) {
-		$where.GetEnumerator() | % {
-			$filter['where']['and'] += @{ $($_.key) = $($_.value) }
+	PROCESS {
+		$endpoint = 'jobs'
+		if ($Id) {
+			$CountOnly = $false
+			$order = $null
+			$endpoint += "/$Id"
 		}
+		if ($All) {
+			Write-Verbose "Getting All Jobs."
+		} else {
+			Write-Verbose "Getting Active Jobs."
+			if (-NOT $where['state']) {
+				$where['state'] = "active"
+			}
+		}
+		Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
 	}
-
-	if ($All) {
-		Write-Verbose "Getting All Jobs from Infocyte HUNT: $HuntServer"
-	} else {
-		Write-Verbose "Getting Active Jobs from Infocyte HUNT: $HuntServer"
-		$filter['where']['and'] = @{ state = "active" }
-	}
-	_ICGetMethod -url $url -filter $filter -NoLimit:$NoLimit
 }
 
 # Get Infocyte HUNT User Audit Logs
 function Get-ICUserAuditLog {
 	[cmdletbinding()]
 	param(
+		[parameter(ValueFromPipeline)]
+		[String]$Id,
+
+		[parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
+        [HashTable]$where=@{},
+        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
+		[String[]]$order = "createdOn DESC",
 		[Switch]$NoLimit,
-		[HashTable]$Where
+		[Switch]$CountOnly
 	)
-	$url = ("$HuntServerAddress/api/useractivities")
-	$filter =  @{
-		order = "createdOn"
-		limit = $resultlimit
-		skip = 0
-		where = @{ and = @() }
-	}
-	if ($where.count -gt 0) {
-		$where.GetEnumerator() | % {
-			$filter['where']['and'] += @{ $($_.key) = $($_.value) }
+	PROCESS {
+		$endpoint = 'useractivities'
+		if ($Id) {
+			$CountOnly = $false
+			$order = $null
+			$endpoint += "/$Id"
 		}
+		Write-Verbose "Getting User Activity Logs"
+		Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
 	}
-		Write-Verbose "Getting User Activity Logs from Infocyte HUNT: $HuntServer"
-	_ICGetMethod -url $url -filter $filter -NoLimit:$NoLimit
 }
 
 # Get Infocyte HUNT User Tasks. These are the items in the task dropdown in the UI.
 function Get-ICUserTask {
 	[cmdletbinding()]
 	param(
-		[String]$UserTaskId,
-		[Switch]$Active,
+		[parameter(ValueFromPipelineByPropertyName)]
+		[alias('UserTaskId')]
+		[String]$Id,
 		[Switch]$All,
-		[HashTable]$Where,
-		[Switch]$NoLimit
+
+		[parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
+        [HashTable]$where=@{},
+        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
+		[String[]]$order = "endedOn Desc",
+		[Switch]$NoLimit,
+		[Switch]$CountOnly
 	)
 
-	$filter =  @{
-		order = "endedOn"
-		limit = $resultlimit
-		skip = 0
-		where = @{ and = @() }
-	}
-	if ($where.count -gt 0) {
-		$where.GetEnumerator() | % {
-			$filter['where']['and'] += @{ $($_.key) = $($_.value) }
-		}
-	}
-
-	if ($UserTaskId) {
-		$url = ("$HuntServerAddress/api/usertasks/$UserTaskId")
-	} else {
-		if ($All) {
-			Write-Verbose "Getting All User Tasks from Infocyte HUNT: $HuntServer"
-			$url = ("$HuntServerAddress/api/usertasks")
+	PROCESS {
+		$endpoint = "usertasks"
+		if ($Id) {
+			$CountOnly = $false
+			$order = $null
+			$endpoint += "/$Id"
 		} else {
-			Write-Verbose "Getting Active Tasks from Infocyte HUNT: $HuntServer"
-			$url = ("$HuntServerAddress/api/usertasks/active")
+			if (-NOT $All -AND -NOT $where) {
+				Write-Verbose "Filtering for running and recently ended tasks (Default)."
+				$where['or'] = @(
+					@{ status = "Active" },
+					@{ endedOn = @{ gte = (Get-Date).ToUniversalTime().AddDays(-1).ToString() } }
+				)
+			}
 		}
+		Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
 	}
-	if ($Active) {
-		Write-Verbose "Getting Running Tasks from Infocyte HUNT: $HuntServer"
-		$filter['where']['and'] += @{ status = "Active" }
-	}
-
-	_ICGetMethod -url $url -filter $filter -NoLimit:$NoLimit
 }
 
 function Get-ICUserTaskItem {
-	[cmdletbinding()]
+	[cmdletbinding(DefaultParameterSetName='userTasks')]
 	param(
-		[parameter(Mandatory=$true, Position=0)]
-		[ValidateNotNullOrEmpty()]
-		[String]$UserTaskId,
+		[parameter(Mandatory,
+			ParameterSetName="userTaskItem")]
+		[alias('userTaskItemId')]
+		[String]$Id,
 
+		[parameter(Mandatory,
+			ParameterSetName="userTasks",
+			ValueFromPipeline,
+			ValueFromPipelineByPropertyName)]
+		[ValidatePattern("[A-Z0-9]{8}-([A-Z0-9]{4}-){3}[A-Z0-9]{12}")]
+		[String]$userTaskId,
+
+		[parameter()]
 		[Switch]$IncludeProgress,
 
-		[HashTable]$Where,
-
-		[Switch]$NoLimit
+		[parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
+        [HashTable]$where=@{},
+        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
+		[String[]]$order = "updatedOn Desc",
+		[String[]]$fields,
+		[Switch]$NoLimit,
+		[Switch]$CountOnly
 	)
 
-	$filter =  @{
-		limit = $resultlimit
-		skip = 0
-		order = "updatedOn"
-		where = @{
-			and = @( @{ userTaskId = $UserTaskId } )
-		}
-	}
-	if ($where.count -gt 0) {
-		$where.GetEnumerator() | % {
-			$filter['where']['and'] += @{ $($_.key) = $($_.value) }
-		}
-	}
+	PROCESS {
+		$Endpoint = "userTaskItems"
 
-	Write-Verbose "Getting All User Task Items from Infocyte HUNT: $HuntServer"
-	$url = ("$HuntServerAddress/api/userTaskItems")
-	if ($IncludeProgress) {
-		$items = _ICGetMethod -url $url -filter $filter -NoLimit:$NoLimit
-		$items | foreach {
-			if ($_.id) {
-				$progress = @()
-				Get-ICUserTaskItemProgress -taskItemId $_.id | foreach { $progress += "$($_.createdOn) $($_.text)" }
-				$_ | Add-Member -MemberType "NoteProperty" -name "progress" -value $progress
+		if ($PsCmdlet.ParameterSetName -eq 'userTaskItem') {
+			$Endpoint += "/$Id"
+		} else {
+			Write-Verbose $userTaskId
+			if ($userTaskId.GetType().name -eq "PSCustomObject") {
+				Write-Debug "Taking input from raw pipeline (`$_): $_."
+
+				if ($_.userTaskId -match "[A-Z0-9]{8}-([A-Z0-9]{4}-){3}[A-Z0-9]{12}") {
+					$userTaskId = $_.userTaskId
+				}
+				elseif ($_.id -match "[A-Z0-9]{8}-([A-Z0-9]{4}-){3}[A-Z0-9]{12}") {
+					$userTaskId = $_.id
+				}
+				else {
+					Write-Error "Can't parse pipeline input for a userTaskId."
+					return
+				}
 			}
+			$where['userTaskId'] = $userTaskId
+			Write-Verbose "Getting All UserTaskItems with userTaskId $userTaskId."
 		}
-		$items
-	} else {
-		_ICGetMethod -url $url -filter $filter -NoLimit:$NoLimit
+
+		if ($IncludeProgress -AND (-NOT $CountOnly)) {
+			$n = 1
+			if ($Id) {
+				$cnt = 1
+			} else {
+				$cnt = Get-ICAPI -Endpoint $Endpoint -where $where -CountOnly
+			}
+			Write-Verbose "Found $cnt userTaskItems. Getting progress for each."
+			$items = Get-ICAPI -Endpoint $Endpoint -where $where -order $order -fields $fields -NoLimit:$NoLimit
+			$items | foreach {
+				$n += 1
+				try { $pc = $n/$cnt } catch { $pc = -1 }
+				if ($_.id) {
+					$progress = @()
+					Write-Progress -Id 2 -Activity "Enriching with Task Progress Information" -status "[$n of $cnt] Getting progress on $($_.name)" -PercentComplete $pc
+					Get-ICUserTaskItemProgress -taskItemId $_.id -fields "createdOn","text" -order "createdOn desc" | foreach {
+						$progress += New-Object PSObject -Property @{
+							createdOn = $_.createdOn
+							text = $_.text
+						}
+					}
+					$_ | Add-Member -MemberType "NoteProperty" -name "progress" -value $progress
+				}
+			}
+			Write-Output $items
+		} else {
+			Get-ICAPI -Endpoint $Endpoint -where $where -order $order -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly
+		}
 	}
 }
 
 function Get-ICUserTaskItemProgress {
 	[cmdletbinding()]
 	param(
-		[parameter(Mandatory=$true, Position=0)]
+		[parameter(Mandatory=$true, ValueFromPipelineByPropertyName)]
 		[ValidateNotNullOrEmpty()]
+		[alias('id')]
 		[String]$taskItemId,
-		[HashTable]$Where,
-		[Switch]$NoLimit
+
+		[parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
+        [HashTable]$where=@{},
+        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
+		[String[]]$order = "createdOn desc",
+		[String[]]$fields,
+		[Switch]$NoLimit,
+		[Switch]$CountOnly
 	)
 
-	$url = ("$HuntServerAddress/api/userTaskItemProgresses")
-	$filter =  @{
-		order = @("createdOn desc", "id")
-		limit = $resultlimit
-		skip = 0
-		where = @{
-			and = @( @{ taskItemId = $taskItemId} )
+	PROCESS {
+		$Endpoint = "userTaskItemProgresses"
+		if ($_.id -AND $_.taskItemId) {
+			# disambuguation
+			$where['taskItemId'] = $_.taskItemId
+		} else {
+			$where['taskItemId'] = $taskItemId
 		}
+		Get-ICAPI -Endpoint $Endpoint -where $where -order $order -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly
 	}
-	if ($where.count -gt 0) {
-		$where.GetEnumerator() | % {
-			$filter['where']['and'] += @{ $($_.key) = $($_.value) }
-		}
-	}
-	_ICGetMethod -url $url -filter $filter -NoLimit:$NoLimit
 }

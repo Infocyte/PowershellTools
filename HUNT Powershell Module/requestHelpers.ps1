@@ -1,90 +1,184 @@
 
 # HElPER FUNCTIONS
-$Depth = 10
-$resultlimit = 1000 # limits the number of results that come back. 1000 is max supported by Infocyte API. Use NoLimit flag on functions to iterate 1000 at a time for all results.
-$Globallimit = 100000
 
-# Used with most Infocyte Get methods. Takes a filter object (hashtable) and adds authentication and passes it as the body for URI encoded parameters. NoLimit will iterate 1000 results at a time to the end of the data set.
-function _ICGetMethod ([String]$url, [HashTable]$filter, [Switch]$NoLimit) {
-    $skip = 0
-    if (-NOT $Global:ICToken) {
+# Used with most Infocyte Get methods.
+# Takes a filter object (hashtable) and adds authentication and passes it as the body for URI encoded parameters.
+# NoLimit will iterate 1000 results at a time to the end of the data set.
+function Get-ICAPI {
+    [cmdletbinding()]
+    Param(
+        [parameter(Mandatory=$true)]
+        [ValidateNotNullorEmpty()]
+        [String]$endpoint,
+
+        [parameter(Mandatory=$false, HelpMessage="Provide a hashtable and it will be converted to json-stringified query params. Reference format and operators here: https://loopback.io/doc/en/lb3/Where-filter.html")]
+        [HashTable]$where=@{},
+
+        [String[]]$order,
+
+        [String[]]$fields,
+
+        [Switch]$NoLimit,
+
+        [Switch]$OverrideGlobalLimit,
+
+        [Switch]$CountOnly
+    )
+
+    # Set access token
+    if ($Global:ICToken) {
+        $body = @{
+            access_token = $Global:ICToken
+        }
+    } else {
         Write-Error "API Token not set! Use Set-ICToken to connect to an Infocyte instance."
         return
     }
-  Write-Progress -Activity "Getting Data from Hunt Server API" -status "Requesting data from $url [$skip]"
+
+    $Globallimit = 100000 # trying to control strains on the database. Add a filter to keep it reasonable.
+    $resultlimit = 1000 # limits the number of results that come back. 1000 is max supported by Infocyte API. Use NoLimit flag on functions to iterate 1000 at a time for all results.
+    $skip = 0
     $count = 0
-    $body = @{
-    	access_token = $Global:ICToken
+    $more = $true
+    $url = "$($Global:HuntServerAddress)/api/$Endpoint"
+
+    $filter = @{
+        skip = $skip
+        limit = $resultlimit
     }
-    if ($filter) {
-    $body['filter'] = $filter | ConvertTo-JSON -Depth $Depth -Compress
+    if ($fields) {
+        $filter['fields'] = $fields
     }
-    Write-Verbose "Requesting data from $url (Limited to $resultlimit unless using -NoLimit)"
-    Write-Verbose "$($body | ConvertTo-JSON -Depth $Depth -Compress)"
-    try {
-    	$Objects = Invoke-RestMethod $url -body $body -Method GET -ContentType 'application/json' -Proxy $Global:Proxy -ProxyCredential $Global:ProxyCredential
-    } catch {
-    	Write-Warning "Error: $_"
-    	return "ERROR: $($_.Exception.Message)"
+    if ($order) {
+        $filter['order'] = $order
     }
-    if ($Objects) {
-    $count += $Objects.count
-    	Write-Output $Objects
-    } else {
-    	return $null
+    if ($where) {
+        $filter['where'] = $where
     }
 
-    if ($NoLimit -AND $Objects.count -eq $resultlimit) { $more = $true } else { $more = $false }
-    if ($Objects.count -gt $Globallimit) {
-    $more = $FALSE
-    Write-Warning "Reached Global Limit ($GlobalLimit) -- Try refining your query with a where filter. Performance on the database seriously degrades when trying to pull more than 100k objects"
+    Write-Verbose "Requesting data from $url"
+    if ($where -AND $where.count -gt 0) {
+        Write-Verbose "where-filter:`n$($where | ConvertTo-JSON -Depth 10)"
     }
-    While ($more) {
-    	$skip += $resultlimit
-    	$filter['skip'] = $skip
-    	$body.remove('filter') | Out-Null
-    	$body.Add('filter', ($filter | ConvertTo-JSON -Depth $Depth -Compress))
-    Write-Progress -Activity "Getting Data from Hunt Server API" -status "Requesting data from $url [$skip]"
-    	try {
-    		$moreobjects = Invoke-RestMethod $url -body $body -Method GET -ContentType 'application/json' -Proxy $Global:Proxy -ProxyCredential $Global:ProxyCredential
-    	} catch {
-    		Write-Warning "Error: $_"
-    		return "ERROR: $($_.Exception.Message)"
-    	}
-    	if ($moreobjects.count -gt 0) {
-      $count += $moreobjects.count
-    		Write-Output $moreobjects
-    	} else {
-    		$more = $false
-    	}
+
+    if ($Endpoint -match "/count$") {
+        # if it matches /count or an id guid, there is no count
+        $CountOnly = $true
+        # JSON Stringify the where on body
+        $body['where'] = $where | ConvertTo-JSON -Depth 10 -Compress
     }
-    Write-Verbose "Recieved $count objects from $url"
+    elseif ($Endpoint -match "[A-Z0-9]{8}-([A-Z0-9]{4}-){3}[A-Z0-9]{12}$" -OR
+            $Endpoint -match "[0-9a-f]{40}$" -OR
+            $Endpoint -match "/.*\d+$") {
+        # Querying a single object. Don't try to count.
+        Write-Debug "$Endpoint matches id filter. Adding filter."
+        $body['filter'] = $filter | ConvertTo-JSON -Depth 10 -Compress
+        $total = 1
+    }
+    elseif ($CountOnly) {
+        $url += "/count"
+        Write-Debug "Counting using /count"
+        $body['where'] = $where | ConvertTo-JSON -Depth 10 -Compress
+    }
+    else {
+        Write-Debug "Counting results first"
+        $body['where'] = $where | ConvertTo-JSON -Depth 10 -Compress
+        Write-Debug "Body:`n$($body|convertto-json)"
+        try {
+            $tcnt = Invoke-RestMethod "$url/count" -body $body -Method GET -ContentType 'application/json' -Proxy $Global:Proxy -ProxyCredential $Global:ProxyCredential
+            $total = [int]$tcnt.'count'
+        } catch {
+            Write-Verbose "Couldn't get a count from $url/count"
+            $total = "Unknown"
+        }
+        if ($NoLimit -AND ($total -ge $Globallimit)) {
+            Write-Warning "Your filter will return $total objects! You are limited to $GlobalLimit results per query."
+            Write-Host -ForegroundColor Yellow -BackgroundColor Black "`tDatabase performance can be severely degraded in large queries."
+            Write-Host -ForegroundColor Yellow -BackgroundColor Black "`tTry refining your query further with a 'where' filter or"
+            Write-Host -ForegroundColor Yellow -BackgroundColor Black "`task Infocyte for a data export by emailing support@infocyte.com."
+            Read-Host -Prompt " Press any key to continue pulling first $GlobalLimit or CTRL+C to quit"
+        }
+        elseif ($NoLimit) {
+            Write-Verbose "Retrieving $total objects that match this filter."
+        }
+        elseif ($total -gt $resultlimit -AND $total -ne "Unknown") {
+            Write-Warning "Found $total objects with this filter. Returning first $resultlimit."
+            Write-Host -ForegroundColor Yellow -BackgroundColor Black "`tUse a tighter 'where' filter or the -NoLimit switch to get more."
+        } else {
+            Write-Verbose "Found $total objects with this filter."
+        }
+        # JSON Stringify the filter on body
+        $body.remove('where') | Out-Null
+        $body['filter'] = $filter | ConvertTo-JSON -Depth 10 -Compress
+    }
+
+    $timer = [system.diagnostics.stopwatch]::StartNew()
+    $times = @()
+
+    while ($more) {
+        try {
+            $pc = $skip/$total
+        } catch {
+            $pc = -1
+        }
+        Write-Progress -Id 1 -Activity "Getting Data from Infocyte API" -status "Requesting data from $url [$skip of $total]" -PercentComplete $pc
+        Write-Debug "Sending $url this Body as 'application/json':`n$($body|convertto-json)"
+        $at = $timer.Elapsed
+        try {
+            $Objects = Invoke-RestMethod $url -body $body -Method GET -ContentType 'application/json' -Proxy $Global:Proxy -ProxyCredential $Global:ProxyCredential
+        } catch {
+            Write-Error "ERROR: $($_.Exception.Message)"
+            return
+        }
+        $bt = $timer.Elapsed
+        $e = ($bt - $at).TotalMilliseconds
+        $times += $e
+        Write-Debug "Last Request: $($e.ToString("#.#"))ms"
+
+        if ($CountOnly) {
+            write-debug $Objects
+            return [int]$Objects.count
+        }
+        if ($Objects) {
+            if ($Objects.count) {
+                $count += $Objects.count
+            } else {
+                write-debug "Couldn't count $objects. Using 1."
+                $count += 1
+            }
+
+            Write-Output $Objects
+
+            if (-NOT $NoLimit) {
+                $more = $false
+            }
+            elseif ($Objects.count -lt $resultlimit) {
+                $more = $false
+            }
+            elseif ($count -ge $Globallimit -AND -NOT $OverrideGlobalLimit) {
+                Write-Warning "Reached Global Limit of $GlobalLimit results."
+                $more = $false
+            }
+            # Set up next Page
+            $body.remove('filter') | Out-Null
+            $skip += $resultlimit
+            $filter['skip'] = $skip
+            $body['filter'] = $filter | ConvertTo-JSON -Depth 10 -Compress
+        } else {
+            Write-Debug "No results from last call."
+            $more = $false
+        }
+    }
+    $timer.Stop()
+    $TotalTime = $timer.Elapsed
+    $AveTime = ($times | Measure-Object -Average).Average
+    $MaxTime = ($times | Measure-Object -Maximum).Maximum
+
+    Write-Progress -Id 1 -Activity "Getting Data from Infocyte API" -Completed
+    Write-Verbose "Received $count objects from $url in $($TotalTime.TotalSeconds.ToString("#.####")) Seconds (Page Request times: Ave= $($AveTime.ToString("#"))ms, Max= $($MaxTime.ToString("#"))ms)"
 }
 
 # Used with all other rest methods. Pass a body (hashtable) and it will add authentication.
-function _ICRestMethod ([String]$url, $body=$null, [String]$method) {
-    if (-NOT $Global:ICToken) {
-        Write-Error "API Token not set! Use Set-ICToken to connect to an Infocyte instance."
-        return
-    }
-    $headers = @{
-        Authorization = $Global:ICToken
-    }
-    Write-verbose "Sending $method command to $url"
-    Write-verbose "Body = $($body | ConvertTo-JSON -Compress -Depth 10)"
-	try {
-		$Result = Invoke-RestMethod $url -headers $headers -body ($body|ConvertTo-JSON -Compress -Depth $Depth) -Method $method -ContentType 'application/json' -Proxy $Global:Proxy -ProxyCredential $Global:ProxyCredential
-	} catch {
-		Write-Warning "Error: $_"
-		return "ERROR: $($_.Exception.Message)"
-	}
-	if ($Result) {
-		Write-Output $Result
-	} else {
-		return $null
-	}
-}
-
 function Invoke-ICAPI {
     [cmdletbinding()]
     Param(
@@ -92,26 +186,61 @@ function Invoke-ICAPI {
         [ValidateNotNullorEmpty()]
         [String]$Endpoint,
 
-        [parameter(Mandatory=$false, HelpMessage="Provide a hashtable or PSObject and it will be converted to the json body or added to json-stringified query params that Loopback wants in GET requests.")]
-        $body=$null,
+        [parameter(Mandatory=$false, HelpMessage="Provide a hashtable.")]
+        [HashTable]$body=$null,
 
         [parameter(Mandatory=$false)]
         [ValidateSet(
-          "GET",
-          "POST",
-          "DELETE",
-          "PATCH"
+            "POST",
+            "DELETE",
+            "PUT",
+            "PATCH"
         )]
-        [String]$Method="GET",
-
-        [Switch]$NoLimit
+        [String]$Method="POST"
     )
-    if ($Method -eq "GET") {
-        _ICGetMethod -url $HuntServerAddress/api/$Endpoint -filter $body -NoLimit:$NoLimit
+
+    if ($Global:ICToken) {
+        $headers = @{
+            Authorization = $Global:ICToken
+        }
     } else {
-        _ICRestMethod -url $HuntServerAddress/api/$Endpoint -body $body -method $Method
+        Write-Error "API Token not set! Use Set-ICToken to set your token to an Infocyte instance."
+        return
     }
+
+    $url = "$($Global:HuntServerAddress)/api/$Endpoint"
+    Write-verbose "Sending $method command to $url"
+    Write-verbose "Body: `n$($body | ConvertTo-JSON -Depth 10)"
+    if ($body) {
+        $json = $body | ConvertTo-JSON -Depth 10 -Compress
+    }
+	try {
+		$Result = Invoke-RestMethod -Uri $url -headers $headers -body $json -Method $method -ContentType 'application/json' -Proxy $Global:Proxy -ProxyCredential $Global:ProxyCredential
+	} catch {
+        if ($($_.Exception.Message) -match "422") {
+            Write-Warning "Cannot process request."
+            Write-Error "$($_.Exception.Message)"
+        } else {
+            Write-Error "$($_.Exception.Message)"
+        }
+	}
+    if ($Method -like "DELETE") {
+        if ($Result.'count') {
+            return $true
+        } else {
+            Write-Warning "DELETE action returned unexpected result: $Result"
+            return
+        }
+    }
+
+	if ($Result) {
+		Write-Output $Result
+	} else {
+        Write-Verbose "Nothing returned from call."
+		return
+	}
 }
+
 
 function Join-Object
 {

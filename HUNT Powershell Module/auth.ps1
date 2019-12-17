@@ -26,8 +26,7 @@ function New-ICToken {
 	param(
 		[parameter(Mandatory=$true)]
 		[ValidateNotNullOrEmpty()]
-		[String]
-		$HuntServer = "https://localhost:443",
+		[String]$HuntServer = "https://localhost:443",
 
 		[parameter(Mandatory=$true)]
 		[System.Management.Automation.PSCredential]
@@ -42,7 +41,7 @@ function New-ICToken {
 	} else {
 		$Global:HuntServerAddress = $HuntServer
 	}
-  $url = "$Global:HuntServerAddress/api/users/login"
+  	$url = "$Global:HuntServerAddress/api/users/login"
 
 	if (-NOT $Credential) {
 		# Default Credentials
@@ -82,10 +81,12 @@ function New-ICToken {
 # You can save tokens and proxy info to disk as well with the -Save switch.
 function Set-ICToken {
 	[cmdletbinding()]
+	[alias("Set-ICInstance")]
 	param(
-		[parameter(Mandatory=$true, HelpMessage="Hunt Instance Address. i.e. 'CloudDemo.infocyte.com'")]
+		[parameter(Mandatory=$true, HelpMessage="Infocyte Cloud Instance Name (e.g. 'clouddemo') or Full URL of Server/API (e.g. https://CloudDemo.infocyte.com)'")]
 		[ValidateNotNullOrEmpty()]
-		[String]$HuntServer = "https://localhost:443",
+		[alias("HuntServer")]
+		[String]$Instance,
 
 		[parameter(HelpMessage="API Token from Infocyte App. Omit if using saved credentials.")]
 		[String]$Token,
@@ -97,20 +98,26 @@ function Set-ICToken {
 
 		[Switch]$DisableSSLVerification,
 
-		[parameter(HelpMessage="Will save provided credentials to disk for future use.")]
+		[parameter(HelpMessage="Will save provided token and proxy settings to disk for future use with this Infocyte Instance.")]
 		[Switch]$Save
 	)
 
 	if ($DisableSSLVerification) {
 		_DisableSSLVerification
 	}
+	Write-Verbose "Setting Security Protocol to TLS1.2"
 	[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-	if ($HuntServer -notlike "https://*") {
-		$Global:HuntServerAddress = "https://" + $HuntServer
+	if ($Instance -match "[:\.]+") {
+		if ($Instance -notlike "https://*") {
+			$Global:HuntServerAddress = "https://$Instance"
+		} else {
+			$Global:HuntServerAddress = $Instance
+		}
 	} else {
-		$Global:HuntServerAddress = $HuntServer
+		$Global:HuntServerAddress = "https://$Instance.infocyte.com"
 	}
+	Write-Host "Setting Global API URL to $Global:HuntServerAddress/api"
 
 	$credentialfile = "$env:appdata\infocyte\credentials.json"
 	$Global:ICCredentials = @{}
@@ -128,7 +135,7 @@ function Set-ICToken {
 		# Set Token to global variable
 		if ($Token.length -eq 64) {
 				$Global:ICToken = $Token
-				Write-Host "Setting Auth Token for $HuntServer to $Token"
+				Write-Host "Setting Auth Token for $Global:HuntServerAddress to $Token"
 		} else {
 			Write-Warning "That token won't work. Must be a 64 character string generated within your profile or admin panel within Infocyte HUNT's web console"
 			return
@@ -146,7 +153,7 @@ function Set-ICToken {
 	}
 
 	if ($Proxy) {
-			Write-Host "Infocyte API functions will now use Proxy: $Proxy"
+			Write-Host "Infocyte API functions will use Proxy: $Proxy"
 			$Global:Proxy = $Proxy
 			if ($ProxyUser -AND $ProxyPass) {
 				Write-Host "Infocyte API functions will now use Proxy User: $ProxyUser"
@@ -164,6 +171,19 @@ function Set-ICToken {
 			$Global:ProxyCredential = New-Object System.Management.Automation.PSCredential ($Global:ICCredentials["ProxyPass"], $pw)
 		}
 	}
+
+	# Set initial default boxId (change with Set-ICBox) and test connection
+	$box = Get-ICBox -Last7 -Global
+	if ($box) {
+		$Global:ICCurrentBox = $box.id
+		Write-Host "`$Global:ICCurrentBox is set to $($box.targetGroup)-$($box.name) [$($box.id)]"
+		Write-Host "All analysis data & object retrieval will default to this box."
+		Write-Host "Use Set-ICBox to change the default in this session."
+	} else {
+		Write-Error "Your connection to $Global:HuntServerAddress failed!"
+		Write-Warning "`nInfocyte API URI: $Global:HuntServerAddress`nToken: $Global:ICToken`nProxy: $Global:Proxy`nProxyUser: $($Global:ICCredentials["ProxyUser"])"
+	}
+
 
 	if ($Save) {
 		Write-Host "Saving Token and Proxy settings to credential file: $credentialfile"

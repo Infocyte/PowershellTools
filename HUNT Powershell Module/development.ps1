@@ -1,6 +1,7 @@
 # For Extension Developers
-function Invoke-ICExtension {
+function Test-ICExtension {
 	[cmdletbinding()]
+	[alias("Invoke-ICExtension")]
 	param(
 		[parameter(mandatory=$true)]
 	  	[String]$Path,
