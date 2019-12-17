@@ -20,6 +20,8 @@ function Get-ICAPI {
 
         [Switch]$NoLimit,
 
+        [Switch]$OverrideGlobalLimit,
+
         [Switch]$CountOnly
     )
 
@@ -153,7 +155,7 @@ function Get-ICAPI {
             elseif ($Objects.count -lt $resultlimit) {
                 $more = $false
             }
-            elseif ($count -ge $Globallimit) {
+            elseif ($count -ge $Globallimit -AND -NOT $OverrideGlobalLimit) {
                 Write-Warning "Reached Global Limit of $GlobalLimit results."
                 $more = $false
             }

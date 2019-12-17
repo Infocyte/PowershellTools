@@ -39,7 +39,8 @@ function Get-ICObject {
         [parameter(HelpMessage="The field or fields to return.")]
         [String[]]$fields,
 
-        [Switch]$NoLimit
+        [Switch]$NoLimit,
+        [Switch]$OverrideGlobalLimit
     )
 
     $Files = @(
@@ -52,7 +53,26 @@ function Get-ICObject {
         "Script"
     )
 
-    if ($where -AND $where['boxId']) {
+    if ($where -AND $where['and']) {
+        if (-NOT $where['and'].boxId) {
+            $where['and'] += @{ 'boxId' = $BoxId }
+        }
+    }
+    if ($where -AND $where['or']) {
+        # handle this wierd loopback thing where 'or' filters screw things up
+        # wrap everything in an explicit 'and'
+        Write-Warning "There is a known issue with Loopback where filters that cause problems with first level 'or' filters."
+        Write-Warning "You should wrap everything in an And filter to make sure this works. Doing this now."
+        $where = @{
+            and = @(
+                @{ or = $where['or'] },
+                @{ boxId = $BoxId }
+            )
+        }
+        $where += @{ boxId = $BoxId }
+        Write-Warning "where-filter:$($where|convertto-json -depth 10)"
+    }
+    elseif ($where) {
         $where['boxId'] = $BoxId
     } else {
         $where += @{ boxId = $BoxId }
@@ -129,8 +149,9 @@ function Get-ICObject {
         }
         "File" {
             If ($where.count -lt 2) {
-                Write-Warning "Not Accepted: You should provide a filter for this query to reduce strain on the database."
-                return
+                Write-Warning "No where filter provided. You should provide a filter for this query to reduce strain on the database."
+                Write-Warning "Defaulting to bad and suspicious objects only."
+                $where += @{ threatName = @{ or = @("Bad", "Suspicious")} }
             }
             $cnt = 0
             $Files | % {
@@ -160,7 +181,7 @@ function Get-ICObject {
             $CountOnly = $false
             $Endpoint += "/$id"
         }
-        Get-ICAPI -Endpoint $Endpoint -where $where -order $order -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly
+        Get-ICAPI -Endpoint $Endpoint -where $where -order $order -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly -OverrideGlobalLimit:$OverrideGlobalLimit
     }
 }
 
