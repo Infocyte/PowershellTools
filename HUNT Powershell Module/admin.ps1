@@ -192,14 +192,33 @@ function Get-ICExtension {
 function New-ICExtension {
     [cmdletbinding()]
     Param(
-        [parameter(mandatory=$true)]
+        [parameter(
+            Mandatory = $true,
+            ParameterSetName = 'Path',
+            ValueFromPipeline = $true,
+            ValueFromPipelineByPropertyName = $true
+        )]
+        [ValidateNotNullOrEmpty()]
+        [alias('FullName')]
+        [string]$Path, # <paths of the survey results (.bz2) files to upload>
+
+        [parameter(
+            mandatory = $true,
+            ParameterSetName  = 'String'
+        )]
+        [ValidateNotNullorEmpty()]
+        [String]$ScriptBody,
+
+        [parameter(
+            mandatory=$false,
+            ParameterSetName = 'Path'
+        )]
+        [parameter(
+            mandatory=$true,
+            ParameterSetName  = 'String'
+        )]
         [ValidateNotNullorEmpty()]
         [String]$Name,
-
-        [parameter(mandatory=$true)]
-        [ValidateNotNullorEmpty()]
-        [alias('ScriptBody','ExtensionBody')]
-        [String]$Body,
 
         [parameter()]
         [String]$Description,
@@ -211,36 +230,84 @@ function New-ICExtension {
         [Switch]$Active
     )
 
-    $Endpoint = "extensions"
-    $bd = @{
-        name = $Name
-        type = $Type
-        body = $Body
-        description = $Description
-        active = $Active
+    PROCESS {
+        $Endpoint = "extensions"
+        $body = @{
+            type = $Type
+        }
+        if ($PSCmdlet.ParameterSetName -eq 'Path') {
+            Write-Verbose "Testing path: $Path"
+            if (Test-Path $Path) {
+                $scriptfile = Get-Item $Path
+                Write-Verbose "Using filename for Extension Name."
+                $body['name'] = $scriptfile.BaseName
+                $ScriptBody = Get-Content $Path -Raw
+            } else {
+                Write-Error "$Path does not exist!"
+                return
+            }
+        } else {
+            $body['name'] = $Name
+        }
+        $body['body'] = $ScriptBody
+        if ($Active) {
+            $body['active'] = $true
+        }
+        if ($Description) {
+            $body['description'] = $Description
+        }
+        Write-Host "Adding new Extension named: $($body['name'])"
+        $ext = Get-ICExtension -where @{ name = $($body['name']); deleted = $False }
+        if ($ext) {
+            Write-Error "There is already an extension named $($body['name'])"
+        } else {
+            Invoke-ICAPI -Endpoint $Endpoint -body $body -method POST
+        }
     }
-    Write-Host "Adding new Extension named: $name"
-    $ext = Get-ICExtension -where @{ name = $Name; deleted = $False }
-    if ($ext) {
-        Write-Error "There is already an extension named $Name"
-    } else {
-        Invoke-ICAPI -Endpoint $Endpoint -body $bd -method POST
-    }
+
 }
 
 function Update-ICExtension {
     [cmdletbinding(SupportsShouldProcess=$true)]
     Param(
-        [parameter(Mandatory=$true, ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
+        [parameter(
+            mandatory=$false,
+            ParameterSetName = 'Path'
+        )]
+        [parameter(
+            mandatory=$true,
+            ParameterSetName  = 'String'
+        )]
         [alias('extensionId')]
         [String]$Id,
 
-        [parameter()]
-        [String]$Name,
+        [parameter(
+            Mandatory = $true,
+            ParameterSetName = 'Path',
+            ValueFromPipeline = $true,
+            ValueFromPipelineByPropertyName = $true
+        )]
+        [ValidateNotNullOrEmpty()]
+        [alias('FullName')]
+        [string]$Path, # <paths of the survey results (.bz2) files to upload>
 
-        [parameter()]
-        [alias('ScriptBody','ExtensionBody')]
-        [String]$Body,
+        [parameter(
+            mandatory = $true,
+            ParameterSetName  = 'String'
+        )]
+        [ValidateNotNullorEmpty()]
+        [String]$ScriptBody,
+
+        [parameter(
+            mandatory=$false,
+            ParameterSetName = 'Path'
+        )]
+        [parameter(
+            mandatory=$false,
+            ParameterSetName  = 'String'
+        )]
+        [ValidateNotNullorEmpty()]
+        [String]$Name,
 
         [parameter()]
         [String]$Description,
@@ -254,6 +321,19 @@ function Update-ICExtension {
 
     PROCESS {
         $Endpoint = "extensions"
+        $body = @{}
+        if ($PSCmdlet.ParameterSetName -eq 'Path') {
+            Write-Verbose "Testing path: $Path"
+            if (Test-Path $Path) {
+                $scriptfile = Get-Item $Path
+                $ScriptBody = Get-Content $Path -Raw
+            } else {
+                Write-Error "$Path does not exist!"
+                return
+            }
+        } else {
+            $body['name'] = $Name
+        }
         $obj = Get-ICExtension -id $Id
         if ($obj) {
             Write-Verbose "Extension found: `n$($obj | converto-json)"
@@ -261,9 +341,17 @@ function Update-ICExtension {
             Write-Error "Extension with id $id not found!"
             return
         }
-        $b = @{
-            id = $Id
+
+        if (-NOT $Id) {
+            Write-Verbose "Using existing Id for Extension Id."
+            $body['name'] = $scriptfile.BaseName
         }
+
+        if (-NOT $Name) {
+            Write-Verbose "Using filename for Extension Name."
+            $body['name'] = $scriptfile.BaseName
+        }
+
         if ($Name) { $b['name'] = $Name } else { $b['name'] = $ext.name}
         if ($Body) { $b['body'] = $Body } else { $b['body'] = $ext.body }
         if ($Description) { $b['description'] = $Description } else { $b['description'] = $ext.description }
