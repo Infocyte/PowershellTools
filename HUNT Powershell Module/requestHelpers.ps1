@@ -121,7 +121,7 @@ function Get-ICAPI {
         } catch {
             $pc = -1
         }
-        if ($total -gt 25) {
+        if ($total -ge 100) {
             Write-Progress -Id 2 -ParentId 1 -Activity "Getting Data from Infocyte API" -status "Requesting data from $url [$skip of $total]" -PercentComplete $pc
         }
         Write-Debug "Sending $url this Body as 'application/json':`n$($body|convertto-json)"
