@@ -243,8 +243,7 @@ function New-ICExtension {
                 $body['name'] = $scriptfile.BaseName
                 $ScriptBody = Get-Content $Path -Raw
             } else {
-                Write-Error "$Path does not exist!"
-                return
+                throw "$Path does not exist!"
             }
         } else {
             $body['name'] = $Name
@@ -259,7 +258,7 @@ function New-ICExtension {
         Write-Host "Adding new Extension named: $($body['name'])"
         $ext = Get-ICExtension -where @{ name = $($body['name']); deleted = $False }
         if ($ext) {
-            Write-Error "There is already an extension named $($body['name'])"
+            throw "There is already an extension named $($body['name'])"
         } else {
             Invoke-ICAPI -Endpoint $Endpoint -body $body -method POST
         }
@@ -296,27 +295,7 @@ function Update-ICExtension {
             ParameterSetName  = 'String'
         )]
         [ValidateNotNullorEmpty()]
-        [String]$ScriptBody,
-
-        [parameter(
-            mandatory=$false,
-            ParameterSetName = 'Path'
-        )]
-        [parameter(
-            mandatory=$false,
-            ParameterSetName  = 'String'
-        )]
-        [ValidateNotNullorEmpty()]
-        [String]$Name,
-
-        [parameter()]
-        [String]$Description,
-
-        [parameter()]
-        [ValidateSet("collection","action")]
-        [String]$Type,
-
-        [Switch]$Active
+        [String]$ScriptBody
     )
 
     PROCESS {
@@ -326,41 +305,46 @@ function Update-ICExtension {
             Write-Verbose "Testing path: $Path"
             if (Test-Path $Path) {
                 $scriptfile = Get-Item $Path
-                $ScriptBody = Get-Content $Path -Raw
+                $body['body'] = Get-Content $Path -Raw
+                $scriptname = $scriptfile.BaseName
             } else {
-                Write-Error "$Path does not exist!"
-                return
+                throw "$Path does not exist!"
             }
         } else {
-            $body['name'] = $Name
+            $body['body'] = $ScriptBody
         }
-        $obj = Get-ICExtension -id $Id
-        if ($obj) {
-            Write-Verbose "Extension found: `n$($obj | converto-json)"
+
+        if ($Id) {
+            Write-Verbose "Looking up extension by Id"
+            $obj = Get-ICExtension -id $Id
+            if ($obj) {
+                Write-Verbose "Extension found: `n$($obj | converto-json)"
+                $body['id'] = $obj.id
+                $body['name'] = $obj.name
+            } else {
+                throw "Extension with id $id not found!"
+            }
         } else {
-            Write-Error "Extension with id $id not found!"
-            return
-        }
+            Write-Verbose "Looking up existing extension by name: $($scriptfile.BaseName)"
+            $obj = Get-ICExtension -where @{ name = $scriptfile.BaseName; deleted = $false }
+            if ($obj) {
+                if ($obj.count) {
+                    throw "More than one extension named $($scriptfile.BaseName)"
+                }
+                Write-Verbose "Found existing extension named $($scriptfile.BaseName) with id $($obj.id)"
+                $body['id'] = $obj.id
+                $body['name'] = $scriptfile.BaseName
 
-        if (-NOT $Id) {
-            Write-Verbose "Using existing Id for Extension Id."
-            $body['name'] = $scriptfile.BaseName
+            } else {
+                throw "Extension named $($scriptfile.BaseName) not found!"
+            }
         }
-
-        if (-NOT $Name) {
-            Write-Verbose "Using filename for Extension Name."
-            $body['name'] = $scriptfile.BaseName
-        }
-
-        if ($Name) { $b['name'] = $Name } else { $b['name'] = $ext.name}
-        if ($Body) { $b['body'] = $Body } else { $b['body'] = $ext.body }
-        if ($Description) { $b['description'] = $Description } else { $b['description'] = $ext.description }
-        if ($Type) { $b['type'] = $Type } else { $b['type'] = $ext.type }
-        if ($Active) { $b['active'] = $Active } else { $b['active'] = $ext.active }
+        $body['type'] = $obj.type
+        $body['description'] = $obj.description
+        $body['active'] = $obj.active
 
         Write-Host "Updating Extension: $($obj.name) [$Id] with `n$($b|convertto-json)"
         if ($PSCmdlet.ShouldProcess($($obj.name), "Will update extension $($obj.name) [$Id]")) {
-
             Invoke-ICAPI -Endpoint $Endpoint -body $b -method POST
         }
     }
