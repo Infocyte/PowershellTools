@@ -243,7 +243,8 @@ function New-ICExtension {
                 $body['name'] = $scriptfile.BaseName
                 $ScriptBody = Get-Content $Path -Raw
             } else {
-                throw "$Path does not exist!"
+                Write-Error "$Path does not exist!"
+                return
             }
         } else {
             $body['name'] = $Name
@@ -258,7 +259,8 @@ function New-ICExtension {
         Write-Host "Adding new Extension named: $($body['name'])"
         $ext = Get-ICExtension -where @{ name = $($body['name']); deleted = $False }
         if ($ext) {
-            throw "There is already an extension named $($body['name'])"
+            Write-Error "There is already an extension named $($body['name'])"
+            return
         } else {
             Invoke-ICAPI -Endpoint $Endpoint -body $body -method POST
         }
@@ -308,7 +310,8 @@ function Update-ICExtension {
                 $body['body'] = Get-Content $Path -Raw
                 $scriptname = $scriptfile.BaseName
             } else {
-                throw "$Path does not exist!"
+                Write-Error "$Path does not exist!"
+                return
             }
         } else {
             $body['body'] = $ScriptBody
@@ -322,21 +325,24 @@ function Update-ICExtension {
                 $body['id'] = $obj.id
                 $body['name'] = $obj.name
             } else {
-                throw "Extension with id $id not found!"
+                Write-Error "Extension with id $id not found!"
+                return
             }
         } else {
             Write-Verbose "Looking up existing extension by name: $($scriptfile.BaseName)"
             $obj = Get-ICExtension -where @{ name = $scriptfile.BaseName; deleted = $false }
             if ($obj) {
                 if ($obj.count) {
-                    throw "More than one extension named $($scriptfile.BaseName)"
+                    Write-Error "More than one extension named $($scriptfile.BaseName)"
+                    return
                 }
                 Write-Verbose "Found existing extension named $($scriptfile.BaseName) with id $($obj.id)"
                 $body['id'] = $obj.id
                 $body['name'] = $scriptfile.BaseName
 
             } else {
-                throw "Extension named $($scriptfile.BaseName) not found!"
+                Write-Error "Extension named $($scriptfile.BaseName) not found!"
+                return
             }
         }
         $body['type'] = $obj.type

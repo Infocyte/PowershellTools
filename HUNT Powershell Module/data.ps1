@@ -433,6 +433,7 @@ function Get-ICDwellTime {
         [String]$Id,
 
         [parameter(ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
+        [ValidatePattern("\b[0-9a-f]{40}\b")]
         [alias('fileRepId')]
         [String]$Sha1,
 
@@ -449,14 +450,9 @@ function Get-ICDwellTime {
         if ($Id) {
             $CountOnly = $False
             $Endpoint += "/$Id"
-        } else {
-            if ($sha1 -match "\b[0-9a-f]{40}\b") {
-                $where['fileRepId'] = $Sha1
-            }
-            else {
-                Write-Error "Incorrect input format. Requires a sha1 (fileRepId) of 40 characters."
-                return
-            }
+        }
+        elseif ($sha1) {
+            $where['fileRepId'] = $Sha1
         }
         Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
     }
