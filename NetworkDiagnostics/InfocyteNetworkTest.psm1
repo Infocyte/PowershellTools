@@ -61,7 +61,7 @@ if ($PSVersionTable.PSVersion.Major -lt 3) {
 			d. Test PSRemoting
 		11. Test 443 Back to Infocyte from Remote Endpoint
 #>
-Function Test-ICNetworkAccess2 {
+Function Test-ICNetworkAccess {
 	[CmdletBinding()]
 	Param(
 		[Parameter(Position = 0, Mandatory = $True, HelpMessage = "The remote system to test connectivity to")]
