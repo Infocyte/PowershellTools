@@ -6,8 +6,35 @@ if ($PSVersionTable.PSVersion.Major -lt 3) {
 } else {
     Write-Host "Checking PSVersion [Minimum Supported: 3.0]: PASSED [$PS]!`n"
 }
+try {
+    [Reflection.Assembly]::LoadFile("$PSScriptRoot\Naos.WinRM.1.0.50\lib\net45\Naos.WinRM.dll")
+} catch {
+    Write-Error "Could not load Naos.WinRM module."
+    return
+}
+
 
 # FUNCTIONS
+
+$WinRM = @()
+
+Function WinRM.New {
+    Param(
+        [String]$Target="192.168.56.101",
+        [String]$Username="razersede\administrator",
+        [SecureString]$Password=(ConvertTo-SecureString "Buster635" -AsPlainText -Force),
+        [Switch]$AutoManagedTrustedHosts
+    )
+
+    $winrm = [Naos.WinRM.MachineManager]::new(
+        $target,
+        $username,
+        $password,
+        $AutoManagedTrustedHosts
+    )
+
+    return $winrm
+}
 
 Function Get-DNSEntry ([String]$target) {
 
@@ -130,7 +157,7 @@ Function Receive-TCPMessage {
 	}
 }
 
-function Test-Connectivity {
+function Invoke-PortScan {
 	[CmdletBinding()]
 	Param(
 		[Parameter(Position = 0, Mandatory = $True, ValueFromPipeline=$False)]
@@ -140,26 +167,42 @@ function Test-Connectivity {
 
 		[Parameter(Position = 1, Mandatory = $True, ValueFromPipeline=$True)]
 		[ValidateRange(1,65535)]
-		[Int32]
-		$port,
+		[Int32[]]
+		$port = @(22,53,80,135,137,139,389,443,445,1025,1026,3389,5985,5986,49152,49153,49154),
 
 		[Parameter(Position = 2, Mandatory = $False, ValueFromPipeline=$False)]
 		[ValidateRange(1,128)]
 		[Int32]
-		$MaxThreads = 24
+		$MaxThreads = 24,
+
+        [Switch]
+        $Pretty
 	)
 
 	BEGIN {
 		$portdict = @{
+            21 = "FTP (TCP 21)"
 			22 = "SSH (TCP 22)"
+            23 = "Telnet (TCP 23)"
+            25 = "SMTP (TCP 25)"
 			53 = "DNS (TCP 53)"
+            69 = "TFTP (TCP 69)"
 			80 = "HTTP (TCP 80)"
+            88 = "Kerberos (TCP 88)"
+            115 = "SFTP (TCP 115)"
+            123 = "NTP (TCP 135)"
 			135 = "WMI/RPC (TCP 135)"
-			137 = "NetBIOS (TCP 137)"
-			139 = "NetBIOS (TCP 139)"
+			137 = "NetBIOS Name (TCP 137)"
+			139 = "NetBIOS Session (TCP 139)"
+            161 = "SNMP (TCP 161)"
 			389 = "LDAP (TCP 389)"
 			443 = "HTTPS (TCP 443)"
 			445 = "SMB (TCP 445)"
+            512 = "exec (TCP 512)"
+            515 = "LPD Printer (TCP 515)"
+            992 = "Telnet Secure (TCP 992)"
+            993 = "IMAP4 Secure (TCP 993)"
+            995 = "POP3 Secure (TCP 995)"
 			3389 = "Remote Desktop (TCP 3389)"
 			5985 = 	"PSRemoting-HTTP (TCP 5985)"
 			5986 = 	"PSRemoting-HTTPS (TCP 5986)"
@@ -172,24 +215,32 @@ function Test-Connectivity {
 				try
 				{
 					$tcpclient.Connect($target,$port)
-				} catch {}
+                    if($tcpclient.Connected)
+                    {
+                        $tcpclient.Close()
+                        Write-Verbose "[SUCCESS] Port $port on $target is open"
+                        $True
+                    }
+                    else {
+                        Write-Warning "[FAILURE] Port $port on $target is closed"
+                        $False
+                    }
+				} catch {
 
-				if($tcpclient.Connected)
-				{
-					$tcpclient.Close()
-					Write-Verbose "[SUCCESS] Port $port on $target is open"
-					$True
-				}
-				else {
-					Write-Warning "[FAILURE] Port $port on $target is closed"
-					$False
-				}
+                } finally {
+                    $tcpclient.close()
+                    $tcpclient.Dispose()
+                }
+
+
 		}
 		$ports = @()
 	}
 
 	PROCESS {
-		$ports += $_
+        foreach ($p in $port) {
+            $ports += $p
+        }
 	}
 
 	END {
@@ -229,11 +280,17 @@ function Test-Connectivity {
             if ($portdict.Keys -contains $Job.Port) {
                 $Result["Name"] = $portdict[$Job.Port]
             }
+            elseif ($Job.Port -lt 1024) {
+                $Result["Name"] = "Well-Known Port"
+            }
             elseif ($Job.Port -ge 49152 -AND $Job.Port -le 65535) {
                 $Result["Name"] = "Dynamic Port (TCP 49152-65535)"
             }
-            elseif ($Job.Port -ge 1024 -AND $Job.Port -le 5000){
+            elseif ($Job.Port -ge 1025 -AND $Job.Port -le 5000){
                 $Result["Name"] = "Legacy Dynamic Port (TCP 1024-5000)"
+            }
+            elseif ($Job.Port -ge 1024 -AND $Job.Port -le 49151) {
+                $Result['Name'] = "Registered Port"
             }
             else {
                 $Result["Name"] = "Unknown Port"
@@ -245,7 +302,20 @@ function Test-Connectivity {
 		$elapsedTime.stop()
 		$RunspacePool.Close()
 
-		$Results
+        if ($Pretty) {
+            Write-Host "==========================================================================="
+            Write-Host -NoNewline ("{0,-8}`t{1,-35}`t{2}`n" -f "Port","Name","Access")
+            $Results | ForEach-Object {
+                if ($_.Access) {
+                    Write-Host -ForegroundColor Green -NoNewline ("{0,-8}`t{1,-35}`t{2}`n" -f $_.Port,$_.Name,$_.Access)
+                } else {
+                    Write-Host -ForegroundColor Red -NoNewline ("{0,-8}`t{1,-35}`t{2}`n" -f $_.Port,$_.Name,$_.Access)
+                }
+            }
+        	Write-Host ""
+        } else {
+            Write-Output $Results
+        }
 	}
 }
 
@@ -267,7 +337,9 @@ Function Test-ADCredentials {
 		$pc = New-Object System.DirectoryServices.AccountManagement.PrincipalContext($ct, $Credential.GetNetworkCredential().Domain)
         $r.isValid = $pc.ValidateCredentials($Credential.GetNetworkCredential().UserName, $Credential.GetNetworkCredential().Password)
 	} catch {
-        $r.Error = "ERROR: Could not contact DirectoryServices on domain $($Credential.GetNetworkCredential().Domain)  - Message $($_.Exception.GetType().FullName): $($_.Exception.Message)"
+        $emsg = _GetFullMessage $_
+        $r.Error = "ERROR: Could not contact DirectoryServices on domain $($Credential.GetNetworkCredential().Domain)  - Message: $emsg"
+        Write-Warning $emsg
 	}
     return $r
 }
@@ -384,13 +456,28 @@ function Test-WebPage ($URL = "https://incyte.infocyte.com", [System.Net.WebProx
 function Add-Error {
     Param(
         [Parameter(Mandatory=$true, Position=0)]
-        [Ref]$Err,
+        [Ref]$Result,
 
         [Parameter(Mandatory=$true, Position=1)]
-        [String]$Message
+        [String]$Message,
+
+        [Parameter(Mandatory=$false, Position=2)]
+        [Object]$Err
     )
+    if ($Err) {
+        $Message = "$Message. ERROR: $(_GetFullMessage $Err)"
+    }
     Write-Warning $Message
-    $Err.Value += "$Message`n"
+    $Result.Value.Error += "$Message`n"
+}
+
+function _GetFullMessage ($Err) {
+    if (-NOT $Err.Exception.InnerException) {
+        $msg = $Err.Exception.Message
+    } else {
+        $msg = "$($Err.Exception.Message) --> $(_GetFullMessage $Err.Exception.InnerException)"
+    }
+    return $Msg
 }
 
 <#
@@ -560,7 +647,7 @@ Function Test-ICNetworkAccess {
         DefaultProxy = $showcurrentproxy
         AsAdmin = $Admin
 	}
-    Write-Host "$Test['Config']"
+    Write-Host "$($Test['Config'])"
 
     Write-Host -ForegroundColor Cyan "`n==========================================================================="
     Write-Host -ForegroundColor Cyan "==========================================================================="
@@ -590,7 +677,7 @@ Function Test-ICNetworkAccess {
             $msg = "This system seems to have resolved to a domain that is different from the provided credentials for $($Domain)."
             $msg += "You may need to provide the correct credentials for the resolved domain or check your DNS provider. "
             $msg += "If this result is unexpected, ensure this system is pointed to the correct DNS server."
-            Add-Error ([Ref]$Result['Error']) $msg
+            Add-Error ([Ref]$Result) $msg
             $Result['SubResults'] += @{ DNSDomainAlignment = $False }
         } else {
             $Result['SubResults'] += @{ DNSDomainAlignment = $True }
@@ -607,7 +694,7 @@ Function Test-ICNetworkAccess {
     } else {
         $msg = "FAIL: DNS Resolution of $Target failed - You may not be pointed at the correct DNS Servers.`n"
         $msg += "Current DNS Servers: $($IPAddress.DNSServerSearchOrder)"
-        Add-Error ([Ref]$Result['Error']) $msg
+        Add-Error ([Ref]$Result) $msg
         $Result['Success'] = $False
     }
     $Test['Results'] += New-Object -Type PSObject -Property $Result
@@ -633,7 +720,7 @@ Function Test-ICNetworkAccess {
 		Write-Host "SUCCESS: $TestAddr has resolved to $($DNSEntry.Hostname) => $($DNSEntry.IP)"
 		$Result['SubResults'] += @{ ExternalDNS = $True }
 	} else {
-        Add-Error ([Ref]$Result['Error']) "FAIL: DNS Resolution of $TestAddr failed - Your internet may be down or restricted."
+        Add-Error ([Ref]$Result) "FAIL: DNS Resolution of $TestAddr failed - Your internet may be down or restricted."
         $Result['SubResults'] += @{ ExternalDNS = $False }
 	}
 
@@ -642,7 +729,7 @@ Function Test-ICNetworkAccess {
 		Write-Host "SUCCESS: Ping (ICMP) to $TestAddr ($($ICMP.IPV4Address)) in $($ICMP.ResponseTime) m/s"
         $Result['SubResults'] += @{ ICMP = $True }
 	} catch {
-        Add-Error ([Ref]$Result['Error']) "FAIL: Ping (ICMP) to $TestAddr failed - Message ($($_.Exception.GetType().FullName)): @($_.Exception.Message)"
+        Add-Error ([Ref]$Result) "FAIL: Ping (ICMP) to $TestAddr failed - Message ($($_.Exception.GetType().FullName)): @($_.Exception.Message)"
         $Result['SubResults'] += @{ ICMP = $False }
 	}
 
@@ -651,7 +738,7 @@ Function Test-ICNetworkAccess {
         $Result['SubResults'] += @{ Web = $true }
         $Result['Success'] = $True
     } else {
-        Add-Error ([Ref]$Result['Error']) "Could not connect to $($TestAddr): $webtest"
+        Add-Error ([Ref]$Result) "Could not connect to $($TestAddr): $webtest"
         $Result['SubResults'] += @{ Web = $False }
         $Result['Success'] = $False
     }
@@ -677,7 +764,7 @@ Function Test-ICNetworkAccess {
 		Write-Host "SUCCESS: $TestAddr resolved to $($DNSEntry.Hostname) / $($DNSEntry.IP)"
 		$Result['SubResults'] += @{ DNS = $True }
 	} else {
-        Add-Error ([Ref]$Result['Error']) "FAIL: DNS Resolution of $TestAddr failed - Your internet may be down or restricted"
+        Add-Error ([Ref]$Result) "FAIL: DNS Resolution of $TestAddr failed - Your internet may be down or restricted"
         $Result['SubResults'] += @{ DNS = $False }
 	}
 
@@ -688,7 +775,7 @@ Function Test-ICNetworkAccess {
             $Result['SubResults'] += @{ WebNoProxy = $True }
             $Result['Success'] = $True
         } else {
-            Add-Error ([Ref]$Result['Error']) "Could not connect to $TestAddr with no proxy (Direct): $webtest"
+            Add-Error ([Ref]$Result) "Could not connect to $TestAddr with no proxy (Direct): $webtest"
             $Result['SubResults'] += @{ WebNoProxy = $False }
         }
     }
@@ -699,7 +786,7 @@ Function Test-ICNetworkAccess {
         $Result['SubResults'] += @{ WebDefaultProxy = $True }
         $Result['Success'] = $True
     } else {
-        Add-Error ([Ref]$Result['Error']) "Could not connect to $($TestAddr) with DefaultCredentials: $webtest"
+        Add-Error ([Ref]$Result) "Could not connect to $($TestAddr) with DefaultCredentials: $webtest"
         $Result['SubResults'] += @{ WebDefaultProxy = $False }
     }
 
@@ -709,7 +796,7 @@ Function Test-ICNetworkAccess {
         $Result['SubResults'] += @{ Web = $True }
         $Result['Success'] = $True
     } else {
-        Add-Error ([Ref]$Result['Error']) "Could not connect to $($TestAddr) with $($ProxyAddress): $webtest"
+        Add-Error ([Ref]$Result) "Could not connect to $($TestAddr) with $($ProxyAddress): $webtest"
         $Result['Success'] = $False
         $Result['SubResults'] += @{ Web = $False }
     }
@@ -740,11 +827,11 @@ Function Test-ICNetworkAccess {
 		Write-Host "SUCCESS: Ping (ICMP) to $Hostname ($($ICMP.IPV4Address)) in $($ICMP.ResponseTime) m/s"
 		$Result['SubResults'] += @{ ICMP = $True }
 	} catch {
-        Add-Error ([Ref]$Result['Error']) "FAIL: Ping (ICMP) to $Hostname (($($ICMP.IPV4Address)) - Message ($($_.Exception.GetType().FullName)): $($_.Exception.Message)"
+        Add-Error ([Ref]$Result) "FAIL: Ping (ICMP) to $Hostname (($($ICMP.IPV4Address)) - Message ($($_.Exception.GetType().FullName)): $($_.Exception.Message)"
 		$Result['SubResults'] += @{ ICMP = $False }
 	}
 
-	$PortResults = $ports | Test-Connectivity -IP $IP
+	$PortResults = $ports | Invoke-PortScan -IP $IP
 	$Result['SubResults'] += @{ Portscan = $PortResults}
     Write-Host "==========================================================================="
     Write-Host -NoNewline ("{0,-8}`t{1,-35}`t{2}`n" -f "Port","Name","Access")
@@ -763,35 +850,35 @@ Function Test-ICNetworkAccess {
         $Result['SubResults'] += @{ DynamicPorts = $true}
 	} else {
         $Result['SubResults'] += @{ DynamicPorts = $False}
-        Add-Error ([Ref]$Result['Error']) "FAIL: No Access to Dynamic Ports (TCP 49152-65535 or 1025-5000 for 2k3/XP) on $IP - May affect WMI & RPC Execution and Deployment against a Windows-based Hosts"
+        Add-Error ([Ref]$Result) "FAIL: No Access to Dynamic Ports (TCP 49152-65535 or 1025-5000 for 2k3/XP) on $IP - May affect WMI & RPC Execution and Deployment against a Windows-based Hosts"
 	}
 
     if ($PortResults | where { $_.Port -eq 22 } | where { $_.Access -eq $true }) {
         $Result['SubResults'] += @{ SSH = $true}
     } else {
         $Result['SubResults'] += @{ SSH = $false}
-        Add-Error ([Ref]$Result['Error']) "FAIL: No Access to SSH (TCP 22) on $IP - Will affect SSH Execution and Deployment against a Unix-based Hosts"
+        Add-Error ([Ref]$Result) "FAIL: No Access to SSH (TCP 22) on $IP - Will affect SSH Execution and Deployment against a Unix-based Hosts"
     }
 
     if ($PortResults | where { $_.Port -eq 139 -OR  $_.Port -eq 445} | where { $_.Access -eq $true }) {
         $Result['SubResults'] += @{ SMB = $true}
     } else {
         $Result['SubResults'] += @{ SMB = $false}
-        Add-Error ([Ref]$Result['Error']) "FAIL: No Access to SMB on $IP - Will affect future file retrieval and may affect Deployments against a Windows-based Hosts"
+        Add-Error ([Ref]$Result) "FAIL: No Access to SMB on $IP - Will affect future file retrieval and may affect Deployments against a Windows-based Hosts"
     }
 
     if ($PortResults | where { $_.Port -eq 135 } | where { $_.Access -eq $true }) {
         $Result['SubResults'] += @{ 'WMI/RPC' = $true}
     } else {
         $Result['SubResults'] += @{ 'WMI/RPC' = $false}
-        Add-Error ([Ref]$Result['Error']) "FAIL: No Access to WMI/RPC on $IP - Will affect WMI and RPC-based Execution and Deployment against a Windows-based Hosts"
+        Add-Error ([Ref]$Result) "FAIL: No Access to WMI/RPC on $IP - Will affect WMI and RPC-based Execution and Deployment against a Windows-based Hosts"
     }
 
     if ($PortResults | where { $_.Port -eq 5985 -OR $_.Port -eq 5986 } | where { $_.Access -eq $true }) {
         $Result['SubResults'] += @{ 'PSRemote/WinRM' = $True }
     } else {
         $Result['SubResults'] += @{ 'PSRemote/WinRM' = $false }
-        Add-Error ([Ref]$Result['Error']) "FAIL: No Access to PSRemote/WinRM on $IP - Will affect PSRemoting Execution and Deployment against a Windows-based Hosts"
+        Add-Error ([Ref]$Result) "FAIL: No Access to PSRemote/WinRM on $IP - Will affect PSRemoting Execution and Deployment against a Windows-based Hosts"
 	}
 
 	$open = ($PortResults | where { $_.Access }).count
@@ -818,7 +905,7 @@ Function Test-ICNetworkAccess {
 	if ($TestCreds.isValid) {
 		Write-Host "SUCCESS: Credentials for $Username are valid on $Domain"
 	} else {
-        Add-Error ([Ref]$Result['Error']) $TestCreds.Error
+        Add-Error ([Ref]$Result) $TestCreds.Error
 		$Result['Success'] = $False
 	}
 	$Test['Results'] += New-Object -Type PSObject -Property $Result
@@ -854,11 +941,11 @@ Function Test-ICNetworkAccess {
    }
 
 	if (-NOT $Test.Results.SubResults.'WMI/RPC') {
-        Add-Error ([Ref]$Result['Error']) "No connectivity to RPC - skipping WMI test"
+        Add-Error ([Ref]$Result) "No connectivity to RPC - skipping WMI test"
 		$Result['Success'] = $False
     } else {
         if (-NOT $opendynports) {
-            Add-Error ([Ref]$Result['Error']) "Dynamic Ports were either blocked or not available - Might effect connection"
+            Add-Error ([Ref]$Result) "Dynamic Ports were either blocked or not available - Might effect connection"
         }
 
         $GetWmiObjectParams = @{
@@ -875,7 +962,7 @@ Function Test-ICNetworkAccess {
                 $Result['SubResults'] += @{ Local = $True }
                 $Result['Success'] = $True
             } Catch {
-                Add-Error ([Ref]$Result['Error']) "FAIL: WMI connection failed to $IP"
+                Add-Error ([Ref]$Result) "FAIL: WMI connection failed to $IP"
                 $Result['SubResults'] += @{ Local = $false }
             }
         } else {
@@ -888,7 +975,7 @@ Function Test-ICNetworkAccess {
                 $Result['SubResults'] += @{ NTLM = $True }
                 $Result['Success'] = $True
             } Catch {
-                Add-Error ([Ref]$Result['Error']) "FAIL: WMI with NTLM failed to $IP"
+                Add-Error ([Ref]$Result) "FAIL: WMI with NTLM failed to $IP"
                 $Result['SubResults'] += @{ NTLM = $false }
             }
 
@@ -901,7 +988,7 @@ Function Test-ICNetworkAccess {
                 $Result['SubResults'] += @{ KerberosByIP = $True }
                 $Result['Success'] = $True
             } Catch {
-                Add-Error ([Ref]$Result['Error']) "FAIL: WMI with Kerberos failed to $Domain\$Hostname ($IP)"
+                Add-Error ([Ref]$Result) "FAIL: WMI with Kerberos failed to $Domain\$Hostname ($IP)"
                 $Result['SubResults'] += @{ KerberosByIP = $false }
             }
 
@@ -913,7 +1000,7 @@ Function Test-ICNetworkAccess {
                 $Result['SubResults'] += @{ KerberosByName = $True }
                 $Result['Success'] = $True
             } Catch {
-                Add-Error ([Ref]$Result['Error']) "FAIL: WMI with Kerberos failed to $Hostname ($IP)"
+                Add-Error ([Ref]$Result) "FAIL: WMI with Kerberos failed to $Hostname ($IP)"
                 $Result['SubResults'] += @{ KerberosByName = $false }
             }
         }
@@ -934,7 +1021,7 @@ Function Test-ICNetworkAccess {
     }
 
  	if (-NOT $Test.Results.SubResults.SMB) {
-        Add-Error ([Ref]$Result['Error']) "No connectivity to NetBIOS and SMB ports - skipping SMB Transfer test"
+        Add-Error ([Ref]$Result) "No connectivity to NetBIOS and SMB ports - skipping SMB Transfer test"
 		$Result['Success'] = $False
     } else {
         try {
@@ -946,7 +1033,7 @@ Function Test-ICNetworkAccess {
                 $mountdrive = New-PSDrive -Name test -PSProvider FileSystem -Root "\\$Hostname\C$" -Credential $Creds -ea STOP
                 Write-Host "SUCCESS: Connected to $Hostname via SMB"
             } catch {
-                Add-Error ([Ref]$Result['Error']) "FAIL: Could not connect to $Target via SMB - C$ administrative share may not be accessible - Message: $($_.Exception.Message)"
+                Add-Error ([Ref]$Result) "FAIL: Could not connect to $Target via SMB - C$ administrative share may not be accessible - Message: $($_.Exception.Message)"
                 $Result['Success'] = $False
             }
         }
@@ -967,43 +1054,58 @@ Function Test-ICNetworkAccess {
     }
 
     if (-NOT $Test.Results.SubResults.'WMI/RPC') {
-        Add-Error ([Ref]$Result['Error']) "No connectivity to RPC - skipping Remote Schtasks test"
+        Add-Error ([Ref]$Result) "No connectivity to RPC - skipping Remote Schtasks test"
         $Result['Success'] = $False
     } else {
         if (-NOT $opendynports) {
-            Add-Error ([Ref]$Result['Error']) "Dynamic Ports were either blocked or not available - Might effect connection"
+            Add-Error ([Ref]$Result) "Dynamic Ports were either blocked or not available - Might effect connection"
         }
-        $a = SCHTASKS /Create /S $IP /U $FQUsername /P ($Creds.GetNetworkCredential().Password) /TN test /TR 'c:\windows\system32\cmd.exe /c Net Time' /SC ONCE /ST 23:59 /RU SYSTEM /F
+        if ($isLocal) {
+            $a = SCHTASKS /Create /TN test /TR 'c:\windows\system32\cmd.exe /c Net Time' /SC ONCE /ST 23:59 /RU SYSTEM /F
+        } else {
+            $a = SCHTASKS /Create /S $IP /U $FQUsername /P ($Creds.GetNetworkCredential().Password) /TN test /TR 'c:\windows\system32\cmd.exe /c Net Time' /SC ONCE /ST 23:59 /RU SYSTEM /F
+        }
         if ($a -match "SUCCESS") {
             Write-Host "SUCCESS: Remote task (test) created on $IP"
             Start-Sleep 1
 
             # Run the task
-            $b = SCHTASKS /Run /S $IP /U $FQUsername /P ($Creds.GetNetworkCredential().Password) /TN test
+            if ($isLocal) {
+                $b = SCHTASKS /Run /TN test
+            } else {
+                $b = SCHTASKS /Run /S $IP /U $FQUsername /P ($Creds.GetNetworkCredential().Password) /TN test
+            }
             if ($b -match "SUCCESS") {
                 Write-Host "SUCCESS: Remote task (test) was initiated on $IP"
             } else {
-                Add-Error ([Ref]$Result['Error']) "Remote task (test) failed to initiate: $b"
+                Add-Error ([Ref]$Result) "Remote task (test) failed to initiate: $b"
                 $Result['Success'] = $False
             }
         } else {
-            Add-Error ([Ref]$Result['Error']) "Remote task (test) failed on $($IP): $a"
+            Add-Error ([Ref]$Result) "Remote task (test) failed on $($IP): $a"
             $Result['Success'] = $False
         }
     }
 
     # Query Task status
-    $c = SCHTASKS /query /S $IP /U $FQUsername /P ($Creds.GetNetworkCredential().Password) /TN test
+    if ($isLocal) {
+        $c = SCHTASKS /query /TN test
+    } else {
+        $c = SCHTASKS /query /S $IP /U $FQUsername /P ($Creds.GetNetworkCredential().Password) /TN test
+    }
     if (($c -match "Running") -OR ($c -match "Ready")) {
         Write-Host "SUCCESS: Remote task (test) ran successfully on $IP"
     } else {
-        Add-Error ([Ref]$Result['Error']) "FAIL: Remote task (test) ran into some issues on $($IP): $c"
+        Add-Error ([Ref]$Result) "FAIL: Remote task (test) ran into some issues on $($IP): $c"
     }
 
     #Delete the task (Cleanup)
     Start-Sleep 1
-    SCHTASKS /delete /S $IP /U $FQUsername /P ($Creds.GetNetworkCredential().Password) /TN test /F | Out-Null
-
+    if ($isLocal) {
+        SCHTASKS /delete /TN test /F | Out-Null
+    } else {
+        SCHTASKS /delete /S $IP /U $FQUsername /P ($Creds.GetNetworkCredential().Password) /TN test /F | Out-Null
+    }
     $Test['Results'] += New-Object -Type PSObject -Property $Result
 
 
@@ -1017,16 +1119,18 @@ Function Test-ICNetworkAccess {
         Success = $True
         SubResults = @()
         Error = $null
-   }
+    }
 
 	if (-NOT $Test.Results.SubResults.'PSRemote/WinRM') {
-        Add-Error ([Ref]$Result['Error']) "No connectivity to Powershell Remoting ports - skipping Powershell Remoting test"
+        Add-Error ([Ref]$Result) "No connectivity to Powershell Remoting ports - skipping Powershell Remoting test"
         $Result['Success'] = $False
+
     } else {
+        <#
         # TrustedHosts
         $current=(get-item WSMan:\localhost\Client\TrustedHosts).value
         if ($current -ne "*" -AND $current -notmatch $IP) {
-            Add-Error ([Ref]$Result['Error']) "$IP is not within TrustedHosts. Adding a temporary entry. Recommend setting to '*' on scanners."
+            Add-Error ([Ref]$Result) "$IP is not within TrustedHosts. Adding a temporary entry. Recommend setting to '*' on scanners."
             if ($current) {
                 $new = $current + ",$IP"
             } else {
@@ -1047,12 +1151,13 @@ Function Test-ICNetworkAccess {
                 Write-Host "SUCCESS: Powershell Remoting Session established with $target"
             }
             catch {
-                Add-Error ([Ref]$Result['Error']) "FAIL: PSRemoting to $target failed. Message: @($_.Exception.Message)"
+                Add-Error ([Ref]$Result) "FAIL: PSRemoting to $target failed. Message: @($_.Exception.Message)"
         		$Result['Success'] = $False
             }
         }
         $errorActionPreference = "Continue"
         set-item WSMan:\localhost\Client\TrustedHosts –value $current
+        #>
     }
 	$Test['Results'] += New-Object -Type PSObject -Property $Result
 	#endregion Remote Execution Protocol Tests
@@ -1073,7 +1178,7 @@ Function Test-ICNetworkAccess {
    if ($isLocal) {
        $webtest = Test-WebPage "https://$ReturnAddress" -Proxy $Proxy
        if ($webtest -notmatch "Success") {
-           Add-Error ([Ref]$Result['Error']) "Could not connect to $($ReturnAddress) with $($ProxyAddress): $($webtest). This will affect return communications."
+           Add-Error ([Ref]$Result) "Could not connect to $($ReturnAddress) with $($ProxyAddress): $($webtest). This will affect return communications."
            $Result['Success'] = $False
        }
    } else {
@@ -1084,10 +1189,10 @@ Function Test-ICNetworkAccess {
                $r = Invoke-Command -ScriptBlock $RemoteScript -ComputerName 10.0.0.11 -Credential $Credential
                $Result['Success'] = $r
                if (-NOT $r) {
-                   Add-Error ([Ref]$Result['Error']) "Remote return path to $($ReturnAddress) failed."
+                   Add-Error ([Ref]$Result) "Remote return path to $($ReturnAddress) failed."
                }
             } catch {
-                Add-Error ([Ref]$Result['Error']) "Could not test remote return path to $($ReturnAddress) - Command failed: $($_.Exception.Message)."
+                Add-Error ([Ref]$Result) "Could not test remote return path to $($ReturnAddress) - Command failed: $($_.Exception.Message)."
                 $Result['Success'] = $False
             }
         }
@@ -1109,20 +1214,28 @@ Function Test-ICNetworkAccess {
                 if ($ReturnAddress -eq $IP) {
                     $server = New-TcpListener -Port 443
                     Start-Sleep 1
-                    Invoke-WmiMethod -class Win32_process -name Create -ArgumentList "powershell.exe -Nop -NoLogo -Win Hidden -encodedCommand $encodedCommand" -ComputerName $Target -Credential $Credential | Out-Null
+                    if ($isLocal) {
+                        Invoke-WmiMethod -class Win32_process -name Create -ArgumentList "powershell.exe -Nop -NoLogo -Win Hidden -encodedCommand $encodedCommand" | Out-Null
+                    } else {
+                        Invoke-WmiMethod -class Win32_process -name Create -ArgumentList "powershell.exe -Nop -NoLogo -Win Hidden -encodedCommand $encodedCommand" -ComputerName $Target -Credential $Credential | Out-Null
+                    }
                 	$msg = if (Receive-TCPMessage) { "SUCCESS" } else { $false }
                 } else {
-                    Invoke-WmiMethod -class Win32_process -name Create -ArgumentList "powershell.exe -Nop -NoLogo -Win Hidden -encodedCommand $encodedCommand" -ComputerName $Target -Credential $Credential | Out-Null
-                	Start-Sleep 3
+                    if ($isLocal) {
+                        Invoke-WmiMethod -class Win32_process -name Create -ArgumentList "powershell.exe -Nop -NoLogo -Win Hidden -encodedCommand $encodedCommand" | Out-Null
+                    } else {
+                        Invoke-WmiMethod -class Win32_process -name Create -ArgumentList "powershell.exe -Nop -NoLogo -Win Hidden -encodedCommand $encodedCommand" -ComputerName $Target -Credential $Credential | Out-Null
+                    }
+                    Start-Sleep 3
                 	$msg = Get-Content test:\\result.txt -ea SilentlyContinue
                 }
 
                 if ($msg -notmatch "SUCCESS") {
-                    Add-Error ([Ref]$Result['Error']) "Remote return path to $($ReturnAddress) failed."
+                    Add-Error ([Ref]$Result) "Remote return path to $($ReturnAddress) failed."
                 	$Result['Success'] = $False
                 }
             } catch {
-                Add-Error ([Ref]$Result['Error']) "FAIL: Could not test remote return path to $($ReturnAddress) - WMI Command Failed - Message: $($_.Exception.Message)"
+                Add-Error ([Ref]$Result) "FAIL: Could not test remote return path to $($ReturnAddress) - WMI Command Failed - Message: $($_.Exception.Message)"
                 $Result['Success'] = $False
     		} finally {
                 Remove-PSDrive test -ea SilentlyContinue
@@ -1146,5 +1259,5 @@ Function Test-ICNetworkAccess {
 	"$Out\InfocyteTest.json" | out-file "$env:temp\ictestoutputfolders" -Append
 
 	return $Test
-}
+
 }
