@@ -1,0 +1,231 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Naos.WinRM</name>
+    </assembly>
+    <members>
+        <member name="T:Naos.WinRM.NaosWinRmBaseException">
+            <summary>
+            Custom base exception to allow global catching of internally generated errors.
+            </summary>
+        </member>
+        <member name="M:Naos.WinRM.NaosWinRmBaseException.#ctor">
+            <summary>
+            Initializes a new instance of the <see cref="T:Naos.WinRM.NaosWinRmBaseException"/> class.
+            </summary>
+        </member>
+        <member name="M:Naos.WinRM.NaosWinRmBaseException.#ctor(System.String)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Naos.WinRM.NaosWinRmBaseException"/> class.
+            </summary>
+            <param name="message">Exception message.</param>
+        </member>
+        <member name="M:Naos.WinRM.NaosWinRmBaseException.#ctor(System.String,System.Exception)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Naos.WinRM.NaosWinRmBaseException"/> class.
+            </summary>
+            <param name="message">Exception message.</param>
+            <param name="innerException">Inner exception.</param>
+        </member>
+        <member name="M:Naos.WinRM.NaosWinRmBaseException.#ctor(System.Runtime.Serialization.SerializationInfo,System.Runtime.Serialization.StreamingContext)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Naos.WinRM.NaosWinRmBaseException"/> class.
+            </summary>
+            <param name="info">Serialization info.</param>
+            <param name="context">Reading context.</param>
+        </member>
+        <member name="T:Naos.WinRM.TrustedHostMissingException">
+            <summary>
+            Custom exception for when trying to execute 
+            </summary>
+        </member>
+        <member name="M:Naos.WinRM.TrustedHostMissingException.#ctor">
+            <summary>
+            Initializes a new instance of the <see cref="T:Naos.WinRM.TrustedHostMissingException"/> class.
+            </summary>
+        </member>
+        <member name="M:Naos.WinRM.TrustedHostMissingException.#ctor(System.String)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Naos.WinRM.TrustedHostMissingException"/> class.
+            </summary>
+            <param name="message">Exception message.</param>
+        </member>
+        <member name="M:Naos.WinRM.TrustedHostMissingException.#ctor(System.String,System.Exception)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Naos.WinRM.TrustedHostMissingException"/> class.
+            </summary>
+            <param name="message">Exception message.</param>
+            <param name="innerException">Inner exception.</param>
+        </member>
+        <member name="M:Naos.WinRM.TrustedHostMissingException.#ctor(System.Runtime.Serialization.SerializationInfo,System.Runtime.Serialization.StreamingContext)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Naos.WinRM.TrustedHostMissingException"/> class.
+            </summary>
+            <param name="info">Serialization info.</param>
+            <param name="context">Reading context.</param>
+        </member>
+        <member name="T:Naos.WinRM.RemoteExecutionException">
+            <summary>
+            Custom exception for when things go wrong running remote commands.
+            </summary>
+        </member>
+        <member name="M:Naos.WinRM.RemoteExecutionException.#ctor">
+            <summary>
+            Initializes a new instance of the <see cref="T:Naos.WinRM.RemoteExecutionException"/> class.
+            </summary>
+        </member>
+        <member name="M:Naos.WinRM.RemoteExecutionException.#ctor(System.String)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Naos.WinRM.RemoteExecutionException"/> class.
+            </summary>
+            <param name="message">Exception message.</param>
+        </member>
+        <member name="M:Naos.WinRM.RemoteExecutionException.#ctor(System.String,System.Exception)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Naos.WinRM.RemoteExecutionException"/> class.
+            </summary>
+            <param name="message">Exception message.</param>
+            <param name="innerException">Inner exception.</param>
+        </member>
+        <member name="M:Naos.WinRM.RemoteExecutionException.#ctor(System.Runtime.Serialization.SerializationInfo,System.Runtime.Serialization.StreamingContext)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Naos.WinRM.RemoteExecutionException"/> class.
+            </summary>
+            <param name="info">Serialization info.</param>
+            <param name="context">Reading context.</param>
+        </member>
+        <member name="T:Naos.WinRM.IManageMachines">
+            <summary>
+            Manages various remote tasks on a machine using the WinRM protocol.
+            </summary>
+        </member>
+        <member name="P:Naos.WinRM.IManageMachines.IpAddress">
+            <summary>
+            Gets the IP address of the machine being managed.
+            </summary>
+        </member>
+        <member name="M:Naos.WinRM.IManageMachines.Reboot(System.Boolean)">
+            <summary>
+            Executes a user initiated reboot.
+            </summary>
+            <param name="force">Can override default behavior of a forceful reboot (kick users off).</param>
+        </member>
+        <member name="M:Naos.WinRM.IManageMachines.SendFile(System.String,System.Byte[],System.Boolean,System.Boolean)">
+            <summary>
+            Sends a file to the remote machine at the provided file path on that target computer.
+            </summary>
+            <param name="filePathOnTargetMachine">File path to write the contents to on the remote machine.</param>
+            <param name="fileContents">Payload to write to the file.</param>
+            <param name="appended">Optionally writes the bytes in appended mode or not (default is NOT).</param>
+            <param name="overwrite">Optionally will overwrite a file that is already there [can NOT be used with 'appended'] (default is NOT).</param>
+        </member>
+        <member name="M:Naos.WinRM.IManageMachines.RetrieveFile(System.String)">
+            <summary>
+            Retrieves a file from the remote machines and returns a checksum verified byte array.
+            </summary>
+            <param name="filePathOnTargetMachine">File path to fetch the contents of on the remote machine.</param>
+            <returns>Bytes of the specified files (throws if missing).</returns>
+        </member>
+        <member name="M:Naos.WinRM.IManageMachines.RunCmd(System.String,System.Collections.Generic.ICollection{System.String})">
+            <summary>
+            Runs an arbitrary command using "CMD.exe /c".
+            </summary>
+            <param name="command">Command to run in "CMD.exe".</param>
+            <param name="commandParameters">Parameters to be passed to the command.</param>
+            <returns>Console output of the command.</returns>
+        </member>
+        <member name="M:Naos.WinRM.IManageMachines.RunCmdOnLocalhost(System.String,System.Collections.Generic.ICollection{System.String})">
+            <summary>
+            Runs an arbitrary command using "CMD.exe /c" on localhost instead of the provided remote computer..
+            </summary>
+            <param name="command">Command to run in "CMD.exe".</param>
+            <param name="commandParameters">Parameters to be passed to the command.</param>
+            <returns>Console output of the command.</returns>
+        </member>
+        <member name="M:Naos.WinRM.IManageMachines.RunScriptOnLocalhost(System.String,System.Collections.Generic.ICollection{System.Object})">
+            <summary>
+            Runs an arbitrary script block on localhost instead of the provided remote computer.
+            </summary>
+            <param name="scriptBlock">Script block.</param>
+            <param name="scriptBlockParameters">Parameters to be passed to the script block.</param>
+            <returns>Collection of objects that were the output from the script block.</returns>
+        </member>
+        <member name="M:Naos.WinRM.IManageMachines.RunScript(System.String,System.Collections.Generic.ICollection{System.Object})">
+            <summary>
+            Runs an arbitrary script block.
+            </summary>
+            <param name="scriptBlock">Script block.</param>
+            <param name="scriptBlockParameters">Parameters to be passed to the script block.</param>
+            <returns>Collection of objects that were the output from the script block.</returns>
+        </member>
+        <member name="T:Naos.WinRM.MachineManager">
+            <inheritdoc />
+        </member>
+        <member name="M:Naos.WinRM.MachineManager.#ctor(System.String,System.String,System.Security.SecureString,System.Boolean,System.Int64,System.Int64,System.Int64)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Naos.WinRM.MachineManager"/> class.
+            </summary>
+            <param name="ipAddress">IP address of machine to interact with.</param>
+            <param name="userName">Username to use to connect.</param>
+            <param name="password">Password to use to connect.</param>
+            <param name="autoManageTrustedHosts">Optionally specify whether to update the TrustedHost list prior to execution or assume it's handled elsewhere (default is FALSE).</param>
+            <param name="fileChunkSizeThresholdByteCount">Optionally specify file size that will trigger chunking the file rather than sending as one file (150000 is default).</param>
+            <param name="fileChunkSizePerSend">Optionally specify size of each chunk that is sent when a file is being chunked for send.</param>
+            <param name="fileChunkSizePerRetrieve">Optionally specify size of each chunk that is received when a file is being chunked for fetch.</param>
+        </member>
+        <member name="M:Naos.WinRM.MachineManager.AddIpAddressToLocalTrustedHosts(System.String)">
+            <summary>
+            Locally updates the trusted hosts to have the ipAddress provided.
+            </summary>
+            <param name="ipAddress">IP Address to add to local trusted hosts.</param>
+        </member>
+        <member name="M:Naos.WinRM.MachineManager.RemoveIpAddressFromLocalTrustedHosts(System.String)">
+            <summary>
+            Locally updates the trusted hosts to remove the ipAddress provided (if applicable).
+            </summary>
+            <param name="ipAddress">IP Address to remove from local trusted hosts.</param>
+        </member>
+        <member name="M:Naos.WinRM.MachineManager.GetListOfIpAddressesFromLocalTrustedHosts">
+            <summary>
+            Locally updates the trusted hosts to have the ipAddress provided.
+            </summary>
+            <returns>List of the trusted hosts.</returns>
+        </member>
+        <member name="P:Naos.WinRM.MachineManager.IpAddress">
+            <inheritdoc />
+        </member>
+        <member name="M:Naos.WinRM.MachineManager.Reboot(System.Boolean)">
+            <inheritdoc />
+        </member>
+        <member name="M:Naos.WinRM.MachineManager.SendFile(System.String,System.Byte[],System.Boolean,System.Boolean)">
+            <inheritdoc />
+        </member>
+        <member name="M:Naos.WinRM.MachineManager.RetrieveFile(System.String)">
+            <inheritdoc />
+        </member>
+        <member name="M:Naos.WinRM.MachineManager.RunCmd(System.String,System.Collections.Generic.ICollection{System.String})">
+            <inheritdoc />
+        </member>
+        <member name="M:Naos.WinRM.MachineManager.RunCmdOnLocalhost(System.String,System.Collections.Generic.ICollection{System.String})">
+            <inheritdoc />
+        </member>
+        <member name="M:Naos.WinRM.MachineManager.RunScriptOnLocalhost(System.String,System.Collections.Generic.ICollection{System.Object})">
+            <inheritdoc />
+        </member>
+        <member name="M:Naos.WinRM.MachineManager.RunScript(System.String,System.Collections.Generic.ICollection{System.Object})">
+            <inheritdoc />
+        </member>
+        <member name="T:Naos.WinRM.StringExtensions">
+            <summary>
+            Manages various remote tasks on a machine using the WinRM protocol.
+            </summary>
+        </member>
+        <member name="M:Naos.WinRM.StringExtensions.ToSecureString(System.String)">
+            <summary>
+            Converts the source string into a secure string. Caller should dispose of the secure string appropriately.
+            </summary>
+            <param name="source">The source string.</param>
+            <returns>A secure version of the source string.</returns>
+        </member>
+    </members>
+</doc>
