@@ -67,7 +67,7 @@ PowerShellVersion = '3.0'
 
 # Modules to import as nested modules of the module specified in RootModule/ModuleToProcess
 NestedModules = @(
-	"Naos.WinRM.1.0.50\lib\net45\Naos.WinRM.dll"
+	#"Naos.WinRM.1.0.50\lib\net45\Naos.WinRM.dll"
 )
 
 # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
