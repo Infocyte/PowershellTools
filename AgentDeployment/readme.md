@@ -1,7 +1,7 @@
 ## Infocyte Agent Scripted Installer (One Line Powershell)
 **Platform:** Microsoft Windows 7+ or Server 2008R2+\
-**Powershell Version:** 3.0+\
-**.NET Version:** 4.5+
+**Powershell Version:** 2.0+\
+**.NET Version:** 4.0+
 
 The following command is all you need.  Run it on any windows system and it will download this script and execute it.  This is useful for scripted software distribution, sccm, or GPO deployments in leu of an MSI.  The script will manage an automated installation process for the HUNT agent.  *IMPORTANT: You DO NOT need to download this script. Leave it here unless you want to host it yourself.*
 
