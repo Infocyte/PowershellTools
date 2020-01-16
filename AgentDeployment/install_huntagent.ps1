@@ -82,8 +82,30 @@ New-Module -name install_InfocyteAgent -scriptblock {
 		# Downloading Agent
 		[Net.ServicePointManager]::SecurityProtocol = [Enum]::ToObject([System.Net.SecurityProtocolType], 3072)
 		$wc = New-Object Net.WebClient
-		$wc.UseDefaultCredentials = $true
 		$wc.Encoding = [System.Text.Encoding]::UTF8
+		$proxy = new-object System.Net.WebProxy
+		$proxyAddr = (get-itemproperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings').ProxyServer
+		if ($Proxy) {
+			if ($proxy.split("@").count -gt 1) {
+				$proxyaddr = $proxy.split("@")[1]
+				$user = $proxy.split("@")[0].split(':')[0]
+				$pass = $proxy.split("@")[0].split(':')[1]
+				$Credentials = New-Object Net.NetworkCredential($user,$pass,"")
+				$proxy.Address = $proxyaddr
+				$proxy.Credentials = $Credentials
+			} else {
+				$proxy.Address = $proxy
+			}
+			$wc.Proxy = $proxy
+		} elseif ($proxyAddr) {
+			$proxy.Address = $proxyAddr
+			$proxy.useDefaultCredentials = $true
+			$wc.Proxy = $proxy
+		}
+		else {
+			$wc.UseDefaultCredentials = $true
+		}
+		
 		# $wc.CachePolicy = New-Object System.Net.Cache.HttpRequestCachePolicy([System.Net.Cache.HttpRequestCacheLevel]::NoCacheNoStore) # For Testing:
 		try {
 			$wc.DownloadFile($agentURL, $agentDestination)
