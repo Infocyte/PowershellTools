@@ -83,9 +83,10 @@ New-Module -name install_InfocyteAgent -scriptblock {
 		[Net.ServicePointManager]::SecurityProtocol = [Enum]::ToObject([System.Net.SecurityProtocolType], 3072)
 		$wc = New-Object Net.WebClient
 		$wc.Encoding = [System.Text.Encoding]::UTF8
-		$proxy = new-object System.Net.WebProxy
+		
 		$proxyAddr = (get-itemproperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings').ProxyServer
 		if ($Proxy) {
+			$proxy = new-object System.Net.WebProxy
 			if ($proxy.split("@").count -gt 1) {
 				$proxyaddr = $proxy.split("@")[1]
 				$user = $proxy.split("@")[0].split(':')[0]
@@ -98,6 +99,7 @@ New-Module -name install_InfocyteAgent -scriptblock {
 			}
 			$wc.Proxy = $proxy
 		} elseif ($proxyAddr) {
+			$proxy = new-object System.Net.WebProxy
 			$proxy.Address = $proxyAddr
 			$proxy.useDefaultCredentials = $true
 			$wc.Proxy = $proxy
