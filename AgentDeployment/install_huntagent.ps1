@@ -86,23 +86,23 @@ New-Module -name install_InfocyteAgent -scriptblock {
 		
 		$proxyAddr = (get-itemproperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings').ProxyServer
 		if ($Proxy) {
-			$proxy = new-object System.Net.WebProxy
+			$ProxyObj = new-object System.Net.WebProxy
 			if ($proxy.split("@").count -gt 1) {
 				$proxyaddr = $proxy.split("@")[1]
 				$user = $proxy.split("@")[0].split(':')[0]
 				$pass = $proxy.split("@")[0].split(':')[1]
 				$Credentials = New-Object Net.NetworkCredential($user,$pass,"")
-				$proxy.Address = $proxyaddr
-				$proxy.Credentials = $Credentials
+				$ProxyObj.Address = $proxyaddr
+				$ProxyObj.Credentials = $Credentials
 			} else {
-				$proxy.Address = $proxy
+				$ProxyObj.Address = $proxy
 			}
-			$wc.Proxy = $proxy
+			$wc.Proxy = $ProxyObj
 		} elseif ($proxyAddr) {
-			$proxy = new-object System.Net.WebProxy
-			$proxy.Address = $proxyAddr
-			$proxy.useDefaultCredentials = $true
-			$wc.Proxy = $proxy
+			$ProxyObj = new-object System.Net.WebProxy
+			$ProxyObj.Address = $proxyAddr
+			$ProxyObj.useDefaultCredentials = $true
+			$wc.Proxy = $ProxyObj
 		}
 		else {
 			$wc.UseDefaultCredentials = $true
