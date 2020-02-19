@@ -9,36 +9,9 @@ else {
     Write-Host "Checking PSVersion [Minimum Supported: 3.0]: PASSED [$PS]!`n"
 }
 
-try {
-    [Reflection.Assembly]::LoadFile("$PSScriptRoot\Naos.WinRM.1.0.50\lib\net45\Naos.WinRM.dll")
-}
-catch {
-    Write-Error "Could not load Naos.WinRM module."
-    return
-}
-
 
 # FUNCTIONS
 
-$WinRM = @()
-
-Function WinRM.New {
-    Param(
-        [String]$Target="192.168.56.101",
-        [String]$Username="razersede\administrator",
-        [SecureString]$Password,
-        [Switch]$AutoManagedTrustedHosts
-    )
-
-    $winrm = [Naos.WinRM.MachineManager]::new(
-        $target,
-        $username,
-        $password,
-        $AutoManagedTrustedHosts
-    )
-
-    return $winrm
-}
 
 Function Get-DNSEntry ([String]$target) {
 
