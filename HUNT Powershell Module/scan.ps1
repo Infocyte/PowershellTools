@@ -99,7 +99,7 @@ function Invoke-ICScan {
 		$UserTask = Invoke-ICFindHosts -TargetGroupId $TargetGroupId
 		While ($stillactive) {
 			Start-Sleep 10
-			$taskstatus = Get-ICUserTask -Id $UserTask.userTaskId
+			$taskstatus = Get-ICUserTask -Id $UserTask.userTaskId -where @{ createdOn = @{ gt = (Get-Date).AddHours(-10) }; name = @{ regexp = $TargetGroup.name } } | Select-Object -first 1
 			if ($taskstatus.status -eq "Active") {
 				Write-Host "Waiting on Discovery. Progress: $($taskstatus.progress)%"
 			} elseif ($taskstatus.status -eq "Completed") {
