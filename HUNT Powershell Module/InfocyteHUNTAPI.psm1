@@ -20,14 +20,18 @@ function Get-ICHelp {
     Write-Host "Authentication Functions:"
     Write-Host -ForegroundColor Cyan "`tNew-ICToken (On-Prem ONLY), Set-ICToken (alias: Set-ICInstance)`n"
 
-    Write-Host "Development Functions:"
-    Write-Host -ForegroundColor Cyan "`tTest-ICExtension, Get-ICAPI, Invoke-ICAPI`n"
+    Write-Host "Generic API Functions"
+    Write-Host -ForegroundColor Cyan "`tGet-ICAPI, Invoke-ICAPI`n"
+
+    Write-Host "Extension Development Functions:"
+    Write-Host -ForegroundColor Cyan "`tNew-ICExtension, Test-ICExtension"
+    Write-Host -ForegroundColor Cyan "`tGet-ICExtension, Update-ICExtension, Remove-ICExtension"
+    Write-Host -ForegroundColor Cyan "`tImport-ICExtension, Import-ICOfficialExtensions`n"
 
     Write-Host "Admin/Misc Functions:"
-    Write-Host -ForegroundColor Cyan "`tNew-ICFlag, Update-ICFlag, Remove-ICFlag, Get-ICFlagColors,`n"
+    Write-Host -ForegroundColor Cyan "`tNew-ICFlag, Update-ICFlag, Remove-ICFlag, Get-ICFlagColors"
     Write-Host -ForegroundColor Cyan "`tGet-ICUsers, Get-ICUserAuditLog,"
-    Write-Host -ForegroundColor Cyan "`tNew-ICExtension, Get-ICExtension,"
-    Write-Host -ForegroundColor Cyan "`tAdd-ICComment", "Get-ICDwellTime"
+    Write-Host -ForegroundColor Cyan "`tAdd-ICComment", "Get-ICDwellTime`n"
 
     Write-Host "Target Group Management Functions:"
     Write-Host -ForegroundColor Cyan "`tNew-ICTargetGroup, Get-ICTargetGroup, Remove-ICTargetGroup,"
@@ -93,4 +97,4 @@ Get-ICHelp
 . "$PSScriptRoot\status.ps1"
 . "$PSScriptRoot\scan.ps1"
 . "$PSScriptRoot\admin.ps1"
-. "$PSScriptRoot\development.ps1"
+. "$PSScriptRoot\extensions.ps1"
