@@ -122,7 +122,7 @@ function Set-ICToken {
 	$credentialfile = "$env:appdata\infocyte\credentials.json"
 	$Global:ICCredentials = @{}
 	if (Test-Path $credentialfile) {
-		(Get-Content $credentialfile | ConvertFrom-JSON).psobject.properties | Foreach {
+		(Get-Content $credentialfile | ConvertFrom-JSON).psobject.properties | ForEach-Object {
 			$Global:ICCredentials[$_.Name] = $_.Value
 		}
 	} else {
