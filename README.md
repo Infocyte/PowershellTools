@@ -10,7 +10,7 @@ OR
 > PS> Update-Module -Name InfocyteHUNTAPI
 
 
-### Agent Deployment
+## Agent Deployment
 
 To simplify deployment of Infocyte agents to windows boxes, there is a Powershell 1-liner that can be used to deploy and configure agents. Only requirement is Powershell 2.0 (Windows 7+ by default) and Admin rights.
 
