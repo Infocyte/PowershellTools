@@ -65,11 +65,11 @@ function Invoke-ICFindHosts {
 		queries = @()
 	}
     if ($QueryId) {
-        $QueryId | foreach {
+        $QueryId | ForEach-Object {
     		$body['queries'] += $_
         }
 	} else {
-		$Queries | foreach {
+		$Queries | ForEach-Object {
 			$body['queries'] += $Queries.Id
 		}
         Write-Verbose "Starting Enumeration of $($TargetGroup.name) with all associated queries.`n$($body['queries'] | convertto-json)"
@@ -172,7 +172,7 @@ function Invoke-ICScanTarget {
 	        }
 		} elseif ($CredentialName) {
 	        # Use Credentialname
-	        $Credential =  Get-ICCredential | where { $_.name -eq $CredentialName }
+	        $Credential =  Get-ICCredential | Where-Object { $_.name -eq $CredentialName }
 			if ($Credential) {
 				$body['credential'] = @{ name = $CredentialName }
 				Write-Error "Credential with name [$CredentialName] does not exist!"
@@ -292,7 +292,7 @@ function Get-ICScanSchedule {
     $Endpoint = "ScheduledJobs"
 	if ($TargetGroupId) {
 		$TargetGroups = Get-ICTargetGroup -TargetGroupId $TargetGroupId
-		$ScheduledJobs = Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$true | where { $_.relatedId -eq $TargetGroupId}
+		$ScheduledJobs = Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$true | Where-Object { $_.relatedId -eq $TargetGroupId}
 	} else {
 		$TargetGroups = Get-ICTargetGroup
 		$ScheduledJobs = Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$true
@@ -301,7 +301,7 @@ function Get-ICScanSchedule {
 	$ScheduledJobs | % {
 		if ($_.relatedId) {
 			 $tgid = $_.relatedId
-			 $tg = $TargetGroups | where { $_.id -eq $tgid }
+			 $tg = $TargetGroups | Where-Object { $_.id -eq $tgid }
 			 if ($tg) {
 				 $_ | Add-Member -MemberType "NoteProperty" -name "targetGroup" -value $tg.name
 			 } else {
@@ -338,10 +338,10 @@ function Remove-ICScanSchedule {
 		}
 		$Schedules = Get-ICScanSchedule
 		if ($Id) {
-			$schedule = $Schedules | where { $_.id -eq $Id}
+			$schedule = $Schedules | Where-Object { $_.id -eq $Id}
 		}
 		elseif ($TargetGroupId) {
-			$schedule = $Schedules | where { $_.relatedId -eq $TargetGroupId}
+			$schedule = $Schedules | Where-Object { $_.relatedId -eq $TargetGroupId}
 			$ScheduleId	= $schedule.id
 		} else {
 			throw "Incorrect input!"
@@ -391,7 +391,7 @@ function Import-ICSurvey {
   	$survey = "HostSurvey.json.gz"
   	$surveyext = "*.json.gz"
 
-  	function Upload-ICSurveys ([String]$FilePath, [String]$ScanId){
+  	function Send-ICSurveys ([String]$FilePath, [String]$ScanId){
   		Write-Verbose "Uploading Surveys"
 			$headers = @{
 		    Authorization = $Global:ICToken
@@ -420,7 +420,7 @@ function Import-ICSurvey {
 		Write-Verbose "Checking for existance of target group with TargetGroupId: '$TargetGroupId' and generating new ScanId"
 		$TargetGroup = Get-ICTargetGroup -id $TargetGroupId
 		if ($TargetGroup) {
-			$TargetGroupName = ($TargetGroups | where { $_.id -eq $TargetGroupId }).name
+			$TargetGroupName = ($TargetGroups | Where-Object { $_.id -eq $TargetGroupId }).name
 		} else {
 			Throw "No Target Group exists with TargetGroupId $TargetGroupId. Specify an existing TargetGroupId to add this survey to or use other parameters to generate one."
 		}
@@ -430,7 +430,7 @@ function Import-ICSurvey {
   	    $TargetGroups = Get-ICTargetGroup
   	    if ($TargetGroups.name -contains $TargetGroupName) {
   		    Write-Verbose "$TargetGroupName Exists."
-			$TargetGroupId = ($targetGroups | where { $_.name -eq $TargetGroupName}).id
+			$TargetGroupId = ($targetGroups | Where-Object { $_.name -eq $TargetGroupName}).id
   	    } else {
             Write-Warning "$TargetGroupName does not exist. Creating new Target Group '$TargetGroupName'"
             $g = Get-ICControllerGroup
@@ -471,7 +471,7 @@ function Import-ICSurvey {
 		foreach ($file in $resolvedPaths) {
  			Write-Verbose "Uploading survey [$file]..."
  			if ((Test-Path $file -type Leaf) -AND ($file -like $surveyext)) {
- 				Upload-ICSurveys -FilePath $file -ScanId $ScanId
+ 				Send-ICSurveys -FilePath $file -ScanId $ScanId
    		    } else {
    			    Write-Warning "$file does not exist or is not a $surveyext file"
    		    }

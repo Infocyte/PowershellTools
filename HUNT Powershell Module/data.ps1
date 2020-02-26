@@ -115,13 +115,13 @@ function Get-ICObject {
                 Write-Verbose "Aggregate Extensions."
                 $extensioninstances = Get-ICObject -Type "Extension" -BoxId $BoxId -where $where -fields $fields -AllInstances
                 $results = @()
-                $extensioninstances | select $fields | Group-Object extensionId | % {
+                $extensioninstances | Select-Object $fields | Group-Object extensionId | ForEach-Object {
                     $props = @{
                         Id = $_.name # extensionId
                         name = $_.group[0].name
                         boxId = $_.group[0].boxId
                         count = $_.count
-                        hosts = ($_.group | select hostId -unique).hostId.count
+                        hosts = ($_.group | Select-Object hostId -unique).hostId.count
                         success = 0
                         compromised = $false
                         Good = 0
@@ -130,11 +130,11 @@ function Get-ICObject {
                         Suspicious = 0
                         Bad = 0
                     }
-                    $_.Group | %{
+                    $_.Group | ForEach-Object {
                         if ($_.success) { $props['success'] += 1}
                     }
 
-                    $_.group | Group-Object threatStatus | % {
+                    $_.group | Group-Object threatStatus | ForEach-Object {
                         $props[$_.Name] = $_.count
                     }
 
@@ -154,7 +154,7 @@ function Get-ICObject {
                 $where += @{ threatName = @{ or = @("Bad", "Suspicious")} }
             }
             $cnt = 0
-            $Files | % {
+            $Files | ForEach-Object {
                 if ($CountOnly) {
                     $c = Get-ICObject -Type $_ -BoxId $BoxId -where $where -AllInstances:$AllInstances -CountOnly
                     Write-Verbose "Found $c $_ Objects"
@@ -222,7 +222,7 @@ function Get-ICVulnerability {
                 Write-verbose "Querying for applications with applicationId: $Id"
                 $a = Get-ICObjects -Id $id -Type Application -BoxId $BoxId
                 if ($a) {
-                    $a | % {
+                    $a | ForEach-Object {
                         $appid = $_.id
                         $_ | Add-Member -MemberType "NoteProperty" -name "applicationId" -value $appid
                     }
@@ -240,7 +240,7 @@ function Get-ICVulnerability {
                 $apps = Get-ICObjects -Type Application -BoxId $BoxId -where $where -NoLimit:$NoLimit -AllInstances:$AllInstances
             } else {
                 $apps = Get-ICObjects -Type Application -BoxId $BoxId -where $where -NoLimit:$NoLimit
-                $apps | % {
+                $apps | ForEach-Object {
                     $appid = $_.id
                     $_ | Add-Member -MemberType "NoteProperty" -name "applicationId" -value $appid
                }
@@ -256,15 +256,15 @@ function Get-ICVulnerability {
 
         if ($apps -AND $appvulns) {
             $appids = $apps.applicationid | sort-object -unique
-            $appvulns = $appvulns | where { $appids -contains $_.applicationId }
-            $apps = $apps | where { $appvulns.applicationId -contains $_.applicationId }
+            $appvulns = $appvulns | Where-Object  { $appids -contains $_.applicationId }
+            $apps = $apps | Where-Object  { $appvulns.applicationId -contains $_.applicationId }
         } else {
             Write-Verbose "No Results found."
             return
         }
 
         Write-Verbose "Found $($appids.count) applications and $($appvulns.count) associated advisories. Enriching details for export...`n"
-        $appvulns | % {
+        $appvulns | ForEach-Object {
             $vuln = $_
             Write-Verbose "==Vulnerable App: $($vuln.ApplicationName) cveId: $($vuln.cveId) App id: $($vuln.applicationId)"
             if ($vuln.cveId) {
@@ -507,10 +507,10 @@ function Get-ICBox {
         return
     }
     $TargetGroups = Get-ICTargetGroup -IncludeArchive -NoLimit:$NoLimit
-    $boxes | % {
+    $boxes | ForEach-Object {
         if ($_.targetId) {
             $tgid = $_.targetId
-            $tg = $TargetGroups | where { $_.id -eq $tgid }
+            $tg = $TargetGroups | Where-Object { $_.id -eq $tgid }
             if ($tg) {
                 $_ | Add-Member -MemberType "NoteProperty" -name "targetGroup" -value $tg.name
                 $_ | Add-Member -MemberType "NoteProperty" -name "lastScannedOn" -value $tg.lastScannedOn
@@ -527,7 +527,7 @@ function Get-ICBox {
         $boxes
     } else {
         Write-Verbose "Including deleted Target Groups..."
-        $boxes | where { -NOT $_.deleted -AND $_.targetGroup -ne "Deleted" }
+        $boxes | Where-Object { -NOT $_.deleted -AND $_.targetGroup -ne "Deleted" }
     }
 }
 

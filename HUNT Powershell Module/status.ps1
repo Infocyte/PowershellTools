@@ -146,13 +146,13 @@ function Get-ICUserTaskItem {
 			}
 			Write-Verbose "Found $cnt userTaskItems. Getting progress for each."
 			$items = Get-ICAPI -Endpoint $Endpoint -where $where -order $order -fields $fields -NoLimit:$NoLimit
-			$items | foreach {
+			$items | ForEach-Object {
 				$n += 1
 				try { $pc = [math]::floor($n*100/$cnt) } catch { $pc = -1 }
 				if ($_.id) {
 					$progress = @()
 					Write-Progress -Id 1 -Activity "Enriching with Task Progress Information" -status "Getting progress on $($_.name) [$n of $cnt]" -PercentComplete $pc
-					Get-ICUserTaskItemProgress -taskItemId $_.id -fields "createdOn","text" -order "createdOn desc" | foreach {
+					Get-ICUserTaskItemProgress -taskItemId $_.id -fields "createdOn","text" -order "createdOn desc" | ForEach-Object {
 						$progress += New-Object PSObject -Property @{
 							createdOn = $_.createdOn
 							text = $_.text

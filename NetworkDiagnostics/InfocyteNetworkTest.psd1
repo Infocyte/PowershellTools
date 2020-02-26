@@ -27,7 +27,7 @@ Author = 'Chris Gerritz'
 CompanyName = 'Infocyte, Inc.'
 
 # Copyright statement for this module
-Copyright = '(c) 2019 Infocyte, Inc. All rights reserved.'
+Copyright = '(c) 2014-2020 Infocyte, Inc. All rights reserved.'
 
 # Description of the functionality provided by this module
 Description = 'Tests remote administration protocols and configurations for agentless scanning with Infocyte'
@@ -66,9 +66,7 @@ PowerShellVersion = '3.0'
 # FormatsToProcess = @()
 
 # Modules to import as nested modules of the module specified in RootModule/ModuleToProcess
-NestedModules = @(
-	#"Naos.WinRM.1.0.50\lib\net45\Naos.WinRM.dll"
-)
+# NestedModules = @()
 
 # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
 FunctionsToExport = @(

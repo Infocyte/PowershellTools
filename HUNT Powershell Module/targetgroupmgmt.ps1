@@ -27,7 +27,7 @@ function New-ICTargetGroup {
         }
         elseif ($cg.count -gt 1) {
             Write-Error "More than one Controller Group. Recommend specifying a ControllerGroupId."
-            Write-Warning "Available Options: `n$($cg | ft -auto | out-string)"
+            Write-Warning "Available Options: `n$($cg | Format-Table -auto | out-string)"
             return
         } else {
             $body['controllerGroupId'] = $cg.id

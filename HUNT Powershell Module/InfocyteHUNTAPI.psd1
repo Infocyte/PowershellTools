@@ -8,7 +8,7 @@
 RootModule = 'InfocyteHUNTAPI.psm1'
 
 # Version number of this module.
-ModuleVersion = '1.2.0'
+ModuleVersion = '1.3.0'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -116,6 +116,8 @@ FunctionsToExport = @(
     "Get-ICExtension",
     "Update-ICExtension",
     "Remove-ICExtension",
+    "Import-ICExtension",
+    "Import-ICOfficialExtensions",
     "Test-ICExtension",
     "Get-ICAgent",
     "Remove-ICAgent",
@@ -158,7 +160,7 @@ PrivateData = @{
         # IconUri = ''
 
         # ReleaseNotes of this module
-        ReleaseNotes = '2.0.0 Complete refactor'
+        ReleaseNotes = 'Consolidate and update extension functions'
 
     } # End of PSData hashtable
 
