@@ -31,8 +31,7 @@ function Get-ICAPI {
             access_token = $Global:ICToken
         }
     } else {
-        Write-Error "API Token not set! Use Set-ICToken to connect to an Infocyte instance."
-        return
+        throw "API Token not set! Use Set-ICToken to connect to an Infocyte instance."
     }
 
     $Globallimit = 100000 # trying to control strains on the database. Add a filter to keep it reasonable.
@@ -46,15 +45,9 @@ function Get-ICAPI {
         skip = $skip
         limit = $resultlimit
     }
-    if ($fields) {
-        $filter['fields'] = $fields
-    }
-    if ($order) {
-        $filter['order'] = $order
-    }
-    if ($where) {
-        $filter['where'] = $where
-    }
+    if ($fields) { $filter['fields'] = $fields }
+    if ($order) { $filter['order'] = $order }
+    if ($where) { $filter['where'] = $where }
 
     Write-Verbose "Requesting data from $url"
     if ($where -AND $where.count -gt 0) {
@@ -89,19 +82,24 @@ function Get-ICAPI {
             $total = [int]$tcnt.'count'
         } catch {
             Write-Verbose "Couldn't get a count from $url/count"
-            $total = "Unknown"
+            $total = "N/A"
         }
-        if ($NoLimit -AND ($total -ge $Globallimit)) {
-            Write-Warning "Your filter will return $total objects! You are limited to $GlobalLimit results per query."
-            Write-Host -ForegroundColor Yellow -BackgroundColor Black "`tDatabase performance can be severely degraded in large queries."
-            Write-Host -ForegroundColor Yellow -BackgroundColor Black "`tTry refining your query further with a 'where' filter or"
-            Write-Host -ForegroundColor Yellow -BackgroundColor Black "`task Infocyte for a data export by emailing support@infocyte.com."
-            Read-Host -Prompt " Press any key to continue pulling first $GlobalLimit or CTRL+C to quit" | out-null
+
+        if ($total.Gettype() -ne [int]) {
+            $NoCount = $true
         }
         elseif ($NoLimit) {
-            Write-Verbose "Retrieving $total objects that match this filter."
+            if ($total -ge $Globallimit) {
+                Write-Warning "Your filter will return $total objects! You are limited to $GlobalLimit results per query."
+                Write-Host -ForegroundColor Yellow -BackgroundColor Black "`tDatabase performance can be severely degraded in large queries."
+                Write-Host -ForegroundColor Yellow -BackgroundColor Black "`tTry refining your query further with a 'where' filter or"
+                Write-Host -ForegroundColor Yellow -BackgroundColor Black "`task Infocyte for a data export by emailing support@infocyte.com."
+                Read-Host -Prompt " Press any key to continue pulling first $GlobalLimit or CTRL+C to quit" | out-null
+            } else {
+                Write-Verbose "Retrieving $total objects that match this filter."
+            }
         }
-        elseif ($total -gt $resultlimit -AND $total -ne "Unknown") {
+        elseif ($total -gt $resultlimit) {
             Write-Warning "Found $total objects with this filter. Returning first $resultlimit."
             Write-Host -ForegroundColor Yellow -BackgroundColor Black "`tUse a tighter 'where' filter or the -NoLimit switch to get more."
         } else {
@@ -121,7 +119,7 @@ function Get-ICAPI {
         } catch {
             $pc = -1
         }
-        if ($total -ge 100) {
+        if (-NOT $NoCount -AND $total -ge 100) {
             Write-Progress -Id 2 -ParentId 1 -Activity "Getting Data from Infocyte API" -status "Requesting data from $url [$skip of $total]" -PercentComplete $pc
         }
         Write-Debug "Sending $url this Body as 'application/json':`n$($body|convertto-json)"
@@ -129,8 +127,7 @@ function Get-ICAPI {
         try {
             $Objects = Invoke-RestMethod $url -body $body -Method GET -ContentType 'application/json' -Proxy $Global:Proxy -ProxyCredential $Global:ProxyCredential
         } catch {
-            Write-Error "ERROR: $($_.Exception.Message)"
-            return
+            throw "ERROR: $($_.Exception.Message)"
         }
         $bt = $timer.Elapsed
         $e = ($bt - $at).TotalMilliseconds
@@ -175,10 +172,12 @@ function Get-ICAPI {
     $TotalTime = $timer.Elapsed
     $AveTime = ($times | Measure-Object -Average).Average
     $MaxTime = ($times | Measure-Object -Maximum).Maximum
-    if ($total -gt 25) {
+    if (-NOT $NoCount -AND $total -gt 25) {
         Write-Progress -Id 2 -ParentId 1 -Activity "Getting Data from Infocyte API" -Completed
     }
-    Write-Verbose "Received $count objects from $url in $($TotalTime.TotalSeconds.ToString("#.####")) Seconds (Page Request times: Ave= $($AveTime.ToString("#"))ms, Max= $($MaxTime.ToString("#"))ms)"
+    if (-NOT $NoCount) {
+        Write-Verbose "Received $count objects from $url in $($TotalTime.TotalSeconds.ToString("#.####")) Seconds (Page Request times: Ave= $($AveTime.ToString("#"))ms, Max= $($MaxTime.ToString("#"))ms)"
+    }
 }
 
 # Used with all other rest methods. Pass a body (hashtable) and it will add authentication.
@@ -207,8 +206,7 @@ function Invoke-ICAPI {
             Authorization = $Global:ICToken
         }
     } else {
-        Write-Error "API Token not set! Use Set-ICToken to set your token to an Infocyte instance."
-        return
+        Throw "API Token not set! Use Set-ICToken to set your token to an Infocyte instance."
     }
 
     $url = "$($Global:HuntServerAddress)/api/$Endpoint"
@@ -221,10 +219,9 @@ function Invoke-ICAPI {
 		$Result = Invoke-RestMethod -Uri $url -headers $headers -body $json -Method $method -ContentType 'application/json' -Proxy $Global:Proxy -ProxyCredential $Global:ProxyCredential
 	} catch {
         if ($($_.Exception.Message) -match "422") {
-            Write-Warning "Cannot process request."
-            Write-Error "$($_.Exception.Message)"
+            Throw "Cannot process request. $($_.Exception.Message)"
         } else {
-            Write-Error "$($_.Exception.Message)"
+            Throw "$($_.Exception.Message)"
         }
 	}
     if ($Method -like "DELETE") {
