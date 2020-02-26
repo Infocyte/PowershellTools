@@ -116,7 +116,7 @@ FunctionsToExport = @(
     "Get-ICExtension",
     "Update-ICExtension",
     "Remove-ICExtension",
-    "Import-ICExtenion",
+    "Import-ICExtension",
     "Import-ICOfficialExtensions",
     "Test-ICExtension",
     "Get-ICAgent",
