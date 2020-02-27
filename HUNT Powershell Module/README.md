@@ -27,7 +27,7 @@ If installed, just load up the Instance you want to interact with in your Powers
 
 ### Retrieving Data and Interacting with Boxes
 Raw data within Infocyte is either an event or forensic object (we call these instances). There are three pre-compiled aggregations of these events we call boxes that normalizes data (i.e. unique by hash+path) and calculates stats for the trailing 7, 30, and 90 days globally and for each target group. By default, getting data using a function like `Get-ICObject` will target the `Global Last 7 Day` box.  
-**Example:**  
+**Setting the default box:**  
 > PS> Set-ICBox -Global -Last 7  
 
 OR  
@@ -38,7 +38,7 @@ OR
 **Getting Data:**  
 > $artifacts = Get-ICObject -Type Artifact -NoLimit
 
-**Data Export Functions:**  
+Data Export Functions:  
 Data is currently seperated by object type though that will change in 2020. All the object and event data can be grabbed with `Get-ICObject` with a reference to object type. Apps and Vulns are treated a little differently so have their own functions.  
 
 	Get-ICObject
