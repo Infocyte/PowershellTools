@@ -7,7 +7,9 @@ function Get-ICObject {
         [parameter(ValueFromPipeline)]
         [String]$Id,
 
-        [parameter(HelpMessage="Data is currently seperated into object-type tables. 'File' will perform a recursive call of all files.")]
+        [parameter(
+            Mandatory=$true,
+            HelpMessage="Data is currently seperated into object-type tables. 'File' will perform a recursive call of all files.")]
         [ValidateSet(
           "Process",
           "Module",
@@ -23,11 +25,11 @@ function Get-ICObject {
           "File",
           "Extension"
         )]
-        [String]$Type="File",
+        [String]$Type,
 
         [parameter(HelpMessage={"Boxes are the 7, 30, and 90 day views of target group or global data. Use Set-ICBox to set your default. CurrentDefault: $Global:ICCurrentBox"})]
         [String]$BoxId=$Global:ICCurrentBox,
-        [parameter(HelpMessage="Defaults to aggregated variants of files (normalized by hash+path). Use this switch to get all instances of the object found.")]
+        [parameter(HelpMessage="Defaults to hash+path aggregation (normalized). Use this switch to get all raw instances of the object found.")]
         [Switch]$AllInstances,
 
         [Switch]$CountOnly,
@@ -379,24 +381,56 @@ function Get-ICReport {
 function Get-ICActivityTrace {
     [cmdletbinding()]
     param(
-        [parameter(ValueFromPipeline=$true)]
+        [parameter(
+            ParameterSetName="Id",
+            ValueFromPipeline=$true)]
         [String]$Id,
 
-        [parameter(ValueFromPipelineByPropertyName=$true)]
+        [parameter(
+            ParameterSetName="accountId",
+            ValueFromPipelineByPropertyName=$true)]
         [String]$accountId,
 
-        [parameter(ValueFromPipelineByPropertyName=$true)]
+        [parameter(
+            ParameterSetName="fileRepId",
+            ValueFromPipeline=$True,
+            ValueFromPipelineByPropertyName=$true)]
         [alias('fileRepId')]
         [String]$sha1,
 
-        [parameter(ValueFromPipelineByPropertyName=$true)]
+        [parameter(
+            ParameterSetName="hostId",
+            ValueFromPipelineByPropertyName=$true)]
         [String]$hostId,
 
+        [parameter(ParameterSetName="accountId")]
+        [parameter(ParameterSetName="fileRepId")]
+        [parameter(ParameterSetName="hostId")]     
         [DateTime]$StartTime=(Get-Date).AddDays(-7).ToUniversalTime(),
+
+        [parameter(ParameterSetName="accountId")]
+        [parameter(ParameterSetName="fileRepId")]
+        [parameter(ParameterSetName="hostId")] 
         [DateTime]$EndTime = (Get-Date).ToUniversalTime(),
+
+        [parameter(ParameterSetName="accountId")]
+        [parameter(ParameterSetName="fileRepId")]
+        [parameter(ParameterSetName="hostId")] 
         [HashTable]$where=@{},
+
+        [parameter(ParameterSetName="accountId")]
+        [parameter(ParameterSetName="fileRepId")]
+        [parameter(ParameterSetName="hostId")] 
         [String[]]$order= @("eventTime desc"),
+
+        [parameter(ParameterSetName="accountId")]
+        [parameter(ParameterSetName="fileRepId")]
+        [parameter(ParameterSetName="hostId")] 
         [Switch]$NoLimit,
+
+        [parameter(ParameterSetName="accountId")]
+        [parameter(ParameterSetName="fileRepId")]
+        [parameter(ParameterSetName="hostId")] 
         [Switch]$CountOnly
     )
 
@@ -459,21 +493,52 @@ function Get-ICDwellTime {
 }
 
 function Get-ICBox {
-    [cmdletbinding()]
+    [cmdletbinding(DefaultParameterSetName="Global")]
     param(
-        [parameter()]
+        [parameter(ParameterSetName="Id")]
         [ValidatePattern("^[A-Z0-9]{8}-([A-Z0-9]{4}-){3}[A-Z0-9]{12}$")]
         [alias('BoxId')]
         [String]$Id,
 
-        [parameter()]
+        [parameter(ParameterSetName="TargetId")]
         [alias('targetId')]
         [String]$targetGroupId,
 
+        [parameter(ParameterSetName="Global")]
         [Switch]$Global,
-        [Switch]$Last7,
-        [Switch]$Last30,
-        [Switch]$Last90,
+
+        [parameter(
+            Mandatory=$false,
+            ParameterSetName="TargetId")]
+        [parameter(
+            Mandatory=$false, 
+            ParameterSetName="Global")]
+        [ValidateSet(7,30,90)]
+        [Int]$Last, #New
+   
+        [parameter(
+            Mandatory=$false,
+            ParameterSetName="TargetId")]
+        [parameter(
+            Mandatory=$false, 
+            ParameterSetName="Global")]
+        [Switch]$Last7, # Legacy
+
+        [parameter(
+            Mandatory=$false,
+            ParameterSetName="TargetId")]
+        [parameter(
+            Mandatory=$false, 
+            ParameterSetName="Global")]
+        [Switch]$Last30, # Legacy
+
+        [parameter(
+            Mandatory=$false,
+            ParameterSetName="TargetId")]
+        [parameter(
+            Mandatory=$false, 
+            ParameterSetName="Global")]
+        [Switch]$Last90, # Legacy
 
         [Switch]$IncludeArchive,
         [Switch]$NoLimit
@@ -483,27 +548,28 @@ function Get-ICBox {
     if ($Id) {
         $Endpoint += "/$Id"
     } else {
-        if ($Last90) {
+        if ($Last90 -OR $Last -eq 7) {
             $where += @{ name = "Last 90 days" }
         }
-        elseif ($Last30) {
+        elseif ($Last30 -OR $Last -eq 30) {
             $where += @{ name = "Last 30 days" }
         }
-        elseif ($Last7) {
+        elseif ($Last7 -OR $Last -eq 30) {
             $where += @{ name = "Last 7 days" }
         }
 
         if ($targetGroupId) {
             $where += @{ targetId = $targetGroupId }
-        }
+        } 
         elseif ($Global) {
+            #Global
             $where += @{ targetId = $null }
         }
     }
 
     $boxes = Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit
     if ($Id -AND -NOT $boxes) {
-        Write-Error "No Box with id $Id"
+        Write-Error "No Box with id $Id was found"
         return
     }
     $TargetGroups = Get-ICTargetGroup -IncludeArchive -NoLimit:$NoLimit
@@ -524,27 +590,66 @@ function Get-ICBox {
         }
     }
     if ($IncludeArchive) {
+        Write-Verbose "Including deleted Target Groups..."
         $boxes
     } else {
-        Write-Verbose "Including deleted Target Groups..."
         $boxes | Where-Object { -NOT $_.deleted -AND $_.targetGroup -ne "Deleted" }
     }
 }
 
 function Set-ICBox {
-    [cmdletbinding()]
+    [cmdletbinding(DefaultParameterSetName="Global")]
     param(
-        [parameter(Mandatory=$true, ValueFromPipeLine=$true)]
+        [parameter(
+            Mandatory=$true, 
+            ValueFromPipeLine=$true,
+            ValueFromPipelineByPropertyName,
+            ParameterSetName="Id"
+            )]
         [ValidatePattern("^[A-Z0-9]{8}-([A-Z0-9]{4}-){3}[A-Z0-9]{12}$")]
         [alias('BoxId')]
-        [String]$Id
+        [String]$Id,
+
+        [parameter(
+            Mandatory=$false,
+            ParameterSetName="TargetId")]
+        [alias('targetId')]
+        [String]$targetGroupId,
+
+        [parameter(
+            Mandatory=$false,
+            ParameterSetName="Global")]
+        [Switch]$Global,
+
+        [parameter(
+            Mandatory=$true,
+            ParameterSetName="TargetId")]
+        [parameter(
+            Mandatory=$true, 
+            ParameterSetName="Global")]
+        [ValidateSet(7,30,90)]
+        [Int]$Last
     )
+
     PROCESS {
-        $box = Get-ICbox -id $Id
-        if ($box) {
-            Write-Host "`$Global:ICCurrentBox is now set to $($box.targetGroup)-$($box.name) [$Id]"
-            $Global:ICCurrentBox = $Id
-            return $true
+        if ($Id) {
+            $box = Get-ICbox -id $Id
+            if ($box) {
+                Write-Host "`$Global:ICCurrentBox is now set to $($box.targetGroup)-$($box.name) [$Id]"
+                $Global:ICCurrentBox = $Id
+                return $true
+            } else {
+                Write-Warning "No Box with Id $Id found."
+                return
+            }
+        } else {
+            Write-Verbose "Setting default box to global last $GlobalLast day aggregation."
+            if ($targetGroupId) {
+                Get-ICBox -targetGroupId $targetGroupId -Last $Last | Set-ICBox
+            } else {
+                #Global
+                Get-ICBox -Last $Last | Set-ICBox
+            }
         }
     }
 }

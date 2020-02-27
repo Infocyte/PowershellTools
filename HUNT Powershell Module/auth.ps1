@@ -173,7 +173,7 @@ function Set-ICToken {
 	}
 
 	# Set initial default boxId (change with Set-ICBox) and test connection
-	$box = Get-ICBox -Last7 -Global
+	$box = Get-ICBox -Last 7 -Global
 	if ($box) {
 		$Global:ICCurrentBox = $box.id
 		Write-Host "`$Global:ICCurrentBox is set to $($box.targetGroup)-$($box.name) [$($box.id)]"
