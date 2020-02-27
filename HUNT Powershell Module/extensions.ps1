@@ -474,7 +474,7 @@ function Test-ICExtension {
 
 	# Clear-Host
     $Devpath = "C:\Program Files\Infocyte\dev"
-	$AgentPath = "C:\Program Files\Infocyte\Agent\"
+	$AgentPath = "C:\Program Files\Infocyte\Agent"
 	$URL = ""
 
     if (Test-Path "$DevPath\s1.exe") {
@@ -482,7 +482,8 @@ function Test-ICExtension {
 		if (Test-Path "$AgentPath\s1.exe") {
 			$Ver2 = (& "$AgentPath\s1.exe" "--version").split(" ")[2]
 			if ($ver2 -gt $ver) {
-				Write-Warning "s1.exe ($ver) has an update: ($Ver2). Copy s1.exe from $AgentPath\s1.exe to $Devpath\s1.exe to update this function."
+                Write-Warning "s1.exe ($ver) has an update: ($Ver2). Copy s1.exe from '$AgentPath\s1.exe' to '$Devpath\s1.exe' to update this function."
+                Write-Warning "Run this command to do so: Copy-Item -Path '$AgentPath\s1.exe' -Destination '$Devpath\s1.exe'"
 			}
 		}
 		$Path = Get-item $Path | Select-Object -ExpandProperty FullName
@@ -492,7 +493,7 @@ function Test-ICExtension {
 		New-Item $Devpath -ItemType Directory | Out-Null
 		if (Test-Path "$AgentPath\s1.exe") {
             $Ver2 = & "$AgentPath\s1.exe" "--version"
-			Write-Warning "$Devpath\s1.exe not found but latest version ($Ver2) was found within your agent folder ($AgentPath). Copying this over."
+			Write-Warning "$Devpath\s1.exe not found but latest version ($Ver2) was found within your agent folder ($AgentPath\s1.exe). Copying this over."
 			Copy-Item -Path "$AgentPath\s1.exe" -Destination "$Devpath\s1.exe" | Out-Null
 		}
 		else {
@@ -540,14 +541,17 @@ function Test-ICExtension {
 		$line = $process.StandardOutput.ReadLine()
 		$output += "`n$line"
 		
-		$reg1 = $line | select-string -Pattern "\d{4}-\d+-\d+T\d+:\d+:\d+\.\d+-\d+:\d+\s(!?.+)\ssurvey_types::response\s- (.+)"
-		$reg2 = $line | select-string -Pattern "^[^\d]{4}" 
-		if ($reg1) {
-			Write-Output "[$($reg1.Matches.Groups[1].Value)] $($reg1.Matches.Groups[2].Value)"
+        $reg1 = $line -Match "\d{4}-\d+-\d+T\d+:\d+:\d+\.\d+-\d+:\d+\s(?<type>!?.+)\ssurvey_types::(response|extensions.*?)\s- (?<message>.+)"
+        $reg2 = $line -Match "^[^\d]{4}" 
+        if ($reg1) {
+			Write-Output "[$($Matches.type)] $($Matches.message)"
 		} 
 		elseif ($reg2) {
-			Write-Output "[] $line"
-		}
+			Write-Output "[PRINT] $line"
+        } 
+        elseif ($PSCmdlet.MyInvocation.BoundParameters["Verbose"].IsPresent) {
+            Write-Output "[VERBOSE] $line"
+        }
 	}
 	Write-debug $output
 }
