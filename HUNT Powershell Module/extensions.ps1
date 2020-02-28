@@ -566,10 +566,10 @@ function Parse-ICExtensionHeader ($ExtensionBody){
         created = $null
         updated = $null
     }
-    if ($ExtensionBody -match '(?si)^--\[\[[\n\r]+(?<preamble>.+?)\]\]--') {
+    if ($ExtensionBody -match '(?si)^--\[\[[\n\r]+(?<preamble>.+?)--\]\]') {
         $preamble = $matches.preamble
     } else {
-        Write-Warning "Could not parse header (should be a section wrapped by --[[ ... ]]--)"
+        Write-Warning "Could not parse header (should be a section wrapped by --[[ ... --]])"
         return $header
     }
 
