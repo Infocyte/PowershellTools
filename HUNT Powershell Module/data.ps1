@@ -548,13 +548,13 @@ function Get-ICBox {
     if ($Id) {
         $Endpoint += "/$Id"
     } else {
-        if ($Last90 -OR $Last -eq 7) {
+        if ($Last -eq 90 -OR $Last90) {
             $where += @{ name = "Last 90 days" }
         }
-        elseif ($Last30 -OR $Last -eq 30) {
+        elseif ($Last -eq 30 -OR $Last30) {
             $where += @{ name = "Last 30 days" }
         }
-        elseif ($Last7 -OR $Last -eq 30) {
+        elseif ($Last -eq 7 -OR $Last7) {
             $where += @{ name = "Last 7 days" }
         }
 
@@ -586,7 +586,7 @@ function Get-ICBox {
                 $_ | Add-Member -MemberType "NoteProperty" -name "deleted" -value $true
             }
         } else {
-            $_ | Add-Member -MemberType "NoteProperty" -name "targetGroup" -value "All"
+            $_ | Add-Member -MemberType "NoteProperty" -name "targetGroup" -value "Global"
         }
     }
     if ($IncludeArchive) {
