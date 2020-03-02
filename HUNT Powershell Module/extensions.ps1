@@ -462,9 +462,7 @@ function Test-ICExtension {
 	[alias("Invoke-ICExtension")]
 	param(
 		[parameter(mandatory=$true)]
-	  	[String]$Path,
-
-	  	[Switch]$DropSurveyFile
+	  	[String]$Path
 	  )
 	  
 	If (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
@@ -511,12 +509,28 @@ function Test-ICExtension {
 			}
 		}
     }
+	
+	if (-NOT (Test-Path "$DevPath\luacheck.exe")) {
+		$url = "https://github.com/mpeterv/luacheck/releases/download/0.23.0/luacheck.exe"
+		Write-Warning "$Devpath\luacheck.exe not found (used for debugging). Attempting to download from Github."
+		# Download luacheck from Github
+		[Net.ServicePointManager]::SecurityProtocol = [Enum]::ToObject([System.Net.SecurityProtocolType], 3072)
+		$wc = New-Object Net.WebClient
+		$wc.Encoding = [System.Text.Encoding]::UTF8
+		$wc.UseDefaultCredentials = $true
+		try {
+			$wc.DownloadFile($URL, "$Devpath\luacheck.exe")
+		} catch {
+			Write-Warning "Could not download luacheck.exe from $URL."
+			return
+		}
+	}
+
 
 	# & "s1.exe --no-delete --no-compress --verbose --only-extensions --extensions $Path"
 	$a = @()
-	$a += "--no-delete"
-	if (-NOT $DropSurveyFile) { $a += "--no-results-file" }
-	$a += "--no-log-file"
+    $a += "--no-delete"
+    $a += "--no-compress"
 	$a += "--no-events"
 	$a += "--only-extensions"
 	$a += "--extensions $Path"
@@ -537,23 +551,23 @@ function Test-ICExtension {
 
 	$line = $process.StandardOutput.ReadLine()
 	$output = "`n$line"
-	while ($line) {
+	while ($line -OR -NOT $process.HasExited) {
 		$line = $process.StandardOutput.ReadLine()
-		$output += "`n$line"
-		
         $reg1 = $line -Match "\d{4}-\d+-\d+T\d+:\d+:\d+\.\d+-\d+:\d+\s(?<type>!?.+)\ssurvey_types::(response|extensions.*?)\s- (?<message>.+)"
-        $reg2 = $line -Match "^[^\d]{4}" 
         if ($reg1) {
 			Write-Output "[$($Matches.type)] $($Matches.message)"
-		} 
-		elseif ($reg2) {
-			Write-Output "[PRINT] $line"
-        } 
-        elseif ($PSCmdlet.MyInvocation.BoundParameters["Verbose"].IsPresent) {
-            Write-Output "[VERBOSE] $line"
+        } else { 
+            if ($line -Match "^([^\d]{4}|\s+)" ) {
+                Write-Host -ForegroundColor DarkGray ": $line"
+            } 
+            elseif ("" -eq $line -OR $null -eq $line) {
+                Write-Host -ForegroundColor DarkGray ": $line"
+            } 
+            else {
+                Write-Verbose "$line"
+            }
         }
 	}
-	Write-debug $output
 }
 function Parse-ICExtensionHeader ($ExtensionBody){
 
