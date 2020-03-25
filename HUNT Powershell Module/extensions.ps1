@@ -60,7 +60,7 @@ function Get-ICExtension {
             $ext | Add-Member -TypeName NoteProperty -NotePropertyName sha256 -NotePropertyValue $ext2.sha256
             Write-Verbose "Parsing Extension Header"
             $header = Parse-ICExtensionHeader $ext.body
-            $ext | Add-Member -TypeName NoteProperty -NotePropertyName gcriptGuid -NotePropertyValue $header.guid
+            $ext | Add-Member -TypeName NoteProperty -NotePropertyName scriptGuid -NotePropertyValue $header.guid
             $ext | Add-Member -TypeName NoteProperty -NotePropertyName scriptName -NotePropertyValue $header.name
             $ext | Add-Member -TypeName NoteProperty -NotePropertyName scriptDescription -NotePropertyValue $header.Description
             $ext | Add-Member -TypeName NoteProperty -NotePropertyName scriptAuthor -NotePropertyValue $header.author
@@ -99,8 +99,9 @@ function Get-ICExtension {
             $c = $ext.count
             $ext | ForEach-Object {
                 $pc = [math]::Floor(($n/$c)*100)
+                $guid = $_.description
                 Write-Progress -Activity "Getting Extentions from Infocyte API" -status "Requesting Body from Extension $n of $c" -PercentComplete $pc
-                $_ | Add-Member -TypeName NoteProperty -NotePropertyName guid -NotePropertyValue $ext.description
+                $_ | Add-Member -TypeName NoteProperty -NotePropertyName guid -NotePropertyValue $guid
                 if ($IncludeBody) {
                     Write-Output (Get-ICExtension -id $_.Id)
                 } else {
@@ -412,6 +413,7 @@ function Remove-ICExtension {
         }
     }
 }
+
 function Import-ICOfficialExtensions {
     [cmdletbinding()]
     Param(
@@ -420,36 +422,55 @@ function Import-ICOfficialExtensions {
     )
 
     $InstanceExtensions = Get-ICExtension -IncludeBody -NoLimit
-    Write-Verbose "Pulling Official Extensions from Github: https://api.github.com/repos/Infocyte/extensions/contents/official/"
-    $Extensions = Invoke-WebRequest -Uri "https://api.github.com/repos/Infocyte/extensions/contents/official/collection" | Select-Object -ExpandProperty content | ConvertFrom-Json
-    $Extensions += Invoke-WebRequest -Uri "https://api.github.com/repos/Infocyte/extensions/contents/official/action" | Select-Object -ExpandProperty content | ConvertFrom-Json
+    Write-Host "Pulling Official Extensions from Github: https://api.github.com/repos/Infocyte/extensions/contents/official/"
+    try {
+        $Extensions = Invoke-WebRequest -Uri "https://api.github.com/repos/Infocyte/extensions/contents/official/collection" | Select-Object -ExpandProperty content | ConvertFrom-Json
+    }
+    catch {
+        Write-Error "Could not download extensions from https://api.github.com/repos/Infocyte/extensions/contents/official/collection"
+    }
+    try {
+        $Extensions += Invoke-WebRequest -Uri "https://api.github.com/repos/Infocyte/extensions/contents/official/action" | Select-Object -ExpandProperty content | ConvertFrom-Json
+    }
+    catch {
+        Write-Error "Could not download extensions from https://api.github.com/repos/Infocyte/extensions/contents/official/action"
+    }
     If ($IncludeContributed) {
-        Write-Verbose "Pulling Official Extensions from Github: https://api.github.com/repos/Infocyte/extensions/contents/contrib/"
-        $Extensions += Invoke-WebRequest -Uri "https://api.github.com/repos/Infocyte/extensions/contents/contrib/collection" | Select-Object -ExpandProperty content | ConvertFrom-Json
-        $Extensions += Invoke-WebRequest -Uri "https://api.github.com/repos/Infocyte/extensions/contents/contrib/action" | Select-Object -ExpandProperty content | ConvertFrom-Json
+        Write-Host "Pulling Official Extensions from Github: https://api.github.com/repos/Infocyte/extensions/contents/contrib/"
+        try {
+            $Extensions += Invoke-WebRequest -Uri "https://api.github.com/repos/Infocyte/extensions/contents/contrib/collection" | Select-Object -ExpandProperty content | ConvertFrom-Json
+        }
+        catch {
+            Write-Error "Could not download extensions from https://api.github.com/repos/Infocyte/extensions/contents/contrib/collection"
+        }
+        try {
+            $Extensions += Invoke-WebRequest -Uri "https://api.github.com/repos/Infocyte/extensions/contents/contrib/action" | Select-Object -ExpandProperty content | ConvertFrom-Json
+        }
+        catch {
+            Write-Error "Could not download extensions from https://api.github.com/repos/Infocyte/extensions/contents/contrib/action"
+        }
     }
     $Extensions | ForEach-Object {
-        #$filename = ($_.name -split "\.")[0]
+        $filename = ($_.name -split "\.")[0]
         try {
             $ext = (new-object Net.WebClient).DownloadString($_.download_url)
-            $header = Parse-ICExtensionHeader $ext
         } catch {
             Write-Warning "Could not download extension. [$_]"
             continue
         }
-
+        $header = Parse-ICExtensionHeader $ext
+        if (-NOT $header) { Write-Warning "Could not parse header on $($_.name)"; continue }
         $existingExt = $InstanceExtensions | Where-Object { $_.guid -eq $header.guid }
         if ($existingExt) {
             if ($Update) {
-                Write-Verbose "Updating extension $($header.name) [$($existingExt.id)] with guid $($header.guid):`n$existingExt"
-
+                Write-Host "Updating extension $($header.name) [$($existingExt.id)] with guid $($header.guid):`n$existingExt"
                 Update-ICExtension -Id $existingExt.id -Body $ext
             }
             else {
                 Write-Warning "Extension $($header.name) [$($existingExt.id)] with guid $($header.guid) already exists. Try using -Update to update it."
             }
         } else {
-            Write-Verbose "Importing extension $($header.name) with guid $($header.guid)"
+            Write-Host "Importing extension $($header.name) with guid $($header.guid)"
             Import-ICExtension -Body $ext -Active -Force:$Force
         }
     }
@@ -569,6 +590,7 @@ function Test-ICExtension {
         }
 	}
 }
+
 function Parse-ICExtensionHeader ($ExtensionBody){
 
     $header = [PSCustomObject]@{
@@ -580,11 +602,11 @@ function Parse-ICExtensionHeader ($ExtensionBody){
         created = $null
         updated = $null
     }
-    if ($ExtensionBody -match '(?si)^--\[\[[\n\r]+(?<preamble>.+?)--\]\]') {
+    if ($ExtensionBody -match '(?si)^--\[\[[\n\r]+(?<preamble>.+?)-*\]\]') {
         $preamble = $matches.preamble
     } else {
-        Write-Warning "Could not parse header (should be a section wrapped by --[[ ... --]])"
-        return $header
+        Write-Warning "Could not parse header (should be a comment section wrapped by --[[ ... --]])"
+        return
     }
 
     #$regex = '(?mi)\s*Name:\s(?<name>.+?)\n|\s*Type:\s(?<type>.+?)\n|\s*Description:\s(\|(?<description>.+?)\||(?<description>.+?)\n)|\s*Updated:\s(?<updated>.+?)\n|\s*Guid:\s(?<guid>.+?)\n'
