@@ -573,21 +573,26 @@ function Test-ICExtension {
 	$line = $process.StandardOutput.ReadLine()
 	$output = "`n$line"
 	while ($line -OR -NOT $process.HasExited) {
-		$line = $process.StandardOutput.ReadLine()
-        $reg1 = $line -Match "\d{4}-\d+-\d+T\d+:\d+:\d+\.\d+-\d+:\d+\s(?<type>!?.+)\ssurvey_types::(response|extensions.*?)\s- (?<message>.+)"
+        $reg = $line -Match "\d{4}-\d+-\d+T\d+:\d+:\d+\.\d+-\d+:\d+\s(?<type>!?.+)\shunt_survey\s-\sCompleted"
         if ($reg1) {
+            Write-Output "[$($Matches.type)] Survey Completed"
+            return
+        }
+        $reg = $line -Match "\d{4}-\d+-\d+T\d+:\d+:\d+\.\d+-\d+:\d+\s(?<type>!?.+)\ssurvey_types::(response|extensions.*?)\s-\s(?<message>.+)"
+        if ($reg) {
 			Write-Output "[$($Matches.type)] $($Matches.message)"
         } else { 
             if ($line -Match "^([^\d]{4}|\s+)" ) {
                 Write-Host -ForegroundColor DarkGray ": $line"
             } 
             elseif ("" -eq $line -OR $null -eq $line) {
-                Write-Host -ForegroundColor DarkGray ": $line"
+                Write-Host -ForegroundColor DarkGray ""
             } 
             else {
                 Write-Verbose "$line"
             }
         }
+        $line = $process.StandardOutput.ReadLine()
 	}
 }
 
