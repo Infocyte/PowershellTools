@@ -154,7 +154,7 @@ function New-ICExtension {
     $template = $template -replace '(?si)(?<start>^--\[\[.+?Created:\s)(.+?)(?<end>\n)',"`${start}$dt`${end}"
     $template = $template -replace '(?si)(?<start>^--\[\[.+?Updated:\s)(.+?)(?<end>\n)',"`${start}$dt`${end}"
     
-    $template | Out-File -Encoding utf8 -FilePath "$pwd\$Name.lua"
+    $template | Out-File -FilePath "$pwd\$Name.lua"
     Write-Output $template
     
     Write-Host "`nCreated $Type extension from template and saved to $pwd\$Name.lua"
