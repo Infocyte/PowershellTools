@@ -136,8 +136,8 @@ function New-ICExtension {
 		[String]$Type = "Collection"  
 	)
 	
-	$CollectionTemplate = "https://raw.githubusercontent.com/Infocyte/extensions/draft/examples/collection_template.lua"
-	$ActionTemplate = "https://raw.githubusercontent.com/Infocyte/extensions/draft/examples/action_template.lua"
+	$CollectionTemplate = "https://raw.githubusercontent.com/Infocyte/extensions/master/examples/collection_template.lua"
+	$ActionTemplate = "https://raw.githubusercontent.com/Infocyte/extensions/master/examples/action_template.lua"
 
 	if ($Type -eq "Collection"){
 		$template = (new-object Net.WebClient).DownloadString($CollectionTemplate)

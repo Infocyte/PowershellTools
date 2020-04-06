@@ -1,4 +1,5 @@
 #Variables
+$Version = "1.3.4" 
 $GUID_REGEX = "^[A-Z0-9]{8}-([A-Z0-9]{4}-){3}[A-Z0-9]{12}$"
 
 Write-Host "Importing Infocyte HUNT API Powershell Module"
@@ -11,6 +12,7 @@ if ($PSVersionTable.PSVersion.Major -lt 5) {
 }
 
 function Get-ICHelp {
+    Write-Host "Infocyte Powershell Module version $Version"
     Write-Host "Pass your Infocyte API Token into Set-ICToken to connect to an instance of Infocyte."
     Write-Host "`tThis will store your login token and server into a global variable for use by the other commands"
     Write-Host "`n"
