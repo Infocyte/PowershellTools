@@ -90,9 +90,12 @@ function Get-ICUserTask {
 		} else {
 			if (-NOT $All -AND -NOT $where) {
 				Write-Verbose "Filtering for running and recently ended tasks (Default)."
-				$where['or'] = @(
-					@{ status = "Active" },
-					@{ endedOn = @{ gte = (Get-Date).ToUniversalTime().AddDays(-1).ToString() } }
+				$where['and'] = @(
+					@{ or = @( 
+						@{ status = "Active" },
+						@{ endedOn = @{ gte = (Get-Date).ToUniversalTime().AddDays(-1).ToString() } }
+					)},
+					@{ archived = $false }
 				)
 			}
 		}
