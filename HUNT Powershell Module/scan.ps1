@@ -211,7 +211,7 @@ function New-ICScanOptions {
         $ExtIds = @()
     }
     PROCESS {
-        $ExtIds += $_
+        $ExtIds += $_.ToString()
     }
     END {
         if (-NOT $ExtIds) {
@@ -224,18 +224,19 @@ function New-ICScanOptions {
             $default = $true
         }
     	$options = @{
-      	    EnableProcess = $default
-    		EnableAccount = $default
-    		EnableMemory = $default
-    		EnableModule = $default
-    		EnableDriver = $default
-    		EnableArtifact = $default
-    		EnableAutostart = $default
-    		EnableApplication = $default
-    		EnableHook = $false
-    		EnableNetwork = $default
-            EnableEventLog = $default
-    		EnableLogDelete = $true
+			process = $default
+			module = $default
+			driver = $default
+			memory = $default
+			account = $default
+    		artifact = $default
+    		autostart = $default
+			application = $default
+			installed = $default
+    		hook = $false
+    		network = $default
+            events = $default
+			extensionIds = @()
         }
         if ($ExtensionIds) {
             $options['extensionIds'] = $Ids
