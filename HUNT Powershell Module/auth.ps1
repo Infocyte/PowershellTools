@@ -107,27 +107,32 @@ function Set-ICToken {
 	}
 	Write-Verbose "Setting Security Protocol to TLS1.2"
 	[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+	[System.Net.ServicePointManager]::MaxServicePointIdleTime = 60000
 
-	if ($Instance -match "[:\.]+") {
-		if ($Instance -notlike "https://*") {
-			$Global:HuntServerAddress = "https://$Instance"
-		} else {
-			$Global:HuntServerAddress = $Instance
-		}
+	if ($Instance -match "https://*") {
+		$Global:HuntServerAddress = $Instance
+	elseif ($Instance -match ".*infocyte.com")
+		$Global:HuntServerAddress = "https://$Instance"
 	} else {
 		$Global:HuntServerAddress = "https://$Instance.infocyte.com"
 	}
 	Write-Host "Setting Global API URL to $Global:HuntServerAddress/api"
 
-	$credentialfile = "$env:appdata\infocyte\credentials.json"
+	if ($IsWindows -OR $env:OS -match "windows") {
+		$credentialfile = "$env:appdata/infocyte/credentials.json"
+	} 
+	else {
+		$credentialfile = "$env:HOME/infocyte/credentials.json"
+	}
+
 	$Global:ICCredentials = @{}
 	if (Test-Path $credentialfile) {
 		(Get-Content $credentialfile | ConvertFrom-JSON).psobject.properties | ForEach-Object {
 			$Global:ICCredentials[$_.Name] = $_.Value
 		}
 	} else {
-		if (-NOT (Test-Path "$env:appdata\infocyte")) {
-			New-Item -ItemType "directory" -Path "$env:appdata\infocyte"
+		if (-NOT (Test-Path (Split-Path $credentialfile))) {
+			New-Item -ItemType "directory" -Path (Split-Path $credentialfile)
 		}
 	}
 
