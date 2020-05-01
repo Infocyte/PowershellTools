@@ -456,10 +456,10 @@ function Import-ICOfficialExtensions {
             $ext = (new-object Net.WebClient).DownloadString($_.download_url)
         } catch {
             Write-Warning "Could not download extension. [$_]"
-            continue
+            return
         }
         $header = Parse-ICExtensionHeader $ext
-        if (-NOT $header) { Write-Warning "Could not parse header on $($_.name)"; continue }
+        if (-NOT $header) { Write-Warning "Could not parse header on $($_.name)"; return }
         $existingExt = $InstanceExtensions | Where-Object { $_.guid -eq $header.guid }
         if ($existingExt) {
             if ($Update) {
@@ -470,8 +470,8 @@ function Import-ICOfficialExtensions {
                 Write-Warning "Extension $($header.name) [$($existingExt.id)] with guid $($header.guid) already exists. Try using -Update to update it."
             }
         } else {
-            Write-Host "Importing extension $($header.name) with guid $($header.guid)"
-            Import-ICExtension -Body $ext -Active -Force:$Force
+            Write-Host "Importing extension $($header.name) [$($header.Type)] with guid $($header.guid)"
+            Import-ICExtension -Body $ext -Active -Type $header.Type -Force:$Force
         }
     }
     
