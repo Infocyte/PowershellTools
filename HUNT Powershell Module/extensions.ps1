@@ -486,84 +486,84 @@ function Test-ICExtension {
 	  	[String]$Path
 	  )
 	  
-	If (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
+	If ($env:OS -match "windows" -AND (-NOT [Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
 		Write-Warning "You do not have Administrator rights to run this script!`nPlease re-run this script as an Administrator!"
 		return
-	}
+    } elseif ($IsLinux -AND (id -u) -eq 0) {
+        Write-Warning "You do not have permissions to run this script!`nPlease re-run this with sudo!"
+		return
+    }
+    
+    # Clear-Host
+    $agentname = "agent.exe"
+    if ($IsWindows -OR $env:OS -match "windows") {
+        $Devpath = "C:/Program Files/Infocyte/dev"
+        $AgentPath = "C:/Program Files/Infocyte/Agent"
+    } else {
+        $Devpath = "opt/infocyte/dev"
+        $AgentPath = "opt/infocyte/agent"
+    }
 
-	# Clear-Host
-    $Devpath = "C:\Program Files\Infocyte\dev"
-	$AgentPath = "C:\Program Files\Infocyte\Agent"
 	$URL = ""
 
-    if (Test-Path "$DevPath\s1.exe") {
-        $Ver = (& "$DevPath\s1.exe" "--version").split(" ")[2]
-		if (Test-Path "$AgentPath\s1.exe") {
-			$Ver2 = (& "$AgentPath\s1.exe" "--version").split(" ")[2]
-			if ($ver2 -gt $ver) {
-                Write-Warning "s1.exe ($ver) has an update: ($Ver2). Copy s1.exe from '$AgentPath\s1.exe' to '$Devpath\s1.exe' to update this function."
-                Write-Warning "Run this command to do so: Copy-Item -Path '$AgentPath\s1.exe' -Destination '$Devpath\s1.exe'"
-			}
-		}
-		$Path = Get-item $Path | Select-Object -ExpandProperty FullName
-		$ext = Get-item $Path | Select-Object -ExpandProperty name
-    	Write-Verbose "Executing $ext with s1.exe (Version: $Ver)"
+    # Check for Agent
+    if (Test-Path "$DevPath/$agentname") {
+        $DevVer = (& "$DevPath/$agentname" "--version").split(" ")[2]
     } else {
 		New-Item $Devpath -ItemType Directory | Out-Null
-		if (Test-Path "$AgentPath\s1.exe") {
-            $Ver2 = & "$AgentPath\s1.exe" "--version"
-			Write-Warning "$Devpath\s1.exe not found but latest version ($Ver2) was found within your agent folder ($AgentPath\s1.exe). Copying this over."
-			Copy-Item -Path "$AgentPath\s1.exe" -Destination "$Devpath\s1.exe" | Out-Null
-		}
-		else {
-			Write-Warning "$Devpath\s1.exe not found! Attempting to download from Infocyte"
-			# Download Survey from S3
-			[Net.ServicePointManager]::SecurityProtocol = [Enum]::ToObject([System.Net.SecurityProtocolType], 3072)
-			$wc = New-Object Net.WebClient
-			$wc.Encoding = [System.Text.Encoding]::UTF8
-			$wc.UseDefaultCredentials = $true
-			try {
-				$wc.DownloadFile($URL, "$Devpath\s1.exe")
-			} catch {
-				Write-Warning "Could not download S1.exe from $URL. You will need to manually download a copy from your Infocyte instance's Download page and add it to $DevPath\s1.exe"
-				return
-			}
-		}
+		if (Test-Path "$AgentPath/$agentname") {
+            $AgentVer = (& "$AgentPath/$agentname" "--version").split(" ")[2]
+			Write-Warning "$Devpath/$agentname not found but latest version ($Ver2) was found within your agent folder ($AgentPath). Copying this over."
+			Copy-Item -Path "$AgentPath/$agentname" -Destination "$Devpath" | Out-Null
+		} else {
+            Write-Error "Infocyte Agent not found. Install an Agent or download it into $DevPath"
+            return
+        }
+	}
+    # Update Agent
+    if (Test-Path "$AgentPath/$agentname") {
+        $AgentVer = (& "$AgentPath/$agentname" "--version").split(" ")[2]
+        if ($AgentVer -gt $DevVer) {
+            Write-Warning "$agentname ($DevVer) has an update: ($AgentVer). Copy '$AgentPath/$agentname' to '$Devpath/$agentname'."
+            Write-Warning "Run this command to do so: Copy-Item -Path '$AgentPath/$agentname' -Destination '$Devpath/$agentname'"
+        }
     }
-	
-	if (-NOT (Test-Path "$DevPath\luacheck.exe")) {
+
+    $Path = Get-item $Path | Select-Object -ExpandProperty FullName
+    $ext = Get-item $Path | Select-Object -ExpandProperty name
+    Write-Verbose "Executing $ext with $agentname (Version: $Ver)"
+    
+
+	if ($isWindows -AND (-NOT (Test-Path "$DevPath/luacheck.exe"))) {
 		$url = "https://github.com/mpeterv/luacheck/releases/download/0.23.0/luacheck.exe"
-		Write-Warning "$Devpath\luacheck.exe not found (used for debugging). Attempting to download from Github."
+		Write-Warning "$Devpath/luacheck.exe not found (used for debugging). Attempting to download from Github."
 		# Download luacheck from Github
-		[Net.ServicePointManager]::SecurityProtocol = [Enum]::ToObject([System.Net.SecurityProtocolType], 3072)
+		#[Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls13
 		$wc = New-Object Net.WebClient
 		$wc.Encoding = [System.Text.Encoding]::UTF8
 		$wc.UseDefaultCredentials = $true
 		try {
-			$wc.DownloadFile($URL, "$Devpath\luacheck.exe")
+			$wc.DownloadFile($URL, "$Devpath/luacheck.exe")
 		} catch {
 			Write-Warning "Could not download luacheck.exe from $URL."
-			return
 		}
 	}
 
-
-	# & "s1.exe --no-delete --no-compress --verbose --only-extensions --extensions $Path"
+	# & "agent.exe --no-delete --no-compress --verbose --only-extensions --extensions $Path"
 	$a = @()
-    $a += "--no-delete"
+    $a += "survey"
     $a += "--no-compress"
-	$a += "--no-events"
 	$a += "--only-extensions"
 	$a += "--extensions $Path"
 	
-	#$p = Start-Process -NoNewWindow -FilePath "$Devpath\s1.exe" -ArgumentList $a -PassThru
+	#$p = Start-Process -NoNewWindow -FilePath "$Devpath\agent.exe" -ArgumentList $a -PassThru
 	
 	$psi = New-object System.Diagnostics.ProcessStartInfo
 	$psi.CreateNoWindow = $true
 	$psi.UseShellExecute = $false
 	$psi.RedirectStandardOutput = $true
 	$psi.RedirectStandardError = $false
-	$psi.FileName = "$Devpath\s1.exe"
+	$psi.FileName = "$Devpath/$agentname"
 	$psi.Arguments = $a
 	$process = New-Object System.Diagnostics.Process
 	$process.StartInfo = $psi
@@ -571,7 +571,7 @@ function Test-ICExtension {
 	#$process.WaitForExit()
 
 	$line = $process.StandardOutput.ReadLine()
-	$output = "`n$line"
+	#$output = "`n$line"
 	while ($line -OR -NOT $process.HasExited) {
         $reg = $line -Match "\d{4}-\d+-\d+T\d+:\d+:\d+\.\d+-\d+:\d+\s(?<type>!?.+)\shunt_survey\s-\sCompleted"
         if ($reg1) {
@@ -610,7 +610,7 @@ function Parse-ICExtensionHeader ($ExtensionBody){
     if ($ExtensionBody -match '(?si)^--\[\[[\n\r]+(?<preamble>.+?)-*\]\]') {
         $preamble = $matches.preamble
     } else {
-        Write-Warning "Could not parse header (should be a comment section wrapped by --[[ ... --]])"
+        Write-Error "Could not parse header (should be a comment section wrapped by --[[ ... --]])"
         return
     }
 
