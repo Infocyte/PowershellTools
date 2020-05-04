@@ -101,7 +101,7 @@ function Get-ICAPI {
         }
         elseif ($total -gt $resultlimit) {
             Write-Warning "Found $total objects with this filter. Returning first $resultlimit."
-            Write-Host -ForegroundColor Yellow -BackgroundColor Black "`tUse a tighter 'where' filter or the -NoLimit switch to get more."
+            Write-Warning "`tUse a tighter 'where' filter or the -NoLimit switch to get more."
         } else {
             Write-Verbose "Found $total objects with this filter."
         }
@@ -115,12 +115,12 @@ function Get-ICAPI {
 
     while ($more) {
         try {
-            $pc = [math]::floor($skip*100/$total)
+            $pc = [math]::floor($skip*100/$total); if ($pc -gt 100) { Write-Debug "`$pc is above 100! `$n=$n"; $pc = 100 }
         } catch {
             $pc = -1
         }
         if (-NOT $NoCount -AND $total -ge 100) {
-            Write-Progress -Id 1 -Activity "Getting Data from Infocyte API" -status "Requesting data from $url [$skip of $total]" -PercentComplete $pc
+            Write-Progress -Activity "Getting Data from Infocyte API" -status "Requesting data from $url [$skip of $total]" -PercentComplete $pc
         }
         Write-Debug "Sending $url this Body as 'application/json':`n$($body|convertto-json)"
         $at = $timer.Elapsed
@@ -173,7 +173,7 @@ function Get-ICAPI {
     $AveTime = ($times | Measure-Object -Average).Average
     $MaxTime = ($times | Measure-Object -Maximum).Maximum
     if (-NOT $NoCount -AND $total -gt 25) {
-        Write-Progress -Id 1 -Activity "Getting Data from Infocyte API" -Completed
+        Write-Progress -Activity "Getting Data from Infocyte API" -Completed
     }
     if (-NOT $NoCount) {
         Write-Verbose "Received $count objects from $url in $($TotalTime.TotalSeconds.ToString("#.####")) Seconds (Page Request times: Ave= $($AveTime.ToString("#"))ms, Max= $($MaxTime.ToString("#"))ms)"

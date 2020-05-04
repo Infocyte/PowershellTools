@@ -39,7 +39,7 @@ function Get-ICJob {
 }
 
 # Get Infocyte HUNT User Audit Logs
-function Get-ICUserAuditLog {
+function Get-ICAuditLog {
 	[cmdletbinding()]
 	param(
 		[parameter(ValueFromPipeline)]
@@ -65,12 +65,13 @@ function Get-ICUserAuditLog {
 }
 
 # Get Infocyte HUNT User Tasks. These are the items in the task dropdown in the UI.
-function Get-ICUserTask {
+function Get-ICTask {
 	[cmdletbinding()]
 	param(
 		[parameter(ValueFromPipelineByPropertyName)]
-		[alias('UserTaskId')]
+		[alias('TaskId')]
 		[String]$Id,
+
 		[Switch]$All,
 
 		[parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
@@ -88,34 +89,30 @@ function Get-ICUserTask {
 			$order = $null
 			$endpoint += "/$Id"
 		} else {
-			if (-NOT $All -AND -NOT $where) {
+			if (-NOT $All -AND $where.keys.count -eq 0) {
 				Write-Verbose "Filtering for running and recently ended tasks (Default)."
-				$where['and'] = @(
-					@{ or = @( 
+				$where = @{ and = @() }
+				$where['and'] += @{ type = @{ neq = "RTS"} }
+				$where['and'] += @{ or = @( 
 						@{ status = "Active" },
 						@{ endedOn = @{ gte = (Get-Date).ToUniversalTime().AddDays(-1).ToString() } }
-					)},
-					@{ archived = $false }
-				)
+					)}
+				$where['and'] += @{ archived = $false }
+				Write-Verbose "Using filter: $($Where | convertto-json)"
 			}
 		}
 		Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
 	}
 }
 
-function Get-ICUserTaskItem {
-	[cmdletbinding(DefaultParameterSetName='userTasks')]
+function Get-ICTaskItems {
+	[cmdletbinding()]
 	param(
-		[parameter(Mandatory,
-			ParameterSetName="userTaskItem")]
-		[String]$Id,
-
-		[parameter(Mandatory,
-			ParameterSetName="userTasks",
-			ValueFromPipeline,
-			ValueFromPipelineByPropertyName)]
+		[parameter(
+			Mandatory,
+			ValueFromPipeline)]
 		[ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
-		[String]$userTaskId,
+		[String]$TaskId,
 
 		[parameter()]
 		[Switch]$IncludeProgress,
@@ -131,15 +128,9 @@ function Get-ICUserTaskItem {
 
 	PROCESS {
 		$Endpoint = "userTaskItems"
-		$PsCmdlet.ParameterSetName
-		if ($PsCmdlet.ParameterSetName -eq 'userTaskItem') {
-			$Endpoint += "/$Id"
-			Write-Verbose "Getting UserTaskItem with userTaskItemId $Id."
-		} else {
-			$where['userTaskId'] = $userTaskId
-			Write-Verbose "Getting All UserTaskItems with userTaskId $userTaskId."
-		}
-
+		$where['userTaskId'] = $TaskId
+		Write-Verbose "Getting All TaskItems with TaskId $TaskId."
+	
 		if ($IncludeProgress -AND (-NOT $CountOnly)) {
 			$n = 1
 			if ($Id) {
@@ -147,16 +138,16 @@ function Get-ICUserTaskItem {
 			} else {
 				$cnt = Get-ICAPI -Endpoint $Endpoint -where $where -CountOnly
 			}
-			Write-Verbose "Found $cnt userTaskItems. Getting progress for each."
+			Write-Verbose "Found $cnt TaskItems. Getting progress for each."
 			$items = Get-ICAPI -Endpoint $Endpoint -where $where -order $order -fields $fields -NoLimit:$NoLimit
 			$items | ForEach-Object {
 				$n += 1
-				try { $pc = [math]::floor($n*100/$cnt) } catch { $pc = -1 }
+				try { $pc = [math]::floor($n*100/$cnt); if ($pc -gt 100) { $pc = 100 } } catch { $pc = -1 }
 				if ($_.id) {
 					$progress = @()
-					Write-Progress -Id 1 -Activity "Enriching with Task Progress Information" -status "Getting progress on $($_.name) [$n of $cnt]" -PercentComplete $pc
-					Get-ICUserTaskItemProgress -taskItemId $_.id -fields "createdOn","text" -order "createdOn desc" | ForEach-Object {
-						$progress += New-Object PSObject -Property @{
+					Write-Progress -Id 101 -Activity "Enriching with Task Progress Information" -status "Getting progress on $($_.name) [$n of $cnt]" -PercentComplete $pc
+					Get-ICTaskItemProgress -taskItemId $_.id -fields "createdOn","text" -order "createdOn desc" | ForEach-Object {
+						$progress += [PSCustomObject]@{
 							createdOn = $_.createdOn
 							text = $_.text
 						}
@@ -171,7 +162,7 @@ function Get-ICUserTaskItem {
 	}
 }
 
-function Get-ICUserTaskItemProgress {
+function Get-ICTaskItemProgress {
 	[cmdletbinding()]
 	param(
 		[parameter(Mandatory=$true, ValueFromPipelineByPropertyName)]
@@ -198,4 +189,72 @@ function Get-ICUserTaskItemProgress {
 		}
 		Get-ICAPI -Endpoint $Endpoint -where $where -order $order -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly
 	}
+}
+
+function Get-ICLastScanTask {
+	[cmdletbinding()]
+	param(
+		[parameter()]
+		[String]$taskItemId,
+
+		[parameter()]
+		[ValidateSet("Scan", "Enumerate")]
+		[String]$Type = "Enumerate"
+	)
+
+	if ($taskItemId) {
+		$Task = Get-ICTask -id $TaskItemId | Select-Object -Last 1
+		if (-NOT $Task -OR $Task.type -notin @("Enumerate", "Scan")) {
+			Write-Error "No task was found with Id: $taskItemId"
+			return
+		}
+	}
+	else {
+		$where = @{ and = @()}
+		#$where['and'] += @{ endedOn = @{ gte = (Get-Date).ToUniversalTime().AddDays(-1).ToString() } }
+		$where['and'] += @{ type = $Type; }
+		$where['and'] += @{ archived = $false }
+		$Task = Get-ICTask -where $where  | Select-Object -Last 1
+		if (-NOT $Task) {
+			Write-Error "No task was found with type: $Type"
+			return
+		}
+	}
+
+	$Progress = Get-ICTaskItems -TaskId $Task.id -IncludeProgress -NoLimit | Select-Object name, createdOn, endedOn, progress
+	$Progress | % {
+		$accessible = $false
+		if ($_.endedOn) {
+			$totalSeconds = [math]::round(([datetime]$_.endedOn - [DateTime]$_.createdOn).TotalSeconds)
+		}
+		$_ | Add-Member -MemberType NoteProperty -Name "totalSeconds" -Value $totalSeconds
+		try {
+			$Message = ($_.progress.text | select-string "ACCESSIBLE").ToString()
+			if ($Message -match "^ACCESSIBLE") {
+				$accessible = $true
+			}
+		} catch {}	
+		$_ | Add-Member -MemberType NoteProperty -Name "message" -Value $Message
+		$_ | Add-Member -MemberType NoteProperty -Name "accessible" -Value $accessible
+	}
+
+	if ($Task.endedOn) {
+		$totalTime = [math]::round(([datetime]$Task.endedOn - [DateTime]$Task.createdOn).TotalSeconds)
+	}
+
+	$result = [PSCustomObject]@{
+		taskId = $Task.Id
+		name = $Task.name
+		createdOn = $Task.createdOn
+		endedOn = $Task.endedOn
+		totalSeconds = $totalTime
+		status = $Task.status
+		type = $Task.type
+		accessibleCount = ($Progress | Where-Object { $_.Accessible }).count
+		inaccessibleCount = ($Progress | Where-Object { -NOT $_.Accessible }).count
+		totalItems = $Progress.count
+		items = $Progress
+	}
+	$result['coverage'] = try { [math]::Round(($($result.accessibleCount)/$($result.totalItems)), 2) } catch { $null }
+	return $result
 }

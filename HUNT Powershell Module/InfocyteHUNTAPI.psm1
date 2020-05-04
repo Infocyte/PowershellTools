@@ -53,7 +53,7 @@ function Get-ICHelp {
     Write-Host -ForegroundColor Cyan "`tAdd-ICScanSchedule, Get-ICScanSchedule, Remove-ICScanSchedule`n"
 
     Write-Host "Task Status Functions:"
-    Write-Host -ForegroundColor Cyan "`tGet-ICUserTask, Get-ICUserTaskItem`n"
+    Write-Host -ForegroundColor Cyan "`tGet-ICTask, Get-ICTaskItems, Get-ICLastScanTask`n"
 
     Write-Host "Offline Scan Import Functions:"
     Write-Host -ForegroundColor Cyan "`tImport-ICSurvey`n"
