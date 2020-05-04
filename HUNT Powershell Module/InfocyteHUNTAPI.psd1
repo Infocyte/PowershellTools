@@ -72,6 +72,7 @@ FunctionsToExport = @(
     "Invoke-ICFindHosts",
     "Invoke-ICScan",
     "Invoke-ICScanTarget",
+    "Invoke-ICResponse",
     "Import-ICSurvey",
     "Get-ICObject",
     "Get-ICAlert",

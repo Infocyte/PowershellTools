@@ -26,8 +26,8 @@ function Get-ICHelp {
     Write-Host -ForegroundColor Cyan "`tGet-ICAPI, Invoke-ICAPI`n"
 
     Write-Host "Extension Development Functions:"
-    Write-Host -ForegroundColor Cyan "`tNew-ICExtension, Test-ICExtension"
-    Write-Host -ForegroundColor Cyan "`tGet-ICExtension, Update-ICExtension, Remove-ICExtension"
+    Write-Host -ForegroundColor Cyan "`tNew-ICExtension, Test-ICExtension,"
+    Write-Host -ForegroundColor Cyan "`tGet-ICExtension, Update-ICExtension, Remove-ICExtension,"
     Write-Host -ForegroundColor Cyan "`tImport-ICExtension, Import-ICOfficialExtensions`n"
 
     Write-Host "Admin/Misc Functions:"
@@ -49,7 +49,7 @@ function Get-ICHelp {
 
     Write-Host "Scanning Functions:"
     Write-Host -ForegroundColor Cyan "`tInvoke-ICFindHosts, New-ICScanOptions,"
-    Write-Host -ForegroundColor Cyan "`tGet-ICScan, Invoke-ICScan, Invoke-ICScanTarget,"
+    Write-Host -ForegroundColor Cyan "`tGet-ICScan, Invoke-ICScan, Invoke-ICScanTarget, Invoke-ICResponse,"
     Write-Host -ForegroundColor Cyan "`tAdd-ICScanSchedule, Get-ICScanSchedule, Remove-ICScanSchedule`n"
 
     Write-Host "Task Status Functions:"
