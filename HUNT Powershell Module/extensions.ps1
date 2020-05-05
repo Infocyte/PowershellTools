@@ -6,6 +6,7 @@ function Get-ICExtension {
             Mandatory = $true, 
             ValueFromPipeline = $true, 
             ParameterSetName = 'Id')]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('extensionId')]
         [String]$Id,
 
@@ -13,6 +14,7 @@ function Get-ICExtension {
             Mandatory = $true, 
             ValueFromPipeline = $true, 
             ParameterSetName = 'guid')]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [String]$Guid,
         
         [Parameter(
@@ -282,6 +284,7 @@ function Update-ICExtension {
             mandatory=$true,
             ParameterSetName  = 'String'
         )]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('extensionId')]
         [String]$Id,
 
@@ -376,7 +379,7 @@ function Remove-ICExtension {
             Mandatory=$true, 
             ValueFromPipeline=$true,
             ParameterSetName = 'Id')]
-        [ValidateNotNullorEmpty()]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('extensionId')]
         [String]$Id,
 
@@ -625,6 +628,9 @@ function Parse-ICExtensionHeader ($ExtensionBody){
     }
     if ($preamble -match '(?mi)^\s*Updated:\s(\d{8})\s*') {
         $header.updated = ($matches[1].split(" ")[0] | ForEach-Object { get-date -year $_.substring(0,4) -Month $_.substring(4,2) -Day $_.substring(6,2) }).date 
+    }
+    if ($header.guid -notmatch $GUID_REGEX) { 
+        Write-Error "Incorrect guid format: $($header.guid).  Should be a guid of form: $GUID_REGEX." 
     }
     return $header
 }

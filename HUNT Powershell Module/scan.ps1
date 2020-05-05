@@ -142,11 +142,11 @@ function Invoke-ICScanTarget {
 		[String]$TargetGroupId,
 		[String]$TargetGroupName = "OnDemand",
 
-		[ValidatePattern("^(([0-9a-fA-F]){8}-([0-9a-fA-F]){4}-([0-9a-fA-F]){4}-([0-9a-fA-F]){4}-([0-9a-fA-F]){12})$")]
+		[ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
 		[String]$CredentialId,
 		[String]$CredentialName,
 
-		[ValidatePattern("^(([0-9a-fA-F]){8}-([0-9a-fA-F]){4}-([0-9a-fA-F]){4}-([0-9a-fA-F]){4}-([0-9a-fA-F]){12})$")]
+		[ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [String]$sshCredentialId,
 		[String]$sshCredentialName,
 
@@ -229,8 +229,9 @@ function Invoke-ICScanTarget {
 
 function New-ICScanOptions {
     param(
-        [parameter(ValueFromPipeLine)]
-		[ValidatePattern("^(([0-9a-fA-F]){8}-([0-9a-fA-F]){4}-([0-9a-fA-F]){4}-([0-9a-fA-F]){4}-([0-9a-fA-F]){12})$")]
+		[parameter(Mandatory=$false,
+			ValueFromPipeLine)]
+		[ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [String[]]$ExtensionIds,
 
         [Switch]$ExtensionsOnly
@@ -239,13 +240,13 @@ function New-ICScanOptions {
         $ExtIds = @()
     }
     PROCESS {
-        $ExtIds += $_.ToString()
+		if ($_) { $ExtIds += $_.ToString() }
     }
     END {
         if (-NOT $ExtIds) {
             $ExtIds = $ExtensionIds
         }
-    	Write-Host 'ScanOption object properties should be set ($True or $False) and then passed into Invoke-ICScan or Add-ICScanSchedule'
+    	Write-Verbose 'ScanOption object properties should be set ($True or $False) and then passed into Invoke-ICScan or Add-ICScanSchedule'
         if ($ExtensionsOnly) {
             $default = $false
         } else {
@@ -266,8 +267,8 @@ function New-ICScanOptions {
             events = $default
 			extensionIds = @()
         }
-        if ($ExtensionIds) {
-            $options['extensionIds'] = $Ids
+        if ($ExtIds) {
+            $options['extensionIds'] = $ExtIds
         }
     	return [PSCustomObject]$options
     }
@@ -284,7 +285,8 @@ function Invoke-ICResponse {
 		[String]$Target,
 
 		[parameter()]
-		[ValidatePattern("^(([0-9a-fA-F]){8}-([0-9a-fA-F]){4}-([0-9a-fA-F]){4}-([0-9a-fA-F]){4}-([0-9a-fA-F]){12})$")]
+		[ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
+		#[ValidatePattern("^(([0-9a-fA-F]){8}-([0-9a-fA-F]){4}-([0-9a-fA-F]){4}-([0-9a-fA-F]){4}-([0-9a-fA-F]){12})$")]
 		[String]$TargetGroupId,
 		[parameter()]
 		[String]$TargetGroupName = "OnDemand",
@@ -292,7 +294,7 @@ function Invoke-ICResponse {
 		[parameter(
 			Mandatory=$true, 
 			ParameterSetName = 'ById')]
-		[ValidatePattern("^(([0-9a-fA-F]){8}-([0-9a-fA-F]){4}-([0-9a-fA-F]){4}-([0-9a-fA-F]){4}-([0-9a-fA-F]){12})$")]
+		[ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
 		[String]$ExtensionId,
 		[parameter(
 			Mandatory=$true, 
@@ -335,7 +337,7 @@ function Invoke-ICResponse {
 			$ExtensionName = $Ext.name
 		}
 		else {
-			$Ext = Get-ICExtension -where @{ name = $ExtensionName } | Select-Object -First
+			$Ext = Get-ICExtension -where @{ name = $ExtensionName } | Select-Object -First 1
 			if (-NOT $Ext) {
 				Write-Error "Extension with name $ExtensionName does not exist!"
 				return
@@ -343,7 +345,7 @@ function Invoke-ICResponse {
 			$ExtensionId = $Ext.Id
 		}
 		
-		$ScanOpts = New-ICScanOptions -ExtensionsOnly -ExtensionIds @($ExtensionId)
+		$ScanOpts = New-ICScanOptions -ExtensionsOnly -ExtensionIds $ExtensionId
 		$Body['options'] = $ScanOpts
 		
 		# Initiating Scan
@@ -431,7 +433,7 @@ function Remove-ICScanSchedule {
 			ValueFromPipeline,
 			ValueFromPipelineByPropertyName
 		)]
-		[ValidatePattern("[A-Z0-9]{8}-([A-Z0-9]{4}-){3}[A-Z0-9]{12}")]
+		[ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
 		[alias('scheduleId')]
 		[string]$Id,
 

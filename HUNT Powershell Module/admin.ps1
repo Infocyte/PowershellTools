@@ -48,6 +48,7 @@ function Get-ICFlag {
     [cmdletbinding()]
     param(
         [parameter(ValueFromPipeline=$true)]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('flagId')]
         [String]$Id,
 
@@ -73,7 +74,7 @@ function Update-ICFlag  {
     [cmdletbinding(SupportsShouldProcess=$true)]
     Param(
         [parameter(Mandatory=$true, ValueFromPipelineByPropertyName)]
-        [ValidateNotNullorEmpty()]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('flagId')]
         [String]$id,
 
@@ -111,7 +112,7 @@ function Remove-ICFlag {
     [cmdletbinding(SupportsShouldProcess=$true)]
     Param(
         [parameter(Mandatory=$true, ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
-        [ValidateNotNullorEmpty()]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('flagId')]
         [String]$id
     )
@@ -137,7 +138,7 @@ function Add-ICComment {
     [cmdletbinding()]
     Param(
         [parameter(Mandatory=$true, ValueFromPipeline)]
-        [ValidateNotNullorEmpty()]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [String]$Id,
 
         [parameter(Mandatory=$true)]

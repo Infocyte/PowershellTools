@@ -7,6 +7,7 @@ function New-ICTargetGroup {
         [String]$Name,
 
         [parameter(Mandatory=$false)]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [String]$ControllerGroupId,
 
         [parameter(HelpMessage="Use first available ControllerGroupId if not provided.")]
@@ -47,8 +48,10 @@ function Get-ICTargetGroup {
     [cmdletbinding()]
     param(
         [parameter(ValueFromPipeline=$true)]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('TargetGroupId','targetId')]
         [String]$Id,
+
         [Switch]$IncludeArchive,
 
         [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
@@ -78,7 +81,7 @@ function Remove-ICTargetGroup {
     [cmdletbinding(SupportsShouldProcess=$true)]
     param(
         [parameter(Mandatory=$true, ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
-        [ValidateNotNullOrEmpty()]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('TargetGroupId','targetId')]
         [String]$Id,
 
@@ -130,6 +133,7 @@ function Get-ICControllerGroup {
     [cmdletbinding()]
     param(
         [parameter(ValueFromPipeline=$true)]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('controllerGroupId')]
         [String]$Id,
 
@@ -154,7 +158,7 @@ function Remove-ICControllerGroup {
     [cmdletbinding(SupportsShouldProcess=$true)]
     param(
         [parameter(Mandatory=$true, ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
-        [ValidateNotNullOrEmpty()]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('ControllerGroupId')]
         [String]$Id
     )
@@ -208,6 +212,7 @@ function Get-ICCredential {
     [cmdletbinding()]
     param(
         [parameter(ValueFromPipeline=$true)]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('credentialId')]
         [String]$id,
 
@@ -255,6 +260,7 @@ function Get-ICAddress {
     [cmdletbinding()]
     param(
         [parameter()]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('addressId')]
         [String]$Id,
 
@@ -291,6 +297,7 @@ function Remove-ICAddress {
     [cmdletbinding(SupportsShouldProcess=$true)]
     Param(
         [parameter(ValueFromPipeLine=$true)]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('AddressId')]
         [String]$id,
 
@@ -337,6 +344,7 @@ function Get-ICAgent {
     [cmdletbinding()]
     param(
         [parameter(ValueFromPipeline=$true)]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('agentId')]
         [String]$Id,
 
@@ -364,7 +372,7 @@ function Remove-ICAgent {
     [cmdletbinding(SupportsShouldProcess=$true)]
     Param(
         [parameter(Mandatory=$true, ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
-        [ValidateNotNullorEmpty()]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('AgentId')]
         [String]$Id
     )
@@ -395,12 +403,16 @@ function New-ICQuery {
         [String]$Name,
 
         [parameter(Mandatory=$True)]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('targetId')]
         [String]$TargetGroupId,
 
         [parameter(Mandatory=$True)]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [String]$credentialId,
 
+        [parameter()]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [String]$sshCredentialId,
 
         [parameter(Mandatory=$True)]
@@ -434,10 +446,12 @@ function Get-ICQuery {
     [cmdletbinding()]
     param(
         [parameter(ValueFromPipeline=$true)]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('queryId')]
         [String]$Id,
 
         [parameter(ValueFromPipelineByPropertyName=$true)]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('targetId')]
         [String]$TargetGroupId,
 
@@ -467,7 +481,7 @@ function Remove-ICQuery {
     [cmdletbinding(SupportsShouldProcess=$true)]
     param(
         [parameter(Mandatory=$true, ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
-        [ValidateNotNullOrEmpty()]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('queryId')]
         [String]$Id
     )

@@ -6,6 +6,7 @@ function Get-ICJob {
 	[cmdletbinding()]
 	param(
 		[parameter(ValueFromPipelineByPropertyName)]
+		[ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
 		[alias('jobId')]
 		[String]$Id,
 
@@ -43,6 +44,7 @@ function Get-ICAuditLog {
 	[cmdletbinding()]
 	param(
 		[parameter(ValueFromPipeline)]
+		[ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
 		[String]$Id,
 
 		[parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
@@ -69,6 +71,7 @@ function Get-ICTask {
 	[cmdletbinding()]
 	param(
 		[parameter(ValueFromPipelineByPropertyName)]
+		[ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
 		[alias('TaskId')]
 		[String]$Id,
 
@@ -166,7 +169,7 @@ function Get-ICTaskItemProgress {
 	[cmdletbinding()]
 	param(
 		[parameter(Mandatory=$true, ValueFromPipelineByPropertyName)]
-		[ValidateNotNullOrEmpty()]
+		[ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
 		[alias('id')]
 		[String]$taskItemId,
 
@@ -195,6 +198,7 @@ function Get-ICLastScanTask {
 	[cmdletbinding()]
 	param(
 		[parameter()]
+		[ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
 		[String]$taskItemId,
 
 		[parameter()]

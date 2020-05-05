@@ -5,6 +5,7 @@ function Get-ICObject {
     [alias("Get-ICData","Get-ICObjects")]
     param(
         [parameter(ValueFromPipeline)]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [String]$Id,
 
         [parameter(
@@ -28,6 +29,7 @@ function Get-ICObject {
         [String]$Type,
 
         [parameter(HelpMessage={"Boxes are the 7, 30, and 90 day views of target group or global data. Use Set-ICBox to set your default. CurrentDefault: $Global:ICCurrentBox"})]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [String]$BoxId=$Global:ICCurrentBox,
         [parameter(HelpMessage="Defaults to hash+path aggregation (normalized). Use this switch to get all raw instances of the object found.")]
         [Switch]$AllInstances,
@@ -191,6 +193,7 @@ function Get-ICVulnerability {
     [cmdletbinding()]
     param(
         [parameter(ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('applicationId')]
         [String]$Id,
 
@@ -307,14 +310,11 @@ function Get-ICVulnerability {
 function Get-ICFileDetail {
     Param(
         [parameter(Mandatory=$true, ValueFromPipeline, ValueFromPipelineByPropertyName)]
+        [ValidateScript({ if ($_ -match "\b[0-9a-f]{40}\b") { $true } else { throw "Incorrect input: $_.  Requires a sha1 (fileRepId) of 40 characters."} })]
         [alias('fileRepId')]
         [String]$sha1
     )
     PROCESS {
-        if ($sha1 -notmatch "\b[0-9a-f]{40}\b") {
-            Write-Error "Incorrect input format. Requires a sha1 (fileRepId) of 40 characters."
-            return
-        }
         Write-Verbose "Requesting FileReport on file with SHA1: $sha1"
         Get-ICAPI -Endpoint "FileReps/$sha1"
     }
@@ -354,6 +354,7 @@ function Get-ICReport {
     [cmdletbinding()]
     param(
         [parameter(ValueFromPipeline=$true)]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('reportId')]
         [String]$Id,
 
@@ -384,23 +385,27 @@ function Get-ICActivityTrace {
         [parameter(
             ParameterSetName="Id",
             ValueFromPipeline=$true)]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [String]$Id,
 
         [parameter(
             ParameterSetName="accountId",
             ValueFromPipelineByPropertyName=$true)]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [String]$accountId,
 
         [parameter(
             ParameterSetName="fileRepId",
             ValueFromPipeline=$True,
             ValueFromPipelineByPropertyName=$true)]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('fileRepId')]
         [String]$sha1,
 
         [parameter(
             ParameterSetName="hostId",
             ValueFromPipelineByPropertyName=$true)]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [String]$hostId,
 
         [parameter(ParameterSetName="accountId")]
@@ -464,6 +469,7 @@ function Get-ICDwellTime {
     [cmdletbinding()]
     param(
         [parameter()]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [String]$Id,
 
         [parameter(ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
@@ -496,7 +502,7 @@ function Get-ICBox {
     [cmdletbinding(DefaultParameterSetName="Global")]
     param(
         [parameter(ParameterSetName="Id")]
-        [ValidatePattern("^[A-Z0-9]{8}-([A-Z0-9]{4}-){3}[A-Z0-9]{12}$")]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('BoxId')]
         [String]$Id,
 
@@ -606,7 +612,7 @@ function Set-ICBox {
             ValueFromPipelineByPropertyName,
             ParameterSetName="Id"
             )]
-        [ValidatePattern("^[A-Z0-9]{8}-([A-Z0-9]{4}-){3}[A-Z0-9]{12}$")]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('BoxId')]
         [String]$Id,
 
