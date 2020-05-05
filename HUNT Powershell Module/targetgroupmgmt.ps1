@@ -381,15 +381,14 @@ function Remove-ICAgent {
         $Endpoint = "Agents/$Id"
         $obj = Get-ICAgent -id $Id
         if (-NOT $obj) {
-            Write-Error "No Agent with id '$Id' exists."
+            Write-Error "No Agent exists with id: $Id"
             return
         }
         if ($PSCmdlet.ShouldProcess($obj.hostname, "Will uninstall agent: $($obj.hostname) [$Id]")) {
-            Write-Warning "Uninstalling Agent $Endpoint $($obj.hostname) [$Id]."
-            Invoke-ICAPI -Endpoint "$Endpoint/uninstall" -method POST
-            Start-Sleep 2
-            Invoke-ICAPI -Endpoint $Endpoint -method DELETE
-            Write-Host "Agent Uninstalled and Deleted."
+            Write-Verbose "Uninstalling Agent $($obj.hostname) [$Id]."
+            Invoke-ICAPI -Endpoint "$Endpoint/uninstall" -method POST | Out-Null
+            Write-Verbose "Agent on $($obj.hostname) [$Id] uninstalled and deleted."
+            return $true
         }
     }
 }

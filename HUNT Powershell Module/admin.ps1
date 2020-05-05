@@ -29,7 +29,7 @@ function New-ICFlag {
     )
 
     $Endpoint = "flags"
-    Write-Host "Adding new flag with Color $Color named $Name [Weight: $Weight]"
+    Write-Verbose "Adding new flag with Color $Color named $Name [Weight: $Weight]"
     $body = @{
     	name = $Name
     	color = $Color
@@ -40,6 +40,8 @@ function New-ICFlag {
         Write-Error "There is already a flag named $Name"
     } else {
         Invoke-ICAPI -Endpoint $Endpoint -body $body -method POST
+        Write-Verbose "Added new flag with Color $Color named $Name [Weight: $Weight]"
+        return $true        
     }
 }
 
@@ -101,9 +103,10 @@ function Update-ICFlag  {
         if ($Weight) { $body['weight'] = $Weight; $n+=1 }
         if ($n -eq 0) { Write-Error "Not Enough Parameters"; return }
 
-        Write-Verbose "Updating flag $Id with:`n$($body|convertto-json)"
+        Write-Verbose "Updating flag with id $Id:`n$($body|convertto-json)"
         if ($PSCmdlet.ShouldProcess($($obj.name), "Will update flag $($obj.name) [$Id]")) {
             Invoke-ICAPI -Endpoint $Endpoint -body $body -method PUT
+            Write-Verbose "Updated flag with Id: $Id"
         }
     }
 }
@@ -120,16 +123,18 @@ function Remove-ICFlag {
         $Endpoint = "flags/$Id"
         $obj = Get-Flags -Id $Id -where { }
         if ($obj) {
-            if ($obj | where { ($_.name -eq "Verified Good") -OR ($_.name -eq "Verified Bad")}) {
+            if ($obj | Where-Object { ($_.name -eq "Verified Good") -OR ($_.name -eq "Verified Bad")}) {
                 Write-Warning "Cannot Delete 'Verified Good' or 'Verified Bad' flags. They are a special case and would break the user interface"
                 return
             }
             if ($PSCmdlet.ShouldProcess($obj.name, "Will remove $($obj.name) [$($obj.color)] with flagId '$Id'")) {
-                Write-Host "Removing $($obj.name) [$($obj.color)] with flagId '$Id'"
+                Write-Verbose "Removing $($obj.name) [$($obj.color)] with flagId '$Id'"
                 Invoke-ICAPI -Endpoint $Endpoint -method DELETE
+                Write-Verbose "Removing $($obj.name) [$($obj.color)] with flagId '$Id'"
+                return $true
             }
         } else {
-            Write-Error "No Agent with id '$Id' exists."
+            Write-Error "No Agent found with id: $Id"
         }
     }
 }
@@ -148,11 +153,12 @@ function Add-ICComment {
 
     PROCESS {
         $Endpoint = "userComments"
-        Write-Host "Adding new comment to item with id $id"
+        Write-Verbose "Adding new comment to item with id $id"
         $body = @{
             relatedId = $Id
             value = $Text
         }
         Invoke-ICAPI -Endpoint $Endpoint -body $body -method POST
+        Write-Verbose "Added new comment to item with id $id: $($body.value)"
     }
 }

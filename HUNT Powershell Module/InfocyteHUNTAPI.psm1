@@ -1,14 +1,14 @@
 #Variables
-$Version = "1.3.4" 
+$Version = "1.3.6" 
 $GUID_REGEX = "^[A-Z0-9]{8}-([A-Z0-9]{4}-){3}[A-Z0-9]{12}$"
 
-Write-Host "Importing Infocyte HUNT API Powershell Module"
+Write-Verbose "Importing Infocyte HUNT API Powershell Module"
 $PS = $PSVersionTable.PSVersion.tostring()
 if ($PSVersionTable.PSVersion.Major -lt 5) {
   Write-Warning "Powershell Version not supported. Install version 5.x or higher"
   return
 } else {
-    Write-Host "Checking PSVersion [Minimum Supported: 5.0]: PASSED [$PS]!`n"
+    Write-Verbose "Checking PSVersion [Minimum Supported: 5.0]: PASSED [$PS]!`n"
 }
 
 function Get-ICHelp {

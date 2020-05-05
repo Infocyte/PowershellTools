@@ -301,7 +301,7 @@ function Get-ICVulnerability {
         $applicationvulnerabilities = Join-Object -Left $apps -Right $appvulns -LeftJoinProperty 'applicationid' -RightJoinProperty 'applicationid' -Type OnlyIfInBoth
         #-RightProperties cveId, description, baseScoreV2, baseScoreV3, published, modified
 
-        Write-Host "DONE: Exporting $($applicationvulnerabilities.count) Vulnerabilities"
+        Write-Verbose "Exporting $($applicationvulnerabilities.count) Vulnerabilities"
         Write-Output $applicationvulnerabilities
     }
 }
@@ -641,11 +641,11 @@ function Set-ICBox {
         if ($Id) {
             $box = Get-ICbox -id $Id
             if ($box) {
-                Write-Host "`$Global:ICCurrentBox is now set to $($box.targetGroup)-$($box.name) [$Id]"
+                Write-Verbose "`$Global:ICCurrentBox is now set to $($box.targetGroup)-$($box.name) [$Id]"
                 $Global:ICCurrentBox = $Id
                 return $true
             } else {
-                Write-Warning "No Box with Id $Id found."
+                Write-Error "No Box found with Id: $Id"
                 return
             }
         } else {

@@ -135,7 +135,11 @@ function New-ICExtension {
           "Collection",
           "Action"
         )]
-		[String]$Type = "Collection"  
+        [String]$Type = "Collection",
+
+        [Parameter(HelpMessage="Filepath and name to save new extension to. Recommending ending as .lua")]
+        [ValidateScript({ Test-Path -Path $_ -IsValid })]
+        [String]$FilePath
 	)
 	
 	$CollectionTemplate = "https://raw.githubusercontent.com/Infocyte/extensions/master/examples/collection_template.lua"
@@ -156,10 +160,14 @@ function New-ICExtension {
     $template = $template -replace '(?si)(?<start>^--\[\[.+?Created:\s)(.+?)(?<end>\n)',"`${start}$dt`${end}"
     $template = $template -replace '(?si)(?<start>^--\[\[.+?Updated:\s)(.+?)(?<end>\n)',"`${start}$dt`${end}"
     
-    $template | Out-File -FilePath "$pwd\$Name.lua"
-    Write-Output $template
     
-    Write-Host "`nCreated $Type extension from template and saved to $pwd\$Name.lua"
+    if ($SavePath) {
+        Write-Host "`nCreated $Type extension from template and saved to $SavePath"
+        $template | Out-File -FilePath $SavePath
+    }
+    else {
+        return $template
+    }    
 }
 function Import-ICExtension {
     [cmdletbinding()]
@@ -395,21 +403,21 @@ function Remove-ICExtension {
             $Endpoint = "extensions/$Id"
             $ext = Get-ICExtension -id $Id
             if (-NOT $ext) {
-                Write-Warning "Extension with id $id not found!"
+                Write-Error "Extension with id $id not found!"
                 return
             }
         } else {
             $Endpoint = "extensions"
             $ext = Get-ICExtension -Guid $Guid
             if (-NOT $ext) {
-                Write-Warning "Extension with guid $Guid not found!"
+                Write-Error "Extension with guid $Guid not found!"
                 return
             }
         }
         
         if ($PSCmdlet.ShouldProcess($($ext.Id), "Will remove $($ext.name) with extensionId '$($ext.Id)'")) {
             if (Invoke-ICAPI -Endpoint $Endpoint -method DELETE) {
-                Write-Host "Removed extension $($ext.name) [$($ext.Id)]"
+                Write-Verbose "Removed extension $($ext.name) [$($ext.Id)]"
             } else {
                 Throw "Extension $($ext.name) [$($ext.Id)] could not be removed!"
             }
@@ -425,7 +433,7 @@ function Import-ICOfficialExtensions {
     )
 
     $InstanceExtensions = Get-ICExtension -IncludeBody -NoLimit
-    Write-Host "Pulling Official Extensions from Github: https://api.github.com/repos/Infocyte/extensions/contents/official/"
+    Write-Verbose "Pulling Official Extensions from Github: https://api.github.com/repos/Infocyte/extensions/contents/official/"
     try {
         $Extensions = Invoke-WebRequest -Uri "https://api.github.com/repos/Infocyte/extensions/contents/official/collection" | Select-Object -ExpandProperty content | ConvertFrom-Json
     }
@@ -439,7 +447,7 @@ function Import-ICOfficialExtensions {
         Write-Error "Could not download extensions from https://api.github.com/repos/Infocyte/extensions/contents/official/action"
     }
     If ($IncludeContributed) {
-        Write-Host "Pulling Official Extensions from Github: https://api.github.com/repos/Infocyte/extensions/contents/contrib/"
+        Write-Verbose "Pulling Official Extensions from Github: https://api.github.com/repos/Infocyte/extensions/contents/contrib/"
         try {
             $Extensions += Invoke-WebRequest -Uri "https://api.github.com/repos/Infocyte/extensions/contents/contrib/collection" | Select-Object -ExpandProperty content | ConvertFrom-Json
         }
@@ -458,7 +466,7 @@ function Import-ICOfficialExtensions {
         try {
             $ext = (new-object Net.WebClient).DownloadString($_.download_url)
         } catch {
-            Write-Warning "Could not download extension. [$_]"
+            Write-Error "Could not download extension. [$_]"
             return
         }
         $header = Parse-ICExtensionHeader $ext
@@ -466,14 +474,14 @@ function Import-ICOfficialExtensions {
         $existingExt = $InstanceExtensions | Where-Object { $_.guid -eq $header.guid }
         if ($existingExt) {
             if ($Update) {
-                Write-Host "Updating extension $($header.name) [$($existingExt.id)] with guid $($header.guid):`n$existingExt"
+                Write-Verbose "Updating extension $($header.name) [$($existingExt.id)] with guid $($header.guid):`n$existingExt"
                 Update-ICExtension -Id $existingExt.id -Body $ext
             }
             else {
                 Write-Warning "Extension $($header.name) [$($existingExt.id)] with guid $($header.guid) already exists. Try using -Update to update it."
             }
         } else {
-            Write-Host "Importing extension $($header.name) [$($header.Type)] with guid $($header.guid)"
+            Write-Verbose "Importing extension $($header.name) [$($header.Type)] with guid $($header.guid)"
             Import-ICExtension -Body $ext -Active -Type $header.Type -Force:$Force
         }
     }
@@ -490,10 +498,10 @@ function Test-ICExtension {
 	  )
 	  
 	If ($env:OS -match "windows" -AND (-NOT [Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
-		Write-Warning "You do not have Administrator rights to run this script!`nPlease re-run this script as an Administrator!"
+		Write-Error "You do not have Administrator rights to run this script!`nPlease re-run this script as an Administrator!"
 		return
     } elseif ($IsLinux -AND (id -u) -eq 0) {
-        Write-Warning "You do not have permissions to run this script!`nPlease re-run this with sudo!"
+        Write-Error "You do not have permissions to run this script!`nPlease re-run this with sudo!"
 		return
     }
     
@@ -527,8 +535,8 @@ function Test-ICExtension {
     if (Test-Path "$AgentPath/$agentname") {
         $AgentVer = (& "$AgentPath/$agentname" "--version").split(" ")[2]
         if ($AgentVer -gt $DevVer) {
-            Write-Warning "$agentname ($DevVer) has an update: ($AgentVer). Copy '$AgentPath/$agentname' to '$Devpath/$agentname'."
-            Write-Warning "Run this command to do so: Copy-Item -Path '$AgentPath/$agentname' -Destination '$Devpath/$agentname'"
+            Write-Warning "$agentname ($DevVer) has an update: ($AgentVer). Copy '$AgentPath/$agentname' to '$Devpath/$agentname'.`n
+                `tRun this command to do so: Copy-Item -Path '$AgentPath/$agentname' -Destination '$Devpath/$agentname'"
         }
     }
 

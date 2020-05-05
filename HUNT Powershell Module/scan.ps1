@@ -69,15 +69,16 @@ function Invoke-ICScan {
 		Throw "TargetGroup with id $TargetGroupId does not exist!"
 	}
 	if ($FindHosts) {
-		Write-Host "Performing discovery on $($TargetGroup.name)"
+		Write-Progress -Activity "Performing discovery on $($TargetGroup.name)"
 		$stillactive = $true
 		$UserTask = Invoke-ICFindHosts -TargetGroupId $TargetGroupId
 		While ($stillactive) {
 			Start-Sleep 10
 			$taskstatus = Get-ICUserTask -Id $UserTask.userTaskId -where @{ createdOn = @{ gt = (Get-Date).AddHours(-10) }; name = @{ regexp = $TargetGroup.name } } | Select-Object -first 1
 			if ($taskstatus.status -eq "Active") {
-				Write-Host "Waiting on Discovery. Progress: $($taskstatus.progress)%"
+				Write-Progress -Activity "Performing discovery on $($TargetGroup.name)" -PercentComplete $($taskstatus.progress)
 			} elseif ($taskstatus.status -eq "Completed") {
+				Write-Progress -Activity "Performing discovery on $($TargetGroup.name)" -Completed
 				$stillactive = $false
 			} else {
 				Throw "Something went wrong in enumeration. Last Status: $($taskstatus.status)"
@@ -86,8 +87,7 @@ function Invoke-ICScan {
 
 	}
 	$Endpoint = "targets/$TargetGroupId/scan"
-	Write-Host "Starting Scan of TargetGroup $($TargetGroup.name)"
-
+	Write-Verbose "Starting Scan of TargetGroup $($TargetGroup.name)"
 
     if ($ScanOptions) {
         $body = @{ options = $ScanOptions }
@@ -568,7 +568,7 @@ function Import-ICSurvey {
 		$ScanId = $newscan.id
 	}
 
-	Write-Host "Importing Survey Results into $TargetGroupName-$ScanName [ScanId: $ScanId] [TargetGroupId: $TargetGroupId]"
+	Write-Verbose "Importing Survey Results into $TargetGroupName-$ScanName [ScanId: $ScanId] [TargetGroupId: $TargetGroupId]"
     }
 
     PROCESS {
@@ -591,7 +591,7 @@ function Import-ICSurvey {
 
     END {
 	    # TODO: detect when scan is no longer processing submissions, then mark as completed
-        #Write-Host "Closing scan..."
+        #Write-Verbose "Closing scan..."
         #Invoke-RestMethod -Headers @{ Authorization = $token } -Uri "$HuntServerAddress/api/scans/$scanId/complete" -Method Post
     }
 

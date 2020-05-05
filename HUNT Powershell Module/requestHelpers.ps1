@@ -90,18 +90,18 @@ function Get-ICAPI {
         }
         elseif ($NoLimit) {
             if ($total -ge $Globallimit) {
-                Write-Warning "Your filter will return $total objects! You are limited to $GlobalLimit results per query."
-                Write-Host -ForegroundColor Yellow -BackgroundColor Black "`tDatabase performance can be severely degraded in large queries."
-                Write-Host -ForegroundColor Yellow -BackgroundColor Black "`tTry refining your query further with a 'where' filter or"
-                Write-Host -ForegroundColor Yellow -BackgroundColor Black "`task Infocyte for a data export by emailing support@infocyte.com."
+                Write-Warning "Your filter will return $total objects! You are limited to $GlobalLimit results per query.`n
+                    `tDatabase performance can be severely degraded in large queries.`n
+                    `tTry refining your query further with a 'where' filter or`n
+                    `task Infocyte for a data export by emailing support@infocyte.com."
                 Read-Host -Prompt " Press any key to continue pulling first $GlobalLimit or CTRL+C to quit" | out-null
             } else {
                 Write-Verbose "Retrieving $total objects that match this filter."
             }
         }
         elseif ($total -gt $resultlimit) {
-            Write-Warning "Found $total objects with this filter. Returning first $resultlimit."
-            Write-Warning "`tUse a tighter 'where' filter or the -NoLimit switch to get more."
+            Write-Warning "Found $total objects with this filter. Returning first $resultlimit.`n
+                `tUse a tighter 'where' filter or the -NoLimit switch to get more."
         } else {
             Write-Verbose "Found $total objects with this filter."
         }
@@ -135,7 +135,7 @@ function Get-ICAPI {
         Write-Debug "Last Request: $($e.ToString("#.#"))ms"
 
         if ($CountOnly) {
-            write-debug $Objects
+            Write-Debug $Objects
             return [int]$Objects.count
         }
         if ($Objects) {
