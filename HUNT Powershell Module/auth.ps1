@@ -142,7 +142,7 @@ function Set-ICToken {
 				$Global:ICToken = $Token
 				Write-Verbose "Setting Auth Token for $Global:HuntServerAddress to $Token"
 		} else {
-			Write-Error "Invalide token. Must be a 64 character string generated within your profile or admin panel within Infocyte HUNT's web console"
+			Throw Exception "Invalide token. Must be a 64 character string generated within your profile or admin panel within Infocyte HUNT's web console"
 			return
 		}
 	} else {
@@ -178,8 +178,15 @@ function Set-ICToken {
 	}
 
 	# Set initial default boxId (change with Set-ICBox) and test connection
-	$box = Get-ICBox -Last 7 -Global
+	try {
+		$box = Get-ICBox -Last 7 -Global
+	}
+	catch [System.Net.WebException] {
+		Throw [System.Net.WebException]::New("Could not connect to $($Global:HuntServerAddress)")
+	}
+
 	if ($box) {
+		Write-Verbose "Successfully connected to $Global:HuntServerAddress"
 		$Global:ICCurrentBox = $box.id
 		Write-Verbose "`$Global:ICCurrentBox is set to $($box.targetGroup)-$($box.name) [$($box.id)]"
 		Write-Verbose "All analysis data & object retrieval will default to this box."
@@ -211,15 +218,6 @@ function Set-ICToken {
 		Write-Verbose "Token, Hunt Server Address, and Proxy settings are stored in global session variables for use in all IC cmdlets."
 	}
 
-	# Test Creds
-	try {
-		$ver = Get-ICAPI -Endpoint "Version"
-		if ($ver) {
-			Write-Verbose "Successfully connected to $Global:HuntServerAddress (Version: $ver)"
-			Return $true
-		}
-	} catch {
-		Write-Error "Connection to $Global:HuntServerAddress failed: $_"
-		return $false
-	}	
+	Return $true
+	
 }
