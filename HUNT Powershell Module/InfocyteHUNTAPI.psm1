@@ -89,7 +89,6 @@ function Get-ICHelp {
     Write-Host -ForegroundColor Cyan 'PS> Get-ICTargetGroup'
     Write-Host -ForegroundColor Cyan 'PS> Get-ChildItem C:\FolderOfSurveyResults\ -filter *.json.gz | Import-ICSurvey -Path .\surveyresult.json.gz -TargetGroupId b3fe4271-356e-42c0-8d7d-01041665a59b'
 }
-Get-ICHelp
 
 # Read in all ps1 files
 . "$PSScriptRoot\requestHelpers.ps1"

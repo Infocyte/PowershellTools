@@ -88,23 +88,25 @@ function Get-ICAPI {
         if ($total.Gettype() -ne [int]) {
             $NoCount = $true
         }
-        elseif ($NoLimit) {
-            if ($total -ge $Globallimit) {
-                Write-Warning "Your filter will return $total objects! You are limited to $GlobalLimit results per query.`n
-                    `tDatabase performance can be severely degraded in large queries.`n
-                    `tTry refining your query further with a 'where' filter or`n
-                    `task Infocyte for a data export by emailing support@infocyte.com."
-                Read-Host -Prompt " Press any key to continue pulling first $GlobalLimit or CTRL+C to quit" | out-null
-            } else {
-                Write-Verbose "Retrieving $total objects that match this filter."
-            }
+        elseif ($total -ge $Globallimit -AND -NOT $OverrideGlobalLimit) {
+            Write-Warning "Your filter will return $total objects! You are limited to $GlobalLimit results per query.
+                Database performance can be severely degraded in large queries. Try refining your query further with a 'where' filter or
+                ask Infocyte for a data export by emailing support@infocyte.com."
+
+
+            $question = 'Are you sure you want to proceed?'
+            $choices  = '&Yes', '&No'
+            $decision = $Host.UI.PromptForChoice('Accept Global Limit', $question, $choices, 1)
+            if ($decision -ne 0) { return }
         }
-        elseif ($total -gt $resultlimit) {
-            Write-Warning "Found $total objects with this filter. Returning first $resultlimit.`n
-                `tUse a tighter 'where' filter or the -NoLimit switch to get more."
-        } else {
+        elseif ($total -gt $resultlimit -AND -NOT $NoLimit) {
+            Write-Warning "Found $total objects with this filter. Returning first $resultlimit.
+                Use a tighter 'where' filter or the -NoLimit switch to get more."
+        } 
+        else {
             Write-Verbose "Found $total objects with this filter."
         }
+
         # JSON Stringify the filter on body
         $body.remove('where') | Out-Null
         $body['filter'] = $filter | ConvertTo-JSON -Depth 10 -Compress
@@ -124,19 +126,17 @@ function Get-ICAPI {
         }
         Write-Debug "Sending $url this Body as 'application/json':`n$($body|convertto-json)"
         $at = $timer.Elapsed
-        try {
-            $Objects = Invoke-RestMethod $url -body $body -Method GET -ContentType 'application/json' -Proxy $Global:Proxy -ProxyCredential $Global:ProxyCredential
-        } catch {
-            throw "ERROR: $($_.Exception.Message)"
-        }
+        $Objects = Invoke-RestMethod $url -body $body -Method GET -ContentType 'application/json' -Proxy $Global:Proxy -ProxyCredential $Global:ProxyCredential
         $bt = $timer.Elapsed
         $e = ($bt - $at).TotalMilliseconds
         $times += $e
         Write-Debug "Last Request: $($e.ToString("#.#"))ms"
 
         if ($CountOnly) {
-            Write-Debug $Objects
-            return [int]$Objects.count
+            if ($Objects) {
+                Write-Debug $Objects
+                return [int]$Objects.count
+            }
         }
         if ($Objects) {
             if ($Objects.count) {
@@ -215,15 +215,8 @@ function Invoke-ICAPI {
     if ($body) {
         $json = $body | ConvertTo-JSON -Depth 10 -Compress
     }
-	try {
-		$Result = Invoke-RestMethod -Uri $url -headers $headers -body $json -Method $method -ContentType 'application/json' -Proxy $Global:Proxy -ProxyCredential $Global:ProxyCredential
-	} catch {
-        if ($($_.Exception.Message) -match "422") {
-            Throw "Cannot process request. $($_.Exception.Message)"
-        } else {
-            Throw "$($_.Exception.Message)"
-        }
-	}
+	$Result = Invoke-RestMethod -Uri $url -headers $headers -body $json -Method $method -ContentType 'application/json' -Proxy $Global:Proxy -ProxyCredential $Global:ProxyCredential
+	
     if ($Method -like "DELETE") {
         if ($Result.'count') {
             return $true

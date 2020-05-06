@@ -103,7 +103,7 @@ function Update-ICFlag  {
         if ($Weight) { $body['weight'] = $Weight; $n+=1 }
         if ($n -eq 0) { Write-Error "Not Enough Parameters"; return }
 
-        Write-Verbose "Updating flag with id $Id:`n$($body|convertto-json)"
+        Write-Verbose "Updating flag with id $($Id):`n$($body|convertto-json)"
         if ($PSCmdlet.ShouldProcess($($obj.name), "Will update flag $($obj.name) [$Id]")) {
             Invoke-ICAPI -Endpoint $Endpoint -body $body -method PUT
             Write-Verbose "Updated flag with Id: $Id"
@@ -120,8 +120,9 @@ function Remove-ICFlag {
         [String]$id
     )
     PROCESS {
+        Write-Verbose "Deleting flag with id $Id"
         $Endpoint = "flags/$Id"
-        $obj = Get-Flags -Id $Id -where { }
+        $obj = Get-ICFlag -Id $Id
         if ($obj) {
             if ($obj | Where-Object { ($_.name -eq "Verified Good") -OR ($_.name -eq "Verified Bad")}) {
                 Write-Warning "Cannot Delete 'Verified Good' or 'Verified Bad' flags. They are a special case and would break the user interface"
@@ -136,6 +137,7 @@ function Remove-ICFlag {
         } else {
             Write-Error "No Agent found with id: $Id"
         }
+        return $Obj
     }
 }
 
@@ -159,6 +161,6 @@ function Add-ICComment {
             value = $Text
         }
         Invoke-ICAPI -Endpoint $Endpoint -body $body -method POST
-        Write-Verbose "Added new comment to item with id $id: $($body.value)"
+        Write-Verbose "Added new comment to item with id $(id): $($body.value)"
     }
 }
