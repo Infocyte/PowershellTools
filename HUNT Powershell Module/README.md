@@ -1,3 +1,5 @@
+[![latest version](https://img.shields.io/powershellgallery/v/InfocyteHUNTAPI.svg?label=latest+version)](https://www.powershellgallery.com/packages/InfocyteHUNTAPI)
+
 # Infocyte HUNT API Module
 Used to interface with the Infocyte API. Anything you can do in the interface can also be done with Powershell.
 Tested on Powershell Version: 5.0
