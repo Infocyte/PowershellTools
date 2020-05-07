@@ -66,10 +66,10 @@ function Get-ICAuditLog {
 function Get-ICTask {
 	[cmdletbinding()]
 	param(
-		[parameter(ValueFromPipelineByPropertyName)]
+		[parameter(ValueFromPipeline, ValueFromPipelineByPropertyName)]
 		[ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
-		[alias('TaskId')]
-		[String]$Id,
+		[alias('id')]
+		[String]$TaskId,
 
 		[Switch]$All,
 
@@ -82,9 +82,9 @@ function Get-ICTask {
 
 	PROCESS {
 		$endpoint = "usertasks"
-		if ($Id) {
+		if ($TaskId) {
 			$CountOnly = $false
-			$endpoint += "/$Id"
+			$endpoint += "/$TaskId"
 		} else {
 			if (-NOT $All -AND $where.keys.count -eq 0) {
 				Write-Verbose "Filtering for running and recently ended tasks (Default)."
@@ -107,8 +107,10 @@ function Get-ICTaskItems {
 	param(
 		[parameter(
 			Mandatory,
-			ValueFromPipeline)]
+			ValueFromPipeline,
+			ValueFromPipelineByPropertyName)]
 		[ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
+		[alias('id')]
 		[String]$TaskId,
 
 		[parameter()]
@@ -141,7 +143,7 @@ function Get-ICTaskItems {
 				if ($_.id) {
 					$progress = @()
 					Write-Progress -Id 101 -Activity "Enriching with Task Progress Information" -status "Getting progress on $($_.name) [$n of $cnt]" -PercentComplete $pc
-					Get-ICTaskItemProgress -taskItemId $_.id -fields "createdOn","text" -order "createdOn desc" | ForEach-Object {
+					Get-ICTaskItemProgress -taskItemId $_.id -fields "createdOn","text" | ForEach-Object {
 						$progress += [PSCustomObject]@{
 							createdOn = $_.createdOn
 							text = $_.text
@@ -160,7 +162,10 @@ function Get-ICTaskItems {
 function Get-ICTaskItemProgress {
 	[cmdletbinding()]
 	param(
-		[parameter(Mandatory=$true, ValueFromPipelineByPropertyName)]
+		[parameter(
+			Mandatory=$true, 
+			ValueFromPipeline,
+			ValueFromPipelineByPropertyName)]
 		[ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
 		[alias('id')]
 		[String]$taskItemId,
@@ -190,17 +195,17 @@ function Get-ICLastScanTask {
 	param(
 		[parameter()]
 		[ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
-		[String]$taskItemId,
+		[String]$targetGroupId,
 
 		[parameter()]
 		[ValidateSet("Scan", "Enumerate")]
 		[String]$Type = "Enumerate"
 	)
 
-	if ($taskItemId) {
-		$Task = Get-ICTask -id $TaskItemId | Select-Object -Last 1
-		if (-NOT $Task -OR $Task.type -notin @("Enumerate", "Scan")) {
-			Write-Error "No task was found with Id: $taskItemId"
+	if ($targetGroupId) {
+		$Task = Get-ICTask -where @{ targetGroupId = $targetGroupId; type = $Type } | Select-Object -Last 1
+		if (-NOT $Task) {
+			Write-Error "No $Type task was found within target group with Id: $targetGroupId"
 			return
 		}
 	}
@@ -237,8 +242,8 @@ function Get-ICLastScanTask {
 		$totalTime = [math]::round(([datetime]$Task.endedOn - [DateTime]$Task.createdOn).TotalSeconds)
 	}
 
-	$result = [PSCustomObject]@{
-		taskId = $Task.Id
+	$result = @{
+		userTaskId = $Task.Id
 		name = $Task.name
 		createdOn = $Task.createdOn
 		endedOn = $Task.endedOn
@@ -251,5 +256,5 @@ function Get-ICLastScanTask {
 		items = $Progress
 	}
 	$result['coverage'] = try { [math]::Round(($($result.accessibleCount)/$($result.totalItems)), 2) } catch { $null }
-	return $result
+	return [PSCustomObject]$result
 }

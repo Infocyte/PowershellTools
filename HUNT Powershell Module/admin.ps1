@@ -37,7 +37,7 @@ function New-ICFlag {
     }
     $f = Get-ICFlag -where @{ name = $Name; deleted = $False }
     if ($f) {
-        Write-Error "There is already a flag named $Name"
+        Throw "There is already a flag named $Name"
     } else {
         Invoke-ICAPI -Endpoint $Endpoint -body $body -method POST
         Write-Verbose "Added new flag with Color $Color named $Name [Weight: $Weight]"

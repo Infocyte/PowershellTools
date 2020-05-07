@@ -177,13 +177,11 @@ function Set-ICToken {
 		}
 	}
 
+	#Test connection
+	$ver = Get-ICAPI -Endpoint "Version"
+
 	# Set initial default boxId (change with Set-ICBox) and test connection
-	try {
-		$box = Get-ICBox -Last 7 -Global
-	}
-	catch [System.Net.WebException] {
-		Throw [System.Net.WebException]::New("Could not connect to $($Global:HuntServerAddress): $($_.Exception.Message)")
-	}
+	$box = Get-ICBox -Last 7 -Global
 
 	if ($box) {
 		Write-Verbose "Successfully connected to $Global:HuntServerAddress"

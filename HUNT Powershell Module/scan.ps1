@@ -221,7 +221,8 @@ function Invoke-ICScanTarget {
 		# Initiating Scan
 		$Endpoint = "targets/scan"
 		Write-Verbose "Starting Scan of target $($target)"
-		Invoke-ICAPI -Endpoint $Endpoint -body $body -method POST
+		$scanTask = Invoke-ICAPI -Endpoint $Endpoint -body $body -method POST
+		return [PSCustomObject]@{ userTaskId = $scanTask.scanTaskId } 
 	}
 }
 
@@ -344,12 +345,15 @@ function Invoke-ICResponse {
 		}
 		
 		$ScanOpts = New-ICScanOptions -ExtensionsOnly -ExtensionIds $ExtensionId
+		$ScanOpts.process = $true # remove when bug fixed
+		$ScanOpts.account = $true
 		$Body['options'] = $ScanOpts
 		
 		# Initiating Scan
 		$Endpoint = "targets/scan"
 		Write-Verbose "Executing response action $ExtensionName on target: $target"
-		Invoke-ICAPI -Endpoint $Endpoint -body $body -method POST
+		$scanTask = Invoke-ICAPI -Endpoint $Endpoint -body $body -method POST
+		return [PSCustomObject]@{ userTaskId = $scanTask.scanTaskId } 
 	}
 }
 

@@ -17,26 +17,32 @@ function Get-ICExtension {
         [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [String]$Guid,
         
+        [parameter(
+            ParameterSetName = 'Id')]
+        [parameter(
+            ParameterSetName = 'guid')]
         [Parameter(
-            Mandatory = $false, 
             ParameterSetName = 'List')]
         [Switch]$IncludeBody,
 
         [parameter(
-            Mandatory = $false, 
             ParameterSetName = 'List',
             HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
 
         [parameter(
-            Mandatory = $false, 
             ParameterSetName = 'List')]
         [Switch]$NoLimit,
 
         [parameter(
-            Mandatory = $false, 
             ParameterSetName = 'List')]
-        [Switch]$CountOnly
+        [Switch]$CountOnly,
+
+        [Parameter(
+            ParameterSetName = 'Id',
+            HelpMessage = "Filepath and name to save extension to. Recommending ending as .lua")]
+        [ValidateScript( { Test-Path -Path $_ -IsValid })]
+        [String]$SavePath
     )
 
     PROCESS {
@@ -65,6 +71,9 @@ function Get-ICExtension {
             Write-Verbose "Looking up user: $($ext.createdBy) and $($ext.updatedBy)"
             $ext.createdBy = (Get-ICAPI -endpoint users -where @{ id = $ext.createdBy } -fields email -ea 0).email
             $ext.updatedBy = (Get-ICAPI -endpoint users -where @{ id = $ext.updatedBy } -fields email -ea 0).email
+            if ($SavePath) {
+                $ext.body | Out-File $SavePath
+            }
             Write-Output $ext
 
         } 
@@ -133,7 +142,7 @@ function New-ICExtension {
 
         [Parameter(HelpMessage="Filepath and name to save new extension to. Recommending ending as .lua")]
         [ValidateScript({ Test-Path -Path $_ -IsValid })]
-        [String]$FilePath
+        [String]$SavePath
 	)
 	
 	$CollectionTemplate = "https://raw.githubusercontent.com/Infocyte/extensions/master/examples/collection_template.lua"
@@ -158,6 +167,7 @@ function New-ICExtension {
     if ($SavePath) {
         Write-Host "`nCreated $Type extension from template and saved to $SavePath"
         $template | Out-File -FilePath $SavePath
+        return $true
     }
     else {
         return $template
@@ -283,7 +293,7 @@ function Update-ICExtension {
             ParameterSetName = 'Path'
         )]
         [parameter(
-            mandatory=$true,
+            mandatory=$false,
             ParameterSetName  = 'String'
         )]
         [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
@@ -375,19 +385,21 @@ function Update-ICExtension {
     }
 }
 function Remove-ICExtension {
-    [cmdletbinding(SupportsShouldProcess=$true)]
+    [cmdletbinding(DefaultParameterSetName = 'Id', SupportsShouldProcess=$true)]
     Param(
         [parameter(
-            Mandatory=$true, 
-            ValueFromPipeline=$true,
+            Mandatory, 
+            ValueFromPipeline,
+            ValueFromPipelineByPropertyName,
             ParameterSetName = 'Id')]
         [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('extensionId')]
         [String]$Id,
 
         [parameter(
-            Mandatory=$true, 
-            ValueFromPipeline=$true,
+            Mandatory, 
+            ValueFromPipeline,
+            ValueFromPipelineByPropertyName,
             ParameterSetName = 'guid')]
         [ValidateNotNullorEmpty()]
         [String]$Guid
@@ -463,8 +475,11 @@ function Import-ICOfficialExtensions {
             Write-Error "Could not download extension. [$_]"
             return
         }
-        $header = Parse-ICExtensionHeader $ext
-        if (-NOT $header) { Write-Warning "Could not parse header on $($_.name)"; return }
+        try {
+            $header = Parse-ICExtensionHeader $ext
+        } catch {
+            Write-Warning "Could not parse header on $($filename)"; return
+        }       
         $existingExt = $InstanceExtensions | Where-Object { $_.guid -eq $header.guid }
         if ($existingExt) {
             if ($Update) {
@@ -479,7 +494,7 @@ function Import-ICOfficialExtensions {
             Import-ICExtension -Body $ext -Active -Type $header.Type -Force:$Force
         }
     }
-    
+    return $true    
 }
 
 # For Extension Developers
@@ -615,8 +630,7 @@ function Parse-ICExtensionHeader ($ExtensionBody){
     if ($ExtensionBody -match '(?si)^--\[\[[\n\r]+(?<preamble>.+?)-*\]\]') {
         $preamble = $matches.preamble
     } else {
-        Write-Error "Could not parse header (should be a comment section wrapped by --[[ ... --]])"
-        return
+        Throw [System.FormatException]::New("Could not parse header (should be a comment section wrapped by --[[ <header> --]] )")
     }
 
     #$regex = '(?mi)\s*Name:\s(?<name>.+?)\n|\s*Type:\s(?<type>.+?)\n|\s*Description:\s(\|(?<description>.+?)\||(?<description>.+?)\n)|\s*Updated:\s(?<updated>.+?)\n|\s*Guid:\s(?<guid>.+?)\n'
@@ -632,7 +646,8 @@ function Parse-ICExtensionHeader ($ExtensionBody){
         $header.updated = ($matches[1].split(" ")[0] | ForEach-Object { get-date -year $_.substring(0,4) -Month $_.substring(4,2) -Day $_.substring(6,2) }).date 
     }
     if ($header.guid -notmatch $GUID_REGEX) { 
-        Write-Error "Incorrect guid format: $($header.guid).  Should be a guid of form: $GUID_REGEX." 
+        Write-Warning "Incorrect guid format: $($header.guid).  Should be a guid of form: $GUID_REGEX. 
+            Use the following command to generate a new one: [guid]::NewGuid().Guid" 
     }
     return $header
 }

@@ -43,7 +43,7 @@ function Get-ICAPI {
         limit = $resultlimit
     }
     if ($fields) { 
-        if ($fields.NotContains('id')) {
+        if (-NOT $fields.Contains('id')) {
             $fields += 'id'
         }
         $filter['fields'] = $fields 
@@ -72,7 +72,7 @@ function Get-ICAPI {
     elseif ($CountOnly) {
         $url += "/count"
         Write-Debug "Counting using /count"
-        $body['where'] = $where | ConvertTo-JSON -Depth 10 -Compress
+         $body['where'] = $where | ConvertTo-JSON -Depth 10 -Compress
     }
     else {
         Write-Debug "Counting results first"
@@ -87,24 +87,21 @@ function Get-ICAPI {
         if ($total.Gettype() -ne [int]) {
             $NoCount = $true
         }
-        elseif ($total -ge $Globallimit -AND -NOT $OverrideGlobalLimit) {
+        elseif ($total -ge $Globallimit) {
             Write-Warning "Your filter will return $total objects! You are limited to $GlobalLimit results per query.
-                Database performance can be severely degraded in large queries. Try refining your query further with a 'where' filter or
-                ask Infocyte for a data export by emailing support@infocyte.com."
-
-
-            $question = 'Are you sure you want to proceed?'
-            $choices  = '&Yes', '&No'
-            $decision = $Host.UI.PromptForChoice('Accept Global Limit', $question, $choices, 1)
-            if ($decision -ne 0) { return }
+                Database performance can be severely degraded in large queries so dumping the database via the API is not advised. 
+                Try refining your query further with a 'where' filter or ask Infocyte for a data export by emailing support@infocyte.com. "
+            return
         }
-        elseif ($total -gt $resultlimit -AND -NOT $NoLimit -AND -NOT $OverrideGlobalLimit) {
+        elseif ($total -gt $resultlimit -AND -NOT $NoLimit) {
             Write-Warning "Found $total objects with this filter. Returning first $resultlimit.
                 Use a tighter 'where' filter or the -NoLimit switch to get more."
         } 
         else {
             Write-Verbose "Found $total objects with this filter."
         }
+
+        $body['filter'] = $filter | ConvertTo-JSON -Depth 10 -Compress
     }
 
     $timer = [system.diagnostics.stopwatch]::StartNew()
@@ -146,28 +143,30 @@ function Get-ICAPI {
 
             Write-Output $Objects
 
-            if ($count -ge $Globallimit -AND -NOT $OverrideGlobalLimit) {
+            if ($count -ge $Globallimit) {
                 Write-Warning "Reached Global Limit of $GlobalLimit results."
                 $more = $false
             }
-            elseif ($Objects.count -lt $resultlimit -OR (-NOT $NoLimit -AND -NOT $OverrideGlobalLimit)) {
+            elseif ($Objects.count -lt $resultlimit -OR -NOT $NoLimit) {
                 $more = $false
             }
             
             # Set up next Page
-            $body.remove('filter') | Out-Null
-            $skip += $resultlimit
+            if ($more) {
+                $body.remove('filter') | Out-Null
+                $skip += $resultlimit
             
-            if ($null -eq $lastId) {
-                $lastId = $Objects[-1].id
-                $filter['where'] += @{ id = @{ gt = $lastId }}
-            } else {
-                $lastId = $Objects[-1].id
-                $filter['where']['id']['gt'] = $lastId
-            }
+                if ($more -AND $null -eq $lastId) {
+                    $lastId = $Objects[-1].id
+                    $filter['where'] += @{ id = @{ gt = $lastId } }
+                } 
+                elseif ($more) {
+                    $lastId = $Objects[-1].id
+                    $filter['where']['id']['gt'] = $lastId
+                }
+                $body['filter'] = $filter | ConvertTo-Json -Depth 10 -Compress
+            }   
             
-            
-            $body['filter'] = $filter | ConvertTo-JSON -Depth 10 -Compress
         } else {
             Write-Debug "No results from last call."
             $more = $false

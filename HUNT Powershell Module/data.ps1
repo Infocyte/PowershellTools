@@ -41,8 +41,7 @@ function Get-ICObject {
         [parameter(HelpMessage="The field or fields to return.")]
         [String[]]$fields,
 
-        [Switch]$NoLimit,
-        [Switch]$OverrideGlobalLimit
+        [Switch]$NoLimit
     )
 
     $Files = @(
@@ -183,7 +182,7 @@ function Get-ICObject {
             $CountOnly = $false
             $Endpoint += "/$id"
         }
-        Get-ICAPI -Endpoint $Endpoint -where $where -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly -OverrideGlobalLimit:$OverrideGlobalLimit
+        Get-ICAPI -Endpoint $Endpoint -where $where -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly
     }
 }
 
@@ -374,7 +373,7 @@ function Get-ICReport {
 }
 
 function Get-ICActivityTrace {
-    [cmdletbinding()]
+    [cmdletbinding(DefaultParameterSetName="fileRepId")]
     param(
         [parameter(
             ParameterSetName="Id",

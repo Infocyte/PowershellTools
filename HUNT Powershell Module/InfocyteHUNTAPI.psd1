@@ -97,6 +97,7 @@ FunctionsToExport = @(
     "Remove-ICAddress",
     "Get-ICScan",
     "Get-ICAuditLog",
+    "Get-ICJob",
     "Add-ICComment",
     "Get-ICTask",
     "Get-ICTaskItems",
