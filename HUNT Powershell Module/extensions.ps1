@@ -6,6 +6,7 @@ function Get-ICExtension {
             Mandatory = $true, 
             ValueFromPipeline = $true, 
             ParameterSetName = 'Id')]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('extensionId')]
         [String]$Id,
 
@@ -13,34 +14,35 @@ function Get-ICExtension {
             Mandatory = $true, 
             ValueFromPipeline = $true, 
             ParameterSetName = 'guid')]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [String]$Guid,
         
+        [parameter(
+            ParameterSetName = 'Id')]
+        [parameter(
+            ParameterSetName = 'guid')]
         [Parameter(
-            Mandatory = $false, 
             ParameterSetName = 'List')]
         [Switch]$IncludeBody,
 
         [parameter(
-            Mandatory = $false, 
             ParameterSetName = 'List',
             HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
 
         [parameter(
-            Mandatory = $false, 
-            ParameterSetName = 'List',
-            HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
-        [String[]]$order,
-
-        [parameter(
-            Mandatory = $false, 
             ParameterSetName = 'List')]
         [Switch]$NoLimit,
 
         [parameter(
-            Mandatory = $false, 
             ParameterSetName = 'List')]
-        [Switch]$CountOnly
+        [Switch]$CountOnly,
+
+        [Parameter(
+            ParameterSetName = 'Id',
+            HelpMessage = "Filepath and name to save extension to. Recommending ending as .lua")]
+        [ValidateScript( { Test-Path -Path $_ -IsValid })]
+        [String]$SavePath
     )
 
     PROCESS {
@@ -69,6 +71,9 @@ function Get-ICExtension {
             Write-Verbose "Looking up user: $($ext.createdBy) and $($ext.updatedBy)"
             $ext.createdBy = (Get-ICAPI -endpoint users -where @{ id = $ext.createdBy } -fields email -ea 0).email
             $ext.updatedBy = (Get-ICAPI -endpoint users -where @{ id = $ext.updatedBy } -fields email -ea 0).email
+            if ($SavePath) {
+                $ext.body | Out-File $SavePath
+            }
             Write-Output $ext
 
         } 
@@ -93,7 +98,7 @@ function Get-ICExtension {
         }
         else {
             $Endpoint = "extensions"
-            $ext = Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
+            $ext = Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit -CountOnly:$CountOnly
             if ($CountOnly) { return $ext }
             $n = 1
             $c = $ext.count
@@ -133,7 +138,11 @@ function New-ICExtension {
           "Collection",
           "Action"
         )]
-		[String]$Type = "Collection"  
+        [String]$Type = "Collection",
+
+        [Parameter(HelpMessage="Filepath and name to save new extension to. Recommending ending as .lua")]
+        [ValidateScript({ Test-Path -Path $_ -IsValid })]
+        [String]$SavePath
 	)
 	
 	$CollectionTemplate = "https://raw.githubusercontent.com/Infocyte/extensions/master/examples/collection_template.lua"
@@ -154,10 +163,15 @@ function New-ICExtension {
     $template = $template -replace '(?si)(?<start>^--\[\[.+?Created:\s)(.+?)(?<end>\n)',"`${start}$dt`${end}"
     $template = $template -replace '(?si)(?<start>^--\[\[.+?Updated:\s)(.+?)(?<end>\n)',"`${start}$dt`${end}"
     
-    $template | Out-File -FilePath "$pwd\$Name.lua"
-    Write-Output $template
     
-    Write-Host "`nCreated $Type extension from template and saved to $pwd\$Name.lua"
+    if ($SavePath) {
+        Write-Host "`nCreated $Type extension from template and saved to $SavePath"
+        $template | Out-File -FilePath $SavePath
+        return $true
+    }
+    else {
+        return $template
+    }    
 }
 function Import-ICExtension {
     [cmdletbinding()]
@@ -279,9 +293,10 @@ function Update-ICExtension {
             ParameterSetName = 'Path'
         )]
         [parameter(
-            mandatory=$true,
+            mandatory=$false,
             ParameterSetName  = 'String'
         )]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('extensionId')]
         [String]$Id,
 
@@ -370,19 +385,21 @@ function Update-ICExtension {
     }
 }
 function Remove-ICExtension {
-    [cmdletbinding(SupportsShouldProcess=$true)]
+    [cmdletbinding(DefaultParameterSetName = 'Id', SupportsShouldProcess=$true)]
     Param(
         [parameter(
-            Mandatory=$true, 
-            ValueFromPipeline=$true,
+            Mandatory, 
+            ValueFromPipeline,
+            ValueFromPipelineByPropertyName,
             ParameterSetName = 'Id')]
-        [ValidateNotNullorEmpty()]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('extensionId')]
         [String]$Id,
 
         [parameter(
-            Mandatory=$true, 
-            ValueFromPipeline=$true,
+            Mandatory, 
+            ValueFromPipeline,
+            ValueFromPipelineByPropertyName,
             ParameterSetName = 'guid')]
         [ValidateNotNullorEmpty()]
         [String]$Guid
@@ -392,21 +409,21 @@ function Remove-ICExtension {
             $Endpoint = "extensions/$Id"
             $ext = Get-ICExtension -id $Id
             if (-NOT $ext) {
-                Write-Warning "Extension with id $id not found!"
+                Write-Error "Extension with id $id not found!"
                 return
             }
         } else {
             $Endpoint = "extensions"
             $ext = Get-ICExtension -Guid $Guid
             if (-NOT $ext) {
-                Write-Warning "Extension with guid $Guid not found!"
+                Write-Error "Extension with guid $Guid not found!"
                 return
             }
         }
         
         if ($PSCmdlet.ShouldProcess($($ext.Id), "Will remove $($ext.name) with extensionId '$($ext.Id)'")) {
             if (Invoke-ICAPI -Endpoint $Endpoint -method DELETE) {
-                Write-Host "Removed extension $($ext.name) [$($ext.Id)]"
+                Write-Verbose "Removed extension $($ext.name) [$($ext.Id)]"
             } else {
                 Throw "Extension $($ext.name) [$($ext.Id)] could not be removed!"
             }
@@ -422,7 +439,7 @@ function Import-ICOfficialExtensions {
     )
 
     $InstanceExtensions = Get-ICExtension -IncludeBody -NoLimit
-    Write-Host "Pulling Official Extensions from Github: https://api.github.com/repos/Infocyte/extensions/contents/official/"
+    Write-Verbose "Pulling Official Extensions from Github: https://api.github.com/repos/Infocyte/extensions/contents/official/"
     try {
         $Extensions = Invoke-WebRequest -Uri "https://api.github.com/repos/Infocyte/extensions/contents/official/collection" | Select-Object -ExpandProperty content | ConvertFrom-Json
     }
@@ -436,7 +453,7 @@ function Import-ICOfficialExtensions {
         Write-Error "Could not download extensions from https://api.github.com/repos/Infocyte/extensions/contents/official/action"
     }
     If ($IncludeContributed) {
-        Write-Host "Pulling Official Extensions from Github: https://api.github.com/repos/Infocyte/extensions/contents/contrib/"
+        Write-Verbose "Pulling Official Extensions from Github: https://api.github.com/repos/Infocyte/extensions/contents/contrib/"
         try {
             $Extensions += Invoke-WebRequest -Uri "https://api.github.com/repos/Infocyte/extensions/contents/contrib/collection" | Select-Object -ExpandProperty content | ConvertFrom-Json
         }
@@ -455,26 +472,29 @@ function Import-ICOfficialExtensions {
         try {
             $ext = (new-object Net.WebClient).DownloadString($_.download_url)
         } catch {
-            Write-Warning "Could not download extension. [$_]"
-            continue
+            Write-Error "Could not download extension. [$_]"
+            return
         }
-        $header = Parse-ICExtensionHeader $ext
-        if (-NOT $header) { Write-Warning "Could not parse header on $($_.name)"; continue }
+        try {
+            $header = Parse-ICExtensionHeader $ext
+        } catch {
+            Write-Warning "Could not parse header on $($filename)"; return
+        }       
         $existingExt = $InstanceExtensions | Where-Object { $_.guid -eq $header.guid }
         if ($existingExt) {
             if ($Update) {
-                Write-Host "Updating extension $($header.name) [$($existingExt.id)] with guid $($header.guid):`n$existingExt"
+                Write-Verbose "Updating extension $($header.name) [$($existingExt.id)] with guid $($header.guid):`n$existingExt"
                 Update-ICExtension -Id $existingExt.id -Body $ext
             }
             else {
                 Write-Warning "Extension $($header.name) [$($existingExt.id)] with guid $($header.guid) already exists. Try using -Update to update it."
             }
         } else {
-            Write-Host "Importing extension $($header.name) with guid $($header.guid)"
-            Import-ICExtension -Body $ext -Active -Force:$Force
+            Write-Verbose "Importing extension $($header.name) [$($header.Type)] with guid $($header.guid)"
+            Import-ICExtension -Body $ext -Active -Type $header.Type -Force:$Force
         }
     }
-    
+    return $true    
 }
 
 # For Extension Developers
@@ -486,84 +506,84 @@ function Test-ICExtension {
 	  	[String]$Path
 	  )
 	  
-	If (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
-		Write-Warning "You do not have Administrator rights to run this script!`nPlease re-run this script as an Administrator!"
+	If ($env:OS -match "windows" -AND (-NOT [Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
+		Write-Error "You do not have Administrator rights to run this script!`nPlease re-run this script as an Administrator!"
 		return
-	}
+    } elseif ($IsLinux -AND (id -u) -eq 0) {
+        Write-Error "You do not have permissions to run this script!`nPlease re-run this with sudo!"
+		return
+    }
+    
+    # Clear-Host
+    $agentname = "agent.exe"
+    if ($IsWindows -OR $env:OS -match "windows") {
+        $Devpath = "C:/Program Files/Infocyte/dev"
+        $AgentPath = "C:/Program Files/Infocyte/Agent"
+    } else {
+        $Devpath = "opt/infocyte/dev"
+        $AgentPath = "opt/infocyte/agent"
+    }
 
-	# Clear-Host
-    $Devpath = "C:\Program Files\Infocyte\dev"
-	$AgentPath = "C:\Program Files\Infocyte\Agent"
 	$URL = ""
 
-    if (Test-Path "$DevPath\s1.exe") {
-        $Ver = (& "$DevPath\s1.exe" "--version").split(" ")[2]
-		if (Test-Path "$AgentPath\s1.exe") {
-			$Ver2 = (& "$AgentPath\s1.exe" "--version").split(" ")[2]
-			if ($ver2 -gt $ver) {
-                Write-Warning "s1.exe ($ver) has an update: ($Ver2). Copy s1.exe from '$AgentPath\s1.exe' to '$Devpath\s1.exe' to update this function."
-                Write-Warning "Run this command to do so: Copy-Item -Path '$AgentPath\s1.exe' -Destination '$Devpath\s1.exe'"
-			}
-		}
-		$Path = Get-item $Path | Select-Object -ExpandProperty FullName
-		$ext = Get-item $Path | Select-Object -ExpandProperty name
-    	Write-Verbose "Executing $ext with s1.exe (Version: $Ver)"
+    # Check for Agent
+    if (Test-Path "$DevPath/$agentname") {
+        $DevVer = (& "$DevPath/$agentname" "--version").split(" ")[2]
     } else {
 		New-Item $Devpath -ItemType Directory | Out-Null
-		if (Test-Path "$AgentPath\s1.exe") {
-            $Ver2 = & "$AgentPath\s1.exe" "--version"
-			Write-Warning "$Devpath\s1.exe not found but latest version ($Ver2) was found within your agent folder ($AgentPath\s1.exe). Copying this over."
-			Copy-Item -Path "$AgentPath\s1.exe" -Destination "$Devpath\s1.exe" | Out-Null
-		}
-		else {
-			Write-Warning "$Devpath\s1.exe not found! Attempting to download from Infocyte"
-			# Download Survey from S3
-			[Net.ServicePointManager]::SecurityProtocol = [Enum]::ToObject([System.Net.SecurityProtocolType], 3072)
-			$wc = New-Object Net.WebClient
-			$wc.Encoding = [System.Text.Encoding]::UTF8
-			$wc.UseDefaultCredentials = $true
-			try {
-				$wc.DownloadFile($URL, "$Devpath\s1.exe")
-			} catch {
-				Write-Warning "Could not download S1.exe from $URL. You will need to manually download a copy from your Infocyte instance's Download page and add it to $DevPath\s1.exe"
-				return
-			}
-		}
+		if (Test-Path "$AgentPath/$agentname") {
+            $AgentVer = (& "$AgentPath/$agentname" "--version").split(" ")[2]
+			Write-Warning "$Devpath/$agentname not found but latest version ($Ver2) was found within your agent folder ($AgentPath). Copying this over."
+			Copy-Item -Path "$AgentPath/$agentname" -Destination "$Devpath" | Out-Null
+		} else {
+            Write-Error "Infocyte Agent not found. Install an Agent or download it into $DevPath"
+            return
+        }
+	}
+    # Update Agent
+    if (Test-Path "$AgentPath/$agentname") {
+        $AgentVer = (& "$AgentPath/$agentname" "--version").split(" ")[2]
+        if ($AgentVer -gt $DevVer) {
+            Write-Warning "$agentname ($DevVer) has an update: ($AgentVer). Copy '$AgentPath/$agentname' to '$Devpath/$agentname'.`n
+                `tRun this command to do so: Copy-Item -Path '$AgentPath/$agentname' -Destination '$Devpath/$agentname'"
+        }
     }
-	
-	if (-NOT (Test-Path "$DevPath\luacheck.exe")) {
+
+    $Path = Get-item $Path | Select-Object -ExpandProperty FullName
+    $ext = Get-item $Path | Select-Object -ExpandProperty name
+    Write-Verbose "Executing $ext with $agentname (Version: $Ver)"
+    
+
+	if ($isWindows -AND (-NOT (Test-Path "$DevPath/luacheck.exe"))) {
 		$url = "https://github.com/mpeterv/luacheck/releases/download/0.23.0/luacheck.exe"
-		Write-Warning "$Devpath\luacheck.exe not found (used for debugging). Attempting to download from Github."
+		Write-Warning "$Devpath/luacheck.exe not found (used for debugging). Attempting to download from Github."
 		# Download luacheck from Github
-		[Net.ServicePointManager]::SecurityProtocol = [Enum]::ToObject([System.Net.SecurityProtocolType], 3072)
+		#[Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls13
 		$wc = New-Object Net.WebClient
 		$wc.Encoding = [System.Text.Encoding]::UTF8
 		$wc.UseDefaultCredentials = $true
 		try {
-			$wc.DownloadFile($URL, "$Devpath\luacheck.exe")
+			$wc.DownloadFile($URL, "$Devpath/luacheck.exe")
 		} catch {
 			Write-Warning "Could not download luacheck.exe from $URL."
-			return
 		}
 	}
 
-
-	# & "s1.exe --no-delete --no-compress --verbose --only-extensions --extensions $Path"
+	# & "agent.exe --no-delete --no-compress --verbose --only-extensions --extensions $Path"
 	$a = @()
-    $a += "--no-delete"
+    $a += "survey"
     $a += "--no-compress"
-	$a += "--no-events"
 	$a += "--only-extensions"
 	$a += "--extensions $Path"
 	
-	#$p = Start-Process -NoNewWindow -FilePath "$Devpath\s1.exe" -ArgumentList $a -PassThru
+	#$p = Start-Process -NoNewWindow -FilePath "$Devpath\agent.exe" -ArgumentList $a -PassThru
 	
 	$psi = New-object System.Diagnostics.ProcessStartInfo
 	$psi.CreateNoWindow = $true
 	$psi.UseShellExecute = $false
 	$psi.RedirectStandardOutput = $true
 	$psi.RedirectStandardError = $false
-	$psi.FileName = "$Devpath\s1.exe"
+	$psi.FileName = "$Devpath/$agentname"
 	$psi.Arguments = $a
 	$process = New-Object System.Diagnostics.Process
 	$process.StartInfo = $psi
@@ -571,7 +591,7 @@ function Test-ICExtension {
 	#$process.WaitForExit()
 
 	$line = $process.StandardOutput.ReadLine()
-	$output = "`n$line"
+	#$output = "`n$line"
 	while ($line -OR -NOT $process.HasExited) {
         $reg = $line -Match "\d{4}-\d+-\d+T\d+:\d+:\d+\.\d+-\d+:\d+\s(?<type>!?.+)\shunt_survey\s-\sCompleted"
         if ($reg1) {
@@ -610,8 +630,7 @@ function Parse-ICExtensionHeader ($ExtensionBody){
     if ($ExtensionBody -match '(?si)^--\[\[[\n\r]+(?<preamble>.+?)-*\]\]') {
         $preamble = $matches.preamble
     } else {
-        Write-Warning "Could not parse header (should be a comment section wrapped by --[[ ... --]])"
-        return
+        Throw [System.FormatException]::New("Could not parse header (should be a comment section wrapped by --[[ <header> --]] )")
     }
 
     #$regex = '(?mi)\s*Name:\s(?<name>.+?)\n|\s*Type:\s(?<type>.+?)\n|\s*Description:\s(\|(?<description>.+?)\||(?<description>.+?)\n)|\s*Updated:\s(?<updated>.+?)\n|\s*Guid:\s(?<guid>.+?)\n'
@@ -625,6 +644,10 @@ function Parse-ICExtensionHeader ($ExtensionBody){
     }
     if ($preamble -match '(?mi)^\s*Updated:\s(\d{8})\s*') {
         $header.updated = ($matches[1].split(" ")[0] | ForEach-Object { get-date -year $_.substring(0,4) -Month $_.substring(4,2) -Day $_.substring(6,2) }).date 
+    }
+    if ($header.guid -notmatch $GUID_REGEX) { 
+        Write-Warning "Incorrect guid format: $($header.guid).  Should be a guid of form: $GUID_REGEX. 
+            Use the following command to generate a new one: [guid]::NewGuid().Guid" 
     }
     return $header
 }

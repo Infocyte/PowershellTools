@@ -29,7 +29,7 @@ function New-ICFlag {
     )
 
     $Endpoint = "flags"
-    Write-Host "Adding new flag with Color $Color named $Name [Weight: $Weight]"
+    Write-Verbose "Adding new flag with Color $Color named $Name [Weight: $Weight]"
     $body = @{
     	name = $Name
     	color = $Color
@@ -37,9 +37,11 @@ function New-ICFlag {
     }
     $f = Get-ICFlag -where @{ name = $Name; deleted = $False }
     if ($f) {
-        Write-Error "There is already a flag named $Name"
+        Throw "There is already a flag named $Name"
     } else {
         Invoke-ICAPI -Endpoint $Endpoint -body $body -method POST
+        Write-Verbose "Added new flag with Color $Color named $Name [Weight: $Weight]"
+        return $true        
     }
 }
 
@@ -48,13 +50,12 @@ function Get-ICFlag {
     [cmdletbinding()]
     param(
         [parameter(ValueFromPipeline=$true)]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('flagId')]
         [String]$Id,
 
         [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
-        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
-        [String[]]$order,
         [Switch]$NoLimit,
         [Switch]$CountOnly
     )
@@ -65,7 +66,7 @@ function Get-ICFlag {
         } else {
             $Endpoint = "flags"
         }
-        Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
+        Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit -CountOnly:$CountOnly
     }
 }
 
@@ -73,7 +74,7 @@ function Update-ICFlag  {
     [cmdletbinding(SupportsShouldProcess=$true)]
     Param(
         [parameter(Mandatory=$true, ValueFromPipelineByPropertyName)]
-        [ValidateNotNullorEmpty()]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('flagId')]
         [String]$id,
 
@@ -100,9 +101,10 @@ function Update-ICFlag  {
         if ($Weight) { $body['weight'] = $Weight; $n+=1 }
         if ($n -eq 0) { Write-Error "Not Enough Parameters"; return }
 
-        Write-Verbose "Updating flag $Id with:`n$($body|convertto-json)"
+        Write-Verbose "Updating flag with id $($Id):`n$($body|convertto-json)"
         if ($PSCmdlet.ShouldProcess($($obj.name), "Will update flag $($obj.name) [$Id]")) {
             Invoke-ICAPI -Endpoint $Endpoint -body $body -method PUT
+            Write-Verbose "Updated flag with Id: $Id"
         }
     }
 }
@@ -111,25 +113,29 @@ function Remove-ICFlag {
     [cmdletbinding(SupportsShouldProcess=$true)]
     Param(
         [parameter(Mandatory=$true, ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
-        [ValidateNotNullorEmpty()]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('flagId')]
         [String]$id
     )
     PROCESS {
+        Write-Verbose "Deleting flag with id $Id"
         $Endpoint = "flags/$Id"
-        $obj = Get-Flags -Id $Id -where { }
+        $obj = Get-ICFlag -Id $Id
         if ($obj) {
-            if ($obj | where { ($_.name -eq "Verified Good") -OR ($_.name -eq "Verified Bad")}) {
+            if ($obj | Where-Object { ($_.name -eq "Verified Good") -OR ($_.name -eq "Verified Bad")}) {
                 Write-Warning "Cannot Delete 'Verified Good' or 'Verified Bad' flags. They are a special case and would break the user interface"
                 return
             }
             if ($PSCmdlet.ShouldProcess($obj.name, "Will remove $($obj.name) [$($obj.color)] with flagId '$Id'")) {
-                Write-Host "Removing $($obj.name) [$($obj.color)] with flagId '$Id'"
+                Write-Verbose "Removing $($obj.name) [$($obj.color)] with flagId '$Id'"
                 Invoke-ICAPI -Endpoint $Endpoint -method DELETE
+                Write-Verbose "Removing $($obj.name) [$($obj.color)] with flagId '$Id'"
+                return $true
             }
         } else {
-            Write-Error "No Agent with id '$Id' exists."
+            Write-Error "No Agent found with id: $Id"
         }
+        return $Obj
     }
 }
 
@@ -137,7 +143,7 @@ function Add-ICComment {
     [cmdletbinding()]
     Param(
         [parameter(Mandatory=$true, ValueFromPipeline)]
-        [ValidateNotNullorEmpty()]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [String]$Id,
 
         [parameter(Mandatory=$true)]
@@ -147,11 +153,12 @@ function Add-ICComment {
 
     PROCESS {
         $Endpoint = "userComments"
-        Write-Host "Adding new comment to item with id $id"
+        Write-Verbose "Adding new comment to item with id $id"
         $body = @{
             relatedId = $Id
             value = $Text
         }
         Invoke-ICAPI -Endpoint $Endpoint -body $body -method POST
+        Write-Verbose "Added new comment to item with id $(id): $($body.value)"
     }
 }
