@@ -14,8 +14,7 @@ function Get-ICScan {
 
         [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
-        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
-        [String[]]$order = "completedOn desc",
+        
         [Switch]$NoLimit,
         [Switch]$CountOnly
     )
@@ -26,7 +25,6 @@ function Get-ICScan {
         if ($Id -AND (-NOT $_.targetId)) {
             Write-Verbose "Getting Scan with Id $Id"
             $CountOnly = $false
-            $order = $null
             $Endpoint += "/$Id"
         }
         elseif ($TargetGroupId) {
@@ -40,7 +38,7 @@ function Get-ICScan {
             }
         }
 
-        Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
+        Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit -CountOnly:$CountOnly
     }
 }
 
@@ -397,8 +395,7 @@ function Get-ICScanSchedule {
     param(
 		[String]$Id,
         [String]$TargetGroupId,
-        [HashTable]$where=@{},
-        [String[]]$order = @("relatedId")
+        [HashTable]$where=@{}
     )
     $Endpoint = "ScheduledJobs"
 	if ($TargetGroupId) {

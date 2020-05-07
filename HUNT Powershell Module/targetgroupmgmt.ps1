@@ -56,8 +56,6 @@ function Get-ICTargetGroup {
 
         [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
-        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
-        [String[]]$order="name",
         [Switch]$NoLimit,
         [Switch]$CountOnly
     )
@@ -73,7 +71,7 @@ function Get-ICTargetGroup {
             $Endpoint += "/$Id"
         }
 
-        Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
+        Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit -CountOnly:$CountOnly
     }
 }
 
@@ -139,8 +137,6 @@ function Get-ICControllerGroup {
 
         [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
-        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
-        [String[]]$order="name",
         [Switch]$NoLimit,
         [Switch]$CountOnly
     )
@@ -150,7 +146,7 @@ function Get-ICControllerGroup {
         if ($Id) {
             $Endpoint += "/$id"
         }
-        Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
+        Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit -CountOnly:$CountOnly
     }
 }
 
@@ -218,8 +214,8 @@ function Get-ICCredential {
 
         [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
-        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
-        [String[]]$order,
+        
+        
         [Switch]$NoLimit,
         [Switch]$CountOnly
     )
@@ -229,7 +225,7 @@ function Get-ICCredential {
         if ($id) {
             $Endpoint += "/$id"
         }
-        Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
+        Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit -CountOnly:$CountOnly
     }
 }
 
@@ -271,8 +267,7 @@ function Get-ICAddress {
 
         [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
-        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
-        [String[]]$order="lastAccessedOn",
+        
         [Switch]$NoLimit,
         [Switch]$CountOnly
     )
@@ -289,7 +284,7 @@ function Get-ICAddress {
             $where += @{ targetId = $TargetGroupId }
         }
 
-        Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
+        Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit -CountOnly:$CountOnly
     }
 }
 
@@ -350,21 +345,20 @@ function Get-ICAgent {
 
         [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
-        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
-        [String[]]$order,
+        
+        
         [Switch]$NoLimit,
         [Switch]$CountOnly
     )
 
     PROCESS {
         if ($Id) {
-            $Order = $null
             $CountOnly = $False
             $Endpoint = "Agents/$Id"
         } else {
             $Endpoint = "Agents"
         }
-        Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
+        Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit -CountOnly:$CountOnly
     }
 }
 
@@ -456,8 +450,8 @@ function Get-ICQuery {
 
         [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
-        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
-        [String[]]$order,
+        
+        
         [Switch]$NoLimit,
         [Switch]$CountOnly
     )

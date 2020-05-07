@@ -14,7 +14,188 @@ function Get-ICAPI {
         [parameter(Mandatory=$false, HelpMessage="Provide a hashtable and it will be converted to json-stringified query params. Reference format and operators here: https://loopback.io/doc/en/lb3/Where-filter.html")]
         [HashTable]$where=@{},
 
-        [String[]]$order,
+        [String[]]$fields,
+
+        [Switch]$NoLimit,
+
+        [Switch]$CountOnly
+    )
+
+    # Set access token
+    if ($Global:ICToken) {
+        $body = @{
+            access_token = $Global:ICToken
+        }
+    } else {
+        throw "API Token not set! Use Set-ICToken to connect to an Infocyte instance."
+    }
+
+    $resultlimit = 1000 # limits the number of results that come back. 1000 is max supported by Infocyte API. Use NoLimit flag on functions to iterate 1000 at a time for all results.
+    $Globallimit = 150000 # trying to control strains on the database. Add a filter to keep it reasonable.
+    $skip = 0
+    $lastId = $null
+    $count = 0
+    $more = $true
+    $url = "$($Global:HuntServerAddress)/api/$Endpoint"
+
+    $filter = @{
+        order = 'id'
+        limit = $resultlimit
+    }
+    if ($fields) { 
+        if ($fields.NotContains('id')) {
+            $fields += 'id'
+        }
+        $filter['fields'] = $fields 
+    }
+    if ($where) { $filter['where'] = $where }
+
+    Write-Verbose "Requesting data from $url"
+    if ($where -AND $where.count -gt 0) {
+        Write-Verbose "where-filter:`n$($where | ConvertTo-JSON -Depth 10)"
+    }
+
+    if ($Endpoint -match "/count$") {
+        # if it matches /count or an id guid, there is no count
+        $CountOnly = $true
+        # JSON Stringify the where on body
+        $body['where'] = $where | ConvertTo-JSON -Depth 10 -Compress
+    }
+    elseif ($Endpoint -match "[A-Z0-9]{8}-([A-Z0-9]{4}-){3}[A-Z0-9]{12}$" -OR
+            $Endpoint -match "[0-9a-f]{40}$" -OR
+            $Endpoint -match "/.*\d+$") {
+        # Querying a single object. Don't try to count.
+        Write-Debug "$Endpoint matches id filter. Adding filter."
+        $body['filter'] = $filter | ConvertTo-JSON -Depth 10 -Compress
+        $total = 1
+    }
+    elseif ($CountOnly) {
+        $url += "/count"
+        Write-Debug "Counting using /count"
+        $body['where'] = $where | ConvertTo-JSON -Depth 10 -Compress
+    }
+    else {
+        Write-Debug "Counting results first"
+        try {
+            $tcnt = Get-ICAPIv2 -endpoint "$endpoint/count" -where $where
+            $total = [int]$tcnt.'count'
+        } catch {
+            Write-Verbose "Couldn't get a count from $url/count"
+            $total = "N/A"
+        }       
+
+        if ($total.Gettype() -ne [int]) {
+            $NoCount = $true
+        }
+        elseif ($total -ge $Globallimit -AND -NOT $OverrideGlobalLimit) {
+            Write-Warning "Your filter will return $total objects! You are limited to $GlobalLimit results per query.
+                Database performance can be severely degraded in large queries. Try refining your query further with a 'where' filter or
+                ask Infocyte for a data export by emailing support@infocyte.com."
+
+
+            $question = 'Are you sure you want to proceed?'
+            $choices  = '&Yes', '&No'
+            $decision = $Host.UI.PromptForChoice('Accept Global Limit', $question, $choices, 1)
+            if ($decision -ne 0) { return }
+        }
+        elseif ($total -gt $resultlimit -AND -NOT $NoLimit -AND -NOT $OverrideGlobalLimit) {
+            Write-Warning "Found $total objects with this filter. Returning first $resultlimit.
+                Use a tighter 'where' filter or the -NoLimit switch to get more."
+        } 
+        else {
+            Write-Verbose "Found $total objects with this filter."
+        }
+    }
+
+    $timer = [system.diagnostics.stopwatch]::StartNew()
+    $times = @()
+
+    while ($more) {
+        try {
+            $pc = [math]::floor($skip*100/$total); if ($pc -gt 100) { Write-Debug "`$pc is above 100! `$n=$n"; $pc = 100 }
+        } catch {
+            $pc = -1
+        }
+        if (-NOT $NoCount -AND $total -ge 100) {
+            Write-Progress -Activity "Getting Data from Infocyte API" -status "Requesting data from $url [$skip of $total]" -PercentComplete $pc
+        }
+        Write-Debug "Sending $url this Body as 'application/json':`n$($body|convertto-json)"
+        $at = $timer.Elapsed
+        $Objects = Invoke-RestMethod $url -body $body -Method GET -ContentType 'application/json' -Proxy $Global:Proxy -ProxyCredential $Global:ProxyCredential
+        $bt = $timer.Elapsed
+        $e = ($bt - $at).TotalMilliseconds
+        $times += $e
+        Write-Debug "Last Request: $($e.ToString("#.#"))ms"
+
+        if ($CountOnly) {
+            if ($Objects) {
+                Write-Debug $Objects
+                return [int]$Objects.count
+            } else {
+                Write-Error "Could not get count!"
+                return
+            }
+        }
+        if ($Objects) {
+            if ($Objects.count) {
+                $count += $Objects.count
+            } else {
+                write-debug "Couldn't count $objects. Using 1."
+                $count += 1
+            }
+
+            Write-Output $Objects
+
+            if ($count -ge $Globallimit -AND -NOT $OverrideGlobalLimit) {
+                Write-Warning "Reached Global Limit of $GlobalLimit results."
+                $more = $false
+            }
+            elseif ($Objects.count -lt $resultlimit -OR (-NOT $NoLimit -AND -NOT $OverrideGlobalLimit)) {
+                $more = $false
+            }
+            
+            # Set up next Page
+            $body.remove('filter') | Out-Null
+            $skip += $resultlimit
+            
+            if ($null -eq $lastId) {
+                $lastId = $Objects[-1].id
+                $filter['where'] += @{ id = @{ gt = $lastId }}
+            } else {
+                $lastId = $Objects[-1].id
+                $filter['where']['id']['gt'] = $lastId
+            }
+            
+            
+            $body['filter'] = $filter | ConvertTo-JSON -Depth 10 -Compress
+        } else {
+            Write-Debug "No results from last call."
+            $more = $false
+        }
+    }
+    $timer.Stop()
+    $TotalTime = $timer.Elapsed
+    $AveTime = ($times | Measure-Object -Average).Average
+    $MaxTime = ($times | Measure-Object -Maximum).Maximum
+    if (-NOT $NoCount -AND $total -gt 100) {
+        Write-Progress -Activity "Getting Data from Infocyte API" -Completed
+    }
+    if (-NOT $NoCount) {
+        Write-Verbose "Received $count objects from $url in $($TotalTime.TotalSeconds.ToString("#.####")) Seconds (Page Request times: Ave= $($AveTime.ToString("#"))ms, Max= $($MaxTime.ToString("#"))ms)"
+    }
+}
+
+function Get-ICAPIv1 {
+    [cmdletbinding()]
+    Param(
+        [parameter(Mandatory=$true)]
+        [ValidateNotNullorEmpty()]
+        [String]$endpoint,
+
+        [parameter(Mandatory=$false, HelpMessage="Provide a hashtable and it will be converted to json-stringified query params. Reference format and operators here: https://loopback.io/doc/en/lb3/Where-filter.html")]
+        [HashTable]$where=@{},
+
+        
 
         [String[]]$fields,
 
@@ -99,7 +280,7 @@ function Get-ICAPI {
             $decision = $Host.UI.PromptForChoice('Accept Global Limit', $question, $choices, 1)
             if ($decision -ne 0) { return }
         }
-        elseif ($total -gt $resultlimit -AND -NOT $NoLimit) {
+        elseif ($total -gt $resultlimit -AND -NOT $NoLimit -AND -NOT $OverrideGlobalLimit) {
             Write-Warning "Found $total objects with this filter. Returning first $resultlimit.
                 Use a tighter 'where' filter or the -NoLimit switch to get more."
         } 
@@ -147,17 +328,14 @@ function Get-ICAPI {
             }
 
             Write-Output $Objects
-
-            if (-NOT $NoLimit) {
-                $more = $false
-            }
-            elseif ($Objects.count -lt $resultlimit) {
-                $more = $false
-            }
-            elseif ($count -ge $Globallimit -AND -NOT $OverrideGlobalLimit) {
+            if ($count -ge $Globallimit -AND -NOT $OverrideGlobalLimit) {
                 Write-Warning "Reached Global Limit of $GlobalLimit results."
                 $more = $false
             }
+            elseif ($Objects.count -lt $resultlimit -OR (-NOT $NoLimit -AND -NOT $OverrideGlobalLimit)) {
+                $more = $false
+            }
+
             # Set up next Page
             $body.remove('filter') | Out-Null
             $skip += $resultlimit
@@ -188,17 +366,18 @@ function Invoke-ICAPI {
         [ValidateNotNullorEmpty()]
         [String]$Endpoint,
 
-        [parameter(Mandatory=$false, HelpMessage="Provide a hashtable.")]
-        [HashTable]$body=$null,
-
-        [parameter(Mandatory=$false)]
+        [parameter(Mandatory=$true)]
         [ValidateSet(
+            "GET",
             "POST",
             "DELETE",
             "PUT",
             "PATCH"
         )]
-        [String]$Method="POST"
+        [String]$Method,
+
+        [parameter(Mandatory=$false, HelpMessage="Provide a hashtable.")]
+        [HashTable]$body
     )
 
     if ($Global:ICToken) {

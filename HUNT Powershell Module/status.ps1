@@ -14,8 +14,7 @@ function Get-ICJob {
 
 		[parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
-        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
-		[String[]]$order = "createdOn",
+        
 		[Switch]$NoLimit,
 		[Switch]$CountOnly
 	)
@@ -24,7 +23,6 @@ function Get-ICJob {
 		$endpoint = 'jobs'
 		if ($Id) {
 			$CountOnly = $false
-			$order = $null
 			$endpoint += "/$Id"
 		}
 		if ($All) {
@@ -35,7 +33,7 @@ function Get-ICJob {
 				$where['state'] = "active"
 			}
 		}
-		Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
+		Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit -CountOnly:$CountOnly
 	}
 }
 
@@ -49,8 +47,7 @@ function Get-ICAuditLog {
 
 		[parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
-        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
-		[String[]]$order = "createdOn DESC",
+        
 		[Switch]$NoLimit,
 		[Switch]$CountOnly
 	)
@@ -58,11 +55,10 @@ function Get-ICAuditLog {
 		$endpoint = 'useractivities'
 		if ($Id) {
 			$CountOnly = $false
-			$order = $null
 			$endpoint += "/$Id"
 		}
 		Write-Verbose "Getting User Activity Logs"
-		Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
+		Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit -CountOnly:$CountOnly
 	}
 }
 
@@ -79,8 +75,7 @@ function Get-ICTask {
 
 		[parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
-        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
-		[String[]]$order = "endedOn Desc",
+        
 		[Switch]$NoLimit,
 		[Switch]$CountOnly
 	)
@@ -89,7 +84,6 @@ function Get-ICTask {
 		$endpoint = "usertasks"
 		if ($Id) {
 			$CountOnly = $false
-			$order = $null
 			$endpoint += "/$Id"
 		} else {
 			if (-NOT $All -AND $where.keys.count -eq 0) {
@@ -104,7 +98,7 @@ function Get-ICTask {
 				Write-Verbose "Using filter: $($Where | convertto-json)"
 			}
 		}
-		Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
+		Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit -CountOnly:$CountOnly
 	}
 }
 
@@ -122,8 +116,6 @@ function Get-ICTaskItems {
 
 		[parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
-        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
-		[String[]]$order = "updatedOn Desc",
 		[String[]]$fields,
 		[Switch]$NoLimit,
 		[Switch]$CountOnly
@@ -142,7 +134,7 @@ function Get-ICTaskItems {
 				$cnt = Get-ICAPI -Endpoint $Endpoint -where $where -CountOnly
 			}
 			Write-Verbose "Found $cnt TaskItems. Getting progress for each."
-			$items = Get-ICAPI -Endpoint $Endpoint -where $where -order $order -fields $fields -NoLimit:$NoLimit
+			$items = Get-ICAPI -Endpoint $Endpoint -where $where -fields $fields -NoLimit:$NoLimit
 			$items | ForEach-Object {
 				$n += 1
 				try { $pc = [math]::floor($n*100/$cnt); if ($pc -gt 100) { $pc = 100 } } catch { $pc = -1 }
@@ -160,7 +152,7 @@ function Get-ICTaskItems {
 			}
 			Write-Output $items
 		} else {
-			Get-ICAPI -Endpoint $Endpoint -where $where -order $order -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly
+			Get-ICAPI -Endpoint $Endpoint -where $where -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly
 		}
 	}
 }
@@ -175,8 +167,7 @@ function Get-ICTaskItemProgress {
 
 		[parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
-        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
-		[String[]]$order = "createdOn desc",
+        
 		[String[]]$fields,
 		[Switch]$NoLimit,
 		[Switch]$CountOnly
@@ -190,7 +181,7 @@ function Get-ICTaskItemProgress {
 		} else {
 			$where['taskItemId'] = $taskItemId
 		}
-		Get-ICAPI -Endpoint $Endpoint -where $where -order $order -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly
+		Get-ICAPI -Endpoint $Endpoint -where $where -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly
 	}
 }
 

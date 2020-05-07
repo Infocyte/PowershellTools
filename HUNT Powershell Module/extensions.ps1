@@ -30,12 +30,6 @@ function Get-ICExtension {
 
         [parameter(
             Mandatory = $false, 
-            ParameterSetName = 'List',
-            HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
-        [String[]]$order,
-
-        [parameter(
-            Mandatory = $false, 
             ParameterSetName = 'List')]
         [Switch]$NoLimit,
 
@@ -95,7 +89,7 @@ function Get-ICExtension {
         }
         else {
             $Endpoint = "extensions"
-            $ext = Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
+            $ext = Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit -CountOnly:$CountOnly
             if ($CountOnly) { return $ext }
             $n = 1
             $c = $ext.count

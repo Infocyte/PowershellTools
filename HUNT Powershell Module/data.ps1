@@ -37,8 +37,6 @@ function Get-ICObject {
         [Switch]$CountOnly,
         [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter")]
         [HashTable]$where=@{},
-        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
-        [String[]]$order,
 
         [parameter(HelpMessage="The field or fields to return.")]
         [String[]]$fields,
@@ -185,7 +183,7 @@ function Get-ICObject {
             $CountOnly = $false
             $Endpoint += "/$id"
         }
-        Get-ICAPI -Endpoint $Endpoint -where $where -order $order -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly -OverrideGlobalLimit:$OverrideGlobalLimit
+        Get-ICAPI -Endpoint $Endpoint -where $where -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly -OverrideGlobalLimit:$OverrideGlobalLimit
     }
 }
 
@@ -202,8 +200,6 @@ function Get-ICVulnerability {
         [String]$BoxId=$Global:ICCurrentBox,
         [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
-        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
-        [String[]]$order,
         [Switch]$NoLimit
     )
 
@@ -331,8 +327,7 @@ function Get-ICAlert {
         [Switch]$IncludeArchived,
         [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
-        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
-        [String[]]$order='createdOn desc',
+        
         [Switch]$NoLimit,
         [Switch]$CountOnly
     )
@@ -346,7 +341,7 @@ function Get-ICAlert {
         if (-NOT ($IncludeArchived -OR $Where['archived'])) {
             $Where += @{ archived = $FALSE }
         }
-        Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
+        Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit -CountOnly:$CountOnly
     }
 }
 
@@ -360,8 +355,7 @@ function Get-ICReport {
 
         [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
-        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
-        [String[]]$order="createdOn DESC",
+        
         [Switch]$NoLimit,
         [Switch]$CountOnly
     )
@@ -375,7 +369,7 @@ function Get-ICReport {
             $fields = @("id","name","createdOn","type","hostCount")
         }
 
-        Get-ICAPI -Endpoint $Endpoint -where $where -order $order -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly
+        Get-ICAPI -Endpoint $Endpoint -where $where -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly
     }
 }
 
@@ -426,11 +420,6 @@ function Get-ICActivityTrace {
         [parameter(ParameterSetName="accountId")]
         [parameter(ParameterSetName="fileRepId")]
         [parameter(ParameterSetName="hostId")] 
-        [String[]]$order= @("eventTime desc"),
-
-        [parameter(ParameterSetName="accountId")]
-        [parameter(ParameterSetName="fileRepId")]
-        [parameter(ParameterSetName="hostId")] 
         [Switch]$NoLimit,
 
         [parameter(ParameterSetName="accountId")]
@@ -461,7 +450,7 @@ function Get-ICActivityTrace {
                 $where['hostId'] = $HostId
             }
         }
-        Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
+        Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit -CountOnly:$CountOnly
     }
 }
 
@@ -479,8 +468,7 @@ function Get-ICDwellTime {
 
         [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
-        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
-        [String[]]$order="dwellDays DESC",
+    
         [Switch]$NoLimit,
         [Switch]$CountOnly
     )
@@ -494,7 +482,7 @@ function Get-ICDwellTime {
         elseif ($sha1) {
             $where['fileRepId'] = $Sha1
         }
-        Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
+        Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit -CountOnly:$CountOnly
     }
 }
 
@@ -573,7 +561,7 @@ function Get-ICBox {
         }
     }
 
-    $boxes = Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit
+    $boxes = Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit
     if ($Id -AND -NOT $boxes) {
         Write-Error "No Box with id $Id was found"
         return

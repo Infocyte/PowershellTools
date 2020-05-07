@@ -182,7 +182,7 @@ function Set-ICToken {
 		$box = Get-ICBox -Last 7 -Global
 	}
 	catch [System.Net.WebException] {
-		Throw [System.Net.WebException]::New("Could not connect to $($Global:HuntServerAddress)")
+		Throw [System.Net.WebException]::New("Could not connect to $($Global:HuntServerAddress): $($_.Exception.Message)")
 	}
 
 	if ($box) {
