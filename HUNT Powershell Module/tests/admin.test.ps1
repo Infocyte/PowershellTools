@@ -1,21 +1,39 @@
-InModuleScope InfocyteHUNTAPI {
+
+
+Describe "ICFlag" {
 
     BeforeAll {
-        Remove-Module -Name InfocyteHUNTAPI -Force -ErrorAction Ignore
-        Import-Module $PSScriptRoot\..\infocyteHUNTAPI.psd1 -Force -ErrorAction Stop
-        Set-ICToken -Instance TestChris2644
-        $PesterPreference = [PesterConfiguration]::Default
-        $PesterPreference.Output.Verbosity.Value = "Normal"
-
+        Get-ICFlag -where @{ name = $Testname } | Remove-ICFlag | Out-Null
     }
-    
-    Describe "Command" {
-        
-        It "does something useful" {
-            $true | Should Be $false
-        }
-
+    AfterAll {
+        Get-ICFlag -where @{ name = $Testname } | Remove-ICFlag | Out-Null
     }
 
-    
+    It "Gets a flag named 'Verified Good" {
+        $r = Get-ICFlag -where @{ name = "Verified Good" }
+        $r.color | Should -BeExactly "green"
+    }
+
+    It "Returns empty when it can't find a flag" {
+        $r = Get-ICFlag -where @{ name = "fake" }
+        $r | Should -Be $null
+    }
+
+    It "Creates a flag" {
+        $r = New-ICFlag -Name $Testname -Color "blue" -Weight 5 
+        $r.id | Should -Not -Be $null
+    }
+
+    It "Throws if it tries to create an existing flag name" {
+        { New-ICFlag -Name $Testname -Color "blue" -Weight 5 } | Should -Throw
+    }
+
+    It "Updates a flag" {
+        $r = Get-ICFlag -where @{ name = $Testname }
+        $r.color | Should -BeExactly "blue"
+
+        $r = Update-ICFlag -id $r.id -Color "green"
+        $r.color | Should -BeExactly "green"
+    }
+
 }
