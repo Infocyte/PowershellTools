@@ -7,6 +7,7 @@ function New-ICTargetGroup {
         [String]$Name,
 
         [parameter(Mandatory=$false)]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [String]$ControllerGroupId,
 
         [parameter(HelpMessage="Use first available ControllerGroupId if not provided.")]
@@ -47,14 +48,14 @@ function Get-ICTargetGroup {
     [cmdletbinding()]
     param(
         [parameter(ValueFromPipeline=$true)]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('TargetGroupId','targetId')]
         [String]$Id,
+
         [Switch]$IncludeArchive,
 
         [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
-        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
-        [String[]]$order="name",
         [Switch]$NoLimit,
         [Switch]$CountOnly
     )
@@ -70,7 +71,7 @@ function Get-ICTargetGroup {
             $Endpoint += "/$Id"
         }
 
-        Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
+        Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit -CountOnly:$CountOnly
     }
 }
 
@@ -78,7 +79,7 @@ function Remove-ICTargetGroup {
     [cmdletbinding(SupportsShouldProcess=$true)]
     param(
         [parameter(Mandatory=$true, ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
-        [ValidateNotNullOrEmpty()]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('TargetGroupId','targetId')]
         [String]$Id,
 
@@ -130,13 +131,12 @@ function Get-ICControllerGroup {
     [cmdletbinding()]
     param(
         [parameter(ValueFromPipeline=$true)]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('controllerGroupId')]
         [String]$Id,
 
         [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
-        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
-        [String[]]$order="name",
         [Switch]$NoLimit,
         [Switch]$CountOnly
     )
@@ -146,7 +146,7 @@ function Get-ICControllerGroup {
         if ($Id) {
             $Endpoint += "/$id"
         }
-        Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
+        Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit -CountOnly:$CountOnly
     }
 }
 
@@ -154,7 +154,7 @@ function Remove-ICControllerGroup {
     [cmdletbinding(SupportsShouldProcess=$true)]
     param(
         [parameter(Mandatory=$true, ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
-        [ValidateNotNullOrEmpty()]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('ControllerGroupId')]
         [String]$Id
     )
@@ -208,13 +208,14 @@ function Get-ICCredential {
     [cmdletbinding()]
     param(
         [parameter(ValueFromPipeline=$true)]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('credentialId')]
         [String]$id,
 
         [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
-        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
-        [String[]]$order,
+        
+        
         [Switch]$NoLimit,
         [Switch]$CountOnly
     )
@@ -224,7 +225,7 @@ function Get-ICCredential {
         if ($id) {
             $Endpoint += "/$id"
         }
-        Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
+        Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit -CountOnly:$CountOnly
     }
 }
 
@@ -255,6 +256,7 @@ function Get-ICAddress {
     [cmdletbinding()]
     param(
         [parameter()]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('addressId')]
         [String]$Id,
 
@@ -265,8 +267,7 @@ function Get-ICAddress {
 
         [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
-        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
-        [String[]]$order="lastAccessedOn",
+        
         [Switch]$NoLimit,
         [Switch]$CountOnly
     )
@@ -283,7 +284,7 @@ function Get-ICAddress {
             $where += @{ targetId = $TargetGroupId }
         }
 
-        Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
+        Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit -CountOnly:$CountOnly
     }
 }
 
@@ -291,6 +292,7 @@ function Remove-ICAddress {
     [cmdletbinding(SupportsShouldProcess=$true)]
     Param(
         [parameter(ValueFromPipeLine=$true)]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('AddressId')]
         [String]$id,
 
@@ -337,26 +339,26 @@ function Get-ICAgent {
     [cmdletbinding()]
     param(
         [parameter(ValueFromPipeline=$true)]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('agentId')]
         [String]$Id,
 
         [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
-        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
-        [String[]]$order,
+        
+        
         [Switch]$NoLimit,
         [Switch]$CountOnly
     )
 
     PROCESS {
         if ($Id) {
-            $Order = $null
             $CountOnly = $False
             $Endpoint = "Agents/$Id"
         } else {
             $Endpoint = "Agents"
         }
-        Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
+        Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit -CountOnly:$CountOnly
     }
 }
 
@@ -364,7 +366,7 @@ function Remove-ICAgent {
     [cmdletbinding(SupportsShouldProcess=$true)]
     Param(
         [parameter(Mandatory=$true, ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
-        [ValidateNotNullorEmpty()]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('AgentId')]
         [String]$Id
     )
@@ -373,15 +375,14 @@ function Remove-ICAgent {
         $Endpoint = "Agents/$Id"
         $obj = Get-ICAgent -id $Id
         if (-NOT $obj) {
-            Write-Error "No Agent with id '$Id' exists."
+            Write-Error "No Agent exists with id: $Id"
             return
         }
         if ($PSCmdlet.ShouldProcess($obj.hostname, "Will uninstall agent: $($obj.hostname) [$Id]")) {
-            Write-Warning "Uninstalling Agent $Endpoint $($obj.hostname) [$Id]."
-            Invoke-ICAPI -Endpoint "$Endpoint/uninstall" -method POST
-            Start-Sleep 2
-            Invoke-ICAPI -Endpoint $Endpoint -method DELETE
-            Write-Host "Agent Uninstalled and Deleted."
+            Write-Verbose "Uninstalling Agent $($obj.hostname) [$Id]."
+            Invoke-ICAPI -Endpoint "$Endpoint/uninstall" -method POST | Out-Null
+            Write-Verbose "Agent on $($obj.hostname) [$Id] uninstalled and deleted."
+            return $true
         }
     }
 }
@@ -395,12 +396,16 @@ function New-ICQuery {
         [String]$Name,
 
         [parameter(Mandatory=$True)]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('targetId')]
         [String]$TargetGroupId,
 
         [parameter(Mandatory=$True)]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [String]$credentialId,
 
+        [parameter()]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [String]$sshCredentialId,
 
         [parameter(Mandatory=$True)]
@@ -434,17 +439,19 @@ function Get-ICQuery {
     [cmdletbinding()]
     param(
         [parameter(ValueFromPipeline=$true)]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('queryId')]
         [String]$Id,
 
         [parameter(ValueFromPipelineByPropertyName=$true)]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('targetId')]
         [String]$TargetGroupId,
 
         [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
-        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
-        [String[]]$order,
+        
+        
         [Switch]$NoLimit,
         [Switch]$CountOnly
     )
@@ -467,7 +474,7 @@ function Remove-ICQuery {
     [cmdletbinding(SupportsShouldProcess=$true)]
     param(
         [parameter(Mandatory=$true, ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
-        [ValidateNotNullOrEmpty()]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('queryId')]
         [String]$Id
     )

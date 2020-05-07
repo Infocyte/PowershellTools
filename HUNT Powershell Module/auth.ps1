@@ -26,7 +26,7 @@ function New-ICToken {
 	param(
 		[parameter(Mandatory=$true)]
 		[ValidateNotNullOrEmpty()]
-		[String]$HuntServer = "https://localhost:443",
+		[String]$HuntServer,
 
 		[parameter(Mandatory=$true)]
 		[System.Management.Automation.PSCredential]
@@ -56,7 +56,7 @@ function New-ICToken {
 		password = $Credential.GetNetworkCredential().password
 	}
 	$i = $data | ConvertTo-JSON
-	Write-Host "Requesting new Token from $Global:HuntServerAddress using account $($Credential.username)"
+	Write-Verbose "Requesting new Token from $Global:HuntServerAddress using account $($Credential.username)"
 	Write-Verbose "Credentials and Hunt Server Address are stored in global variables for use in all IC cmdlets"
 
 	try {
@@ -107,27 +107,32 @@ function Set-ICToken {
 	}
 	Write-Verbose "Setting Security Protocol to TLS1.2"
 	[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+	[System.Net.ServicePointManager]::MaxServicePointIdleTime = 60000
 
-	if ($Instance -match "[:\.]+") {
-		if ($Instance -notlike "https://*") {
-			$Global:HuntServerAddress = "https://$Instance"
-		} else {
-			$Global:HuntServerAddress = $Instance
-		}
+	if ($Instance -match "https://*") {
+		$Global:HuntServerAddress = $Instance
+	elseif ($Instance -match ".*infocyte.com")
+		$Global:HuntServerAddress = "https://$Instance"
 	} else {
 		$Global:HuntServerAddress = "https://$Instance.infocyte.com"
 	}
-	Write-Host "Setting Global API URL to $Global:HuntServerAddress/api"
+	Write-Verbose "Setting Global API URL to $Global:HuntServerAddress/api"
 
-	$credentialfile = "$env:appdata\infocyte\credentials.json"
+	if ($IsWindows -OR $env:OS -match "windows") {
+		$credentialfile = "$env:appdata/infocyte/credentials.json"
+	} 
+	else {
+		$credentialfile = "$env:HOME/infocyte/credentials.json"
+	}
+
 	$Global:ICCredentials = @{}
 	if (Test-Path $credentialfile) {
 		(Get-Content $credentialfile | ConvertFrom-JSON).psobject.properties | ForEach-Object {
 			$Global:ICCredentials[$_.Name] = $_.Value
 		}
 	} else {
-		if (-NOT (Test-Path "$env:appdata\infocyte")) {
-			New-Item -ItemType "directory" -Path "$env:appdata\infocyte"
+		if (-NOT (Test-Path (Split-Path $credentialfile))) {
+			New-Item -ItemType "directory" -Path (Split-Path $credentialfile) | Out-Null
 		}
 	}
 
@@ -135,28 +140,28 @@ function Set-ICToken {
 		# Set Token to global variable
 		if ($Token.length -eq 64) {
 				$Global:ICToken = $Token
-				Write-Host "Setting Auth Token for $Global:HuntServerAddress to $Token"
+				Write-Verbose "Setting Auth Token for $Global:HuntServerAddress to $Token"
 		} else {
-			Write-Warning "That token won't work. Must be a 64 character string generated within your profile or admin panel within Infocyte HUNT's web console"
+			Throw Exception "Invalide token. Must be a 64 character string generated within your profile or admin panel within Infocyte HUNT's web console"
 			return
 		}
 	} else {
 		# Load from file
 		if ($Global:ICCredentials[$Global:HuntServerAddress]) {
-			Write-Host "Setting auth token from credential file: $credentialfile"
+			Write-Verbose "Setting auth token from credential file: $credentialfile"
 			$Global:ICToken = $Global:ICCredentials[$Global:HuntServerAddress]
 		} else {
-			Write-Warning "No Token found for $($Global:HuntServerAddress) in credential file!"
+			Write-Error "No Token found for $($Global:HuntServerAddress) in credential file!"
 			Write-Warning "Please provide credentials with -Save switch to save them to credential file first."
 			return
 		}
 	}
 
 	if ($Proxy) {
-			Write-Host "Infocyte API functions will use Proxy: $Proxy"
+			Write-Verbose "Infocyte API functions will use Proxy: $Proxy"
 			$Global:Proxy = $Proxy
 			if ($ProxyUser -AND $ProxyPass) {
-				Write-Host "Infocyte API functions will now use Proxy User: $ProxyUser"
+				Write-Verbose "Infocyte API functions will now use Proxy User: $ProxyUser"
 				$pw = ConvertTo-SecureString $ProxyPass -AsPlainText -Force
 				$Global:ProxyCredential = New-Object System.Management.Automation.PSCredential ($ProxyUser, $pw)
 			}
@@ -164,7 +169,7 @@ function Set-ICToken {
 		# Load from file
 		$Global:Proxy = $Global:ICCredentials["Proxy"]
 		if ($Global:Proxy) {
-			Write-Host "Infocyte API functions will use Proxy config loaded from credential file: $($Global:Proxy)"
+			Write-Verbose "Infocyte API functions will use Proxy config loaded from credential file: $($Global:Proxy)"
 		}
 		if ($Global:ICCredentials["ProxyUser"]) {
 			$pw = ConvertTo-SecureString $Global:ICCredentials["ProxyPass"] -AsPlainText -Force
@@ -172,13 +177,18 @@ function Set-ICToken {
 		}
 	}
 
+	#Test connection
+	$ver = Get-ICAPI -Endpoint "Version"
+
 	# Set initial default boxId (change with Set-ICBox) and test connection
 	$box = Get-ICBox -Last 7 -Global
+
 	if ($box) {
+		Write-Verbose "Successfully connected to $Global:HuntServerAddress"
 		$Global:ICCurrentBox = $box.id
-		Write-Host "`$Global:ICCurrentBox is set to $($box.targetGroup)-$($box.name) [$($box.id)]"
-		Write-Host "All analysis data & object retrieval will default to this box."
-		Write-Host "Use Set-ICBox to change the default in this session."
+		Write-Verbose "`$Global:ICCurrentBox is set to $($box.targetGroup)-$($box.name) [$($box.id)]"
+		Write-Verbose "All analysis data & object retrieval will default to this box."
+		Write-Verbose "Use Set-ICBox to change the default in this session."
 	} else {
 		Write-Error "Your connection to $Global:HuntServerAddress failed!"
 		Write-Warning "`nInfocyte API URI: $Global:HuntServerAddress`nToken: $Global:ICToken`nProxy: $Global:Proxy`nProxyUser: $($Global:ICCredentials["ProxyUser"])"
@@ -186,7 +196,7 @@ function Set-ICToken {
 
 
 	if ($Save) {
-		Write-Host "Saving Token and Proxy settings to credential file: $credentialfile"
+		Write-Verbose "Saving Token and Proxy settings to credential file: $credentialfile"
 		$Global:ICCredentials[$Global:HuntServerAddress] = $Global:ICToken
 		if ($Proxy) {
 			$Global:ICCredentials["Proxy"] = $Proxy
@@ -197,12 +207,15 @@ function Set-ICToken {
 		}
 		if (Test-Path $credentialfile) {
 			# Archive current credential
-			Write-Host "Previous credential file has been backed up."
+			Write-Verbose "Previous credential file has been backed up."
 			Copy-Item -Path $credentialfile -Destination "$($credentialfile)-OLD"
 		}
 		$Global:ICCredentials | ConvertTo-JSON | Out-File $credentialfile -Force
-		Write-Host "Token, Hunt Server Address, and Proxy settings are stored on disk. Omit token and proxy arguments to use saved versions."
+		Write-Verbose "Token, Hunt Server Address, and Proxy settings are stored on disk. Omit token and proxy arguments to use saved versions."
 	} else {
-		Write-Host "Token, Hunt Server Address, and Proxy settings are stored in global session variables for use in all IC cmdlets."
+		Write-Verbose "Token, Hunt Server Address, and Proxy settings are stored in global session variables for use in all IC cmdlets."
 	}
+
+	Return $true
+	
 }

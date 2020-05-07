@@ -2,13 +2,13 @@
 $Version = "1.4.0" 
 $GUID_REGEX = "^[A-Z0-9]{8}-([A-Z0-9]{4}-){3}[A-Z0-9]{12}$"
 
-Write-Host "Importing Infocyte HUNT API Powershell Module"
+Write-Verbose "Importing Infocyte HUNT API Powershell Module"
 $PS = $PSVersionTable.PSVersion.tostring()
 if ($PSVersionTable.PSVersion.Major -lt 5) {
   Write-Warning "Powershell Version not supported. Install version 5.x or higher"
   return
 } else {
-    Write-Host "Checking PSVersion [Minimum Supported: 5.0]: PASSED [$PS]!`n"
+    Write-Verbose "Checking PSVersion [Minimum Supported: 5.0]: PASSED [$PS]!`n"
 }
 
 function Get-ICHelp {
@@ -26,8 +26,8 @@ function Get-ICHelp {
     Write-Host -ForegroundColor Cyan "`tGet-ICAPI, Invoke-ICAPI`n"
 
     Write-Host "Extension Development Functions:"
-    Write-Host -ForegroundColor Cyan "`tNew-ICExtension, Test-ICExtension"
-    Write-Host -ForegroundColor Cyan "`tGet-ICExtension, Update-ICExtension, Remove-ICExtension"
+    Write-Host -ForegroundColor Cyan "`tNew-ICExtension, Test-ICExtension,"
+    Write-Host -ForegroundColor Cyan "`tGet-ICExtension, Update-ICExtension, Remove-ICExtension,"
     Write-Host -ForegroundColor Cyan "`tImport-ICExtension, Import-ICOfficialExtensions`n"
 
     Write-Host "Admin/Misc Functions:"
@@ -49,11 +49,11 @@ function Get-ICHelp {
 
     Write-Host "Scanning Functions:"
     Write-Host -ForegroundColor Cyan "`tInvoke-ICFindHosts, New-ICScanOptions,"
-    Write-Host -ForegroundColor Cyan "`tGet-ICScan, Invoke-ICScan, Invoke-ICScanTarget,"
+    Write-Host -ForegroundColor Cyan "`tGet-ICScan, Invoke-ICScan, Invoke-ICScanTarget, Invoke-ICResponse,"
     Write-Host -ForegroundColor Cyan "`tAdd-ICScanSchedule, Get-ICScanSchedule, Remove-ICScanSchedule`n"
 
     Write-Host "Task Status Functions:"
-    Write-Host -ForegroundColor Cyan "`tGet-ICUserTask, Get-ICUserTaskItem`n"
+    Write-Host -ForegroundColor Cyan "`tGet-ICTask, Get-ICTaskItems, Get-ICLastScanTask`n"
 
     Write-Host "Offline Scan Import Functions:"
     Write-Host -ForegroundColor Cyan "`tImport-ICSurvey`n"
@@ -89,7 +89,6 @@ function Get-ICHelp {
     Write-Host -ForegroundColor Cyan 'PS> Get-ICTargetGroup'
     Write-Host -ForegroundColor Cyan 'PS> Get-ChildItem C:\FolderOfSurveyResults\ -filter *.json.gz | Import-ICSurvey -Path .\surveyresult.json.gz -TargetGroupId b3fe4271-356e-42c0-8d7d-01041665a59b'
 }
-Get-ICHelp
 
 # Read in all ps1 files
 . "$PSScriptRoot\requestHelpers.ps1"

@@ -5,6 +5,7 @@ function Get-ICObject {
     [alias("Get-ICData","Get-ICObjects")]
     param(
         [parameter(ValueFromPipeline)]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [String]$Id,
 
         [parameter(
@@ -28,6 +29,7 @@ function Get-ICObject {
         [String]$Type,
 
         [parameter(HelpMessage={"Boxes are the 7, 30, and 90 day views of target group or global data. Use Set-ICBox to set your default. CurrentDefault: $Global:ICCurrentBox"})]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [String]$BoxId=$Global:ICCurrentBox,
         [parameter(HelpMessage="Defaults to hash+path aggregation (normalized). Use this switch to get all raw instances of the object found.")]
         [Switch]$AllInstances,
@@ -35,14 +37,11 @@ function Get-ICObject {
         [Switch]$CountOnly,
         [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter")]
         [HashTable]$where=@{},
-        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
-        [String[]]$order,
 
         [parameter(HelpMessage="The field or fields to return.")]
         [String[]]$fields,
 
-        [Switch]$NoLimit,
-        [Switch]$OverrideGlobalLimit
+        [Switch]$NoLimit
     )
 
     $Files = @(
@@ -183,7 +182,7 @@ function Get-ICObject {
             $CountOnly = $false
             $Endpoint += "/$id"
         }
-        Get-ICAPI -Endpoint $Endpoint -where $where -order $order -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly -OverrideGlobalLimit:$OverrideGlobalLimit
+        Get-ICAPI -Endpoint $Endpoint -where $where -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly
     }
 }
 
@@ -191,6 +190,7 @@ function Get-ICVulnerability {
     [cmdletbinding()]
     param(
         [parameter(ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('applicationId')]
         [String]$Id,
 
@@ -199,8 +199,6 @@ function Get-ICVulnerability {
         [String]$BoxId=$Global:ICCurrentBox,
         [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
-        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
-        [String[]]$order,
         [Switch]$NoLimit
     )
 
@@ -298,7 +296,7 @@ function Get-ICVulnerability {
         $applicationvulnerabilities = Join-Object -Left $apps -Right $appvulns -LeftJoinProperty 'applicationid' -RightJoinProperty 'applicationid' -Type OnlyIfInBoth
         #-RightProperties cveId, description, baseScoreV2, baseScoreV3, published, modified
 
-        Write-Host "DONE: Exporting $($applicationvulnerabilities.count) Vulnerabilities"
+        Write-Verbose "Exporting $($applicationvulnerabilities.count) Vulnerabilities"
         Write-Output $applicationvulnerabilities
     }
 }
@@ -307,14 +305,11 @@ function Get-ICVulnerability {
 function Get-ICFileDetail {
     Param(
         [parameter(Mandatory=$true, ValueFromPipeline, ValueFromPipelineByPropertyName)]
+        [ValidateScript({ if ($_ -match "\b[0-9a-f]{40}\b") { $true } else { throw "Incorrect input: $_.  Requires a sha1 (fileRepId) of 40 characters."} })]
         [alias('fileRepId')]
         [String]$sha1
     )
     PROCESS {
-        if ($sha1 -notmatch "\b[0-9a-f]{40}\b") {
-            Write-Error "Incorrect input format. Requires a sha1 (fileRepId) of 40 characters."
-            return
-        }
         Write-Verbose "Requesting FileReport on file with SHA1: $sha1"
         Get-ICAPI -Endpoint "FileReps/$sha1"
     }
@@ -331,8 +326,7 @@ function Get-ICAlert {
         [Switch]$IncludeArchived,
         [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
-        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
-        [String[]]$order='createdOn desc',
+        
         [Switch]$NoLimit,
         [Switch]$CountOnly
     )
@@ -346,7 +340,7 @@ function Get-ICAlert {
         if (-NOT ($IncludeArchived -OR $Where['archived'])) {
             $Where += @{ archived = $FALSE }
         }
-        Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
+        Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit -CountOnly:$CountOnly
     }
 }
 
@@ -354,13 +348,13 @@ function Get-ICReport {
     [cmdletbinding()]
     param(
         [parameter(ValueFromPipeline=$true)]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('reportId')]
         [String]$Id,
 
         [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
-        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
-        [String[]]$order="createdOn DESC",
+        
         [Switch]$NoLimit,
         [Switch]$CountOnly
     )
@@ -374,33 +368,37 @@ function Get-ICReport {
             $fields = @("id","name","createdOn","type","hostCount")
         }
 
-        Get-ICAPI -Endpoint $Endpoint -where $where -order $order -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly
+        Get-ICAPI -Endpoint $Endpoint -where $where -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly
     }
 }
 
 function Get-ICActivityTrace {
-    [cmdletbinding()]
+    [cmdletbinding(DefaultParameterSetName="fileRepId")]
     param(
         [parameter(
             ParameterSetName="Id",
             ValueFromPipeline=$true)]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [String]$Id,
 
         [parameter(
             ParameterSetName="accountId",
             ValueFromPipelineByPropertyName=$true)]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [String]$accountId,
 
         [parameter(
             ParameterSetName="fileRepId",
             ValueFromPipeline=$True,
             ValueFromPipelineByPropertyName=$true)]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('fileRepId')]
         [String]$sha1,
 
         [parameter(
             ParameterSetName="hostId",
             ValueFromPipelineByPropertyName=$true)]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [String]$hostId,
 
         [parameter(ParameterSetName="accountId")]
@@ -417,11 +415,6 @@ function Get-ICActivityTrace {
         [parameter(ParameterSetName="fileRepId")]
         [parameter(ParameterSetName="hostId")] 
         [HashTable]$where=@{},
-
-        [parameter(ParameterSetName="accountId")]
-        [parameter(ParameterSetName="fileRepId")]
-        [parameter(ParameterSetName="hostId")] 
-        [String[]]$order= @("eventTime desc"),
 
         [parameter(ParameterSetName="accountId")]
         [parameter(ParameterSetName="fileRepId")]
@@ -456,7 +449,7 @@ function Get-ICActivityTrace {
                 $where['hostId'] = $HostId
             }
         }
-        Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
+        Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit -CountOnly:$CountOnly
     }
 }
 
@@ -464,6 +457,7 @@ function Get-ICDwellTime {
     [cmdletbinding()]
     param(
         [parameter()]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [String]$Id,
 
         [parameter(ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
@@ -473,8 +467,7 @@ function Get-ICDwellTime {
 
         [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
-        [parameter(HelpMessage="The field or fields to order the results on: https://loopback.io/doc/en/lb2/Order-filter.html")]
-        [String[]]$order="dwellDays DESC",
+    
         [Switch]$NoLimit,
         [Switch]$CountOnly
     )
@@ -488,7 +481,7 @@ function Get-ICDwellTime {
         elseif ($sha1) {
             $where['fileRepId'] = $Sha1
         }
-        Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit -CountOnly:$CountOnly
+        Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit -CountOnly:$CountOnly
     }
 }
 
@@ -496,7 +489,7 @@ function Get-ICBox {
     [cmdletbinding(DefaultParameterSetName="Global")]
     param(
         [parameter(ParameterSetName="Id")]
-        [ValidatePattern("^[A-Z0-9]{8}-([A-Z0-9]{4}-){3}[A-Z0-9]{12}$")]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('BoxId')]
         [String]$Id,
 
@@ -567,7 +560,7 @@ function Get-ICBox {
         }
     }
 
-    $boxes = Get-ICAPI -Endpoint $Endpoint -where $where -order $order -NoLimit:$NoLimit
+    $boxes = Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit
     if ($Id -AND -NOT $boxes) {
         Write-Error "No Box with id $Id was found"
         return
@@ -606,7 +599,7 @@ function Set-ICBox {
             ValueFromPipelineByPropertyName,
             ParameterSetName="Id"
             )]
-        [ValidatePattern("^[A-Z0-9]{8}-([A-Z0-9]{4}-){3}[A-Z0-9]{12}$")]
+        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('BoxId')]
         [String]$Id,
 
@@ -635,11 +628,11 @@ function Set-ICBox {
         if ($Id) {
             $box = Get-ICbox -id $Id
             if ($box) {
-                Write-Host "`$Global:ICCurrentBox is now set to $($box.targetGroup)-$($box.name) [$Id]"
+                Write-Verbose "`$Global:ICCurrentBox is now set to $($box.targetGroup)-$($box.name) [$Id]"
                 $Global:ICCurrentBox = $Id
                 return $true
             } else {
-                Write-Warning "No Box with Id $Id found."
+                Write-Error "No Box found with Id: $Id"
                 return
             }
         } else {
