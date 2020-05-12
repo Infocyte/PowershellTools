@@ -8,7 +8,7 @@
 RootModule = 'InfocyteHUNTAPI.psm1'
 
 # Version number of this module.
-ModuleVersion = '1.4.0'
+ModuleVersion = '1.4.1'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -80,6 +80,7 @@ FunctionsToExport = @(
     "Get-ICVulnerability",
     "Get-ICActivityTrace",
     "Get-ICFileDetail",
+    "Get-ICNotes",
     "New-ICToken",
     "New-ICTargetGroup",
     "Get-ICTargetGroup",

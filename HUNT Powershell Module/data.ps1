@@ -307,11 +307,48 @@ function Get-ICFileDetail {
         [parameter(Mandatory=$true, ValueFromPipeline, ValueFromPipelineByPropertyName)]
         [ValidateScript({ if ($_ -match "\b[0-9a-f]{40}\b") { $true } else { throw "Incorrect input: $_.  Requires a sha1 (fileRepId) of 40 characters."} })]
         [alias('fileRepId')]
-        [String]$sha1
+        [String]$sha1,
+
+        [parameter(HelpMessage="The field or fields to return.")]
+        [String[]]$fields
     )
     PROCESS {
         Write-Verbose "Requesting FileReport on file with SHA1: $sha1"
-        Get-ICAPI -Endpoint "FileReps/$sha1"
+        $fileReport = Get-ICAPI -Endpoint "FileReps/$sha1" -fields $fields
+        $notes = Get-ICNotes -relatedId $sha1
+        $fileReport | Add-Member -Type NoteProperty -name CommentCount -value ($notes.count)
+        $fileReport | Add-Member -Type NoteProperty -name Comments -value ($notes)
+        return $fileReport
+    }
+}
+
+function Get-ICNotes {
+    Param(
+        [parameter(Mandatory=$true, ValueFromPipeline, ValueFromPipelineByPropertyName)]
+        [ValidateScript({ if ($_ -match "\b[0-9a-f]{40}\b") { $true } else { throw "Incorrect input: $_.  Requires a relatedId or fileRepId (sha1) of 40 characters."} })]
+        [alias('fileRepId')]
+        [alias('sha1')]
+        [String]$relatedId,
+
+        [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter")]
+        [HashTable]$where,
+
+        [parameter(HelpMessage="The field or fields to return.")]
+        [String[]]$fields
+    )
+    
+    PROCESS {
+        Write-Verbose "Getting notes/comments on object with id: $relatedId"
+        if (-NOT $where -AND $relatedId) {
+            $where += @{ relatedId = $relatedId }
+        }
+        $comments = Get-ICAPI -Endpoint "userComments" -where $where
+        $comments | % {
+            Write-Verbose "Looking up user: $($_.userId)"
+            $_.createdBy = (Get-ICAPI -endpoint users -where @{ id = $_.userId } -fields email -ea 0).email
+        }
+        $comments | Write-Output
+
     }
 }
 
@@ -326,6 +363,9 @@ function Get-ICAlert {
         [Switch]$IncludeArchived,
         [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
+
+        [parameter(HelpMessage="The field or fields to return.")]
+        [String[]]$fields,
         
         [Switch]$NoLimit,
         [Switch]$CountOnly
@@ -340,7 +380,7 @@ function Get-ICAlert {
         if (-NOT ($IncludeArchived -OR $Where['archived'])) {
             $Where += @{ archived = $FALSE }
         }
-        Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit -CountOnly:$CountOnly
+        Get-ICAPI -Endpoint $Endpoint -where $where -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly
     }
 }
 
