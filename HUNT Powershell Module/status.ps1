@@ -24,13 +24,16 @@ function Get-ICJob {
 		if ($Id) {
 			$CountOnly = $false
 			$endpoint += "/$Id"
-		}
-		if ($All) {
-			Write-Verbose "Getting All Jobs."
+			$where = $null
+			$NoLimit = $false
 		} else {
-			Write-Verbose "Getting Active Jobs."
-			if (-NOT $where['state']) {
-				$where['state'] = "active"
+			if ($All) {
+				Write-Verbose "Getting All Jobs."
+			} else {
+				Write-Verbose "Getting Active Jobs."
+				if (-NOT $where['state']) {
+					$where['state'] = "active"
+				}
 			}
 		}
 		Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit -CountOnly:$CountOnly
@@ -69,6 +72,7 @@ function Get-ICTask {
 		[parameter(ValueFromPipeline, ValueFromPipelineByPropertyName)]
 		[ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
 		[alias('id')]
+		[alias('userTaskId')]
 		[String]$TaskId,
 
 		[Switch]$All,
@@ -98,7 +102,14 @@ function Get-ICTask {
 				Write-Verbose "Using filter: $($Where | convertto-json)"
 			}
 		}
-		Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit -CountOnly:$CountOnly
+		$Tasks = Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit -CountOnly:$CountOnly
+		$Tasks | ForEach-Object {
+			$_ | Add-Member -Type NoteProperty -Name totalSeconds -Value $null
+			if ($_.endedOn) {
+				$_.totalSeconds = [math]::round(([datetime]$_.endedOn - [DateTime]$_.createdOn).TotalSeconds)
+			}
+		}
+		Write-Output $Tasks
 	}
 }
 
@@ -111,14 +122,15 @@ function Get-ICTaskItems {
 			ValueFromPipelineByPropertyName)]
 		[ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
 		[alias('id')]
+		[alias('userTaskId')]
 		[String]$TaskId,
 
 		[parameter()]
 		[Switch]$IncludeProgress,
 
 		[parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
-        [HashTable]$where=@{},
-		[String[]]$fields,
+        [HashTable]$Where=@{},
+		[String[]]$Fields,
 		[Switch]$NoLimit,
 		[Switch]$CountOnly
 	)
@@ -126,40 +138,93 @@ function Get-ICTaskItems {
 	PROCESS {
 		$Endpoint = "userTaskItems"
 		$where['userTaskId'] = $TaskId
+		
+		if ($CountOnly) {
+			return (Get-ICAPI -Endpoint $Endpoint -where $where -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly)
+		}
+
 		Write-Verbose "Getting All TaskItems with TaskId $TaskId."
-	
-		if ($IncludeProgress -AND (-NOT $CountOnly)) {
-			$n = 1
+		$Items = Get-ICAPI -Endpoint $Endpoint -where $where -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly
+		ForEach ($item in $items) {
+			$item | Add-Member -Type NoteProperty -Name totalSeconds -Value $null
+			if ($item.endedOn) {
+				$item.totalSeconds = [math]::round(([datetime]$item.endedOn - [DateTime]$item.createdOn).TotalSeconds)
+			}
+
+			if ($item.type -eq "host-access" -OR $item.type -eq "enumeration") {
+				$type = $item.type
+				$item | Add-Member -Type NoteProperty -Name queryId -Value $null
+				$item | Add-Member -Type NoteProperty -Name queryName -Value $null
+				
+				if ($type -eq "enumeration") {
+					$item.queryId = $item.result.queryId
+				} 
+				elseif ($type -eq "host-access") {
+					Write-Verbose "Getting QueryId from job"
+					try { $j = Get-ICJob -Id $item.jobId } catch { }
+					$item.queryId = $j.data.queryId
+				}
+
+				if ($item.queryId) {
+					Write-Verbose "Getting QueryName"
+					$q = Get-ICQuery -Id $item.queryId
+					$item.queryName = $q.Name
+				}
+			}
+		}
+
+		if (-NOT $IncludeProgress) {
+			 
+			Write-Output $Items
+
+		} else {
+			$n = 0
 			if ($Id) {
 				$cnt = 1
 			} else {
 				$cnt = Get-ICAPI -Endpoint $Endpoint -where $where -CountOnly
 			}
 			Write-Verbose "Found $cnt TaskItems. Getting progress for each."
-			$items = Get-ICAPI -Endpoint $Endpoint -where $where -fields $fields -NoLimit:$NoLimit
-			$items | ForEach-Object {
+			ForEach ($item in $items) {
+				$item | Add-Member -Type NoteProperty -Name lastMessage -Value $null
+				if ($item.type -eq "host-access") {
+					$item | Add-Member -Type NoteProperty -Name accessible -Value $null
+				}
+
 				$n += 1
 				try { $pc = [math]::floor($n*100/$cnt); if ($pc -gt 100) { $pc = 100 } } catch { $pc = -1 }
-				if ($_.id) {
-					$progress = @()
-					Write-Progress -Id 101 -Activity "Enriching with Task Progress Information" -status "Getting progress on $($_.name) [$n of $cnt]" -PercentComplete $pc
-					Get-ICTaskItemProgress -taskItemId $_.id -fields "createdOn","text" | ForEach-Object {
-						$progress += [PSCustomObject]@{
-							createdOn = $_.createdOn
-							text = $_.text
+				if ($item.id) {
+					Write-Progress -Id 101 -Activity "Enriching with Task Progress Information" -status "Getting progress on $($item.name) [$n of $cnt]" -PercentComplete $pc
+					$progresstext = @()
+					_Get-ICTaskItemProgress -taskItemId $item.id | ForEach-Object {
+						$p = $_
+						$p | foreach-object {
+							$progresstext += "$($_.createdOn) - $($_.text)"	
+							if (-NOT $LastProgressMsg) {
+								$LastProgressMsg = "$($_.createdOn) - $($_.text)"
+							}
+							if ($type -eq "host-access" -AND $_.text -match "^ACCESSIBLE:") { 
+								$item.accessible = $true
+								$item.lastMessage = $_.text
+							}
+							elseif ($type -eq "host-access" -AND $_.text -match "^INACCESSIBLE:") { 
+								$item.accessible = $false
+								$item.lastMessage = $_.text
+							}																
 						}
 					}
-					$_ | Add-Member -MemberType "NoteProperty" -name "progress" -value $progress
+					if ($item.status -ne "complete" -AND -NOT $item.message) {
+						$item.lastMessage = $LastProgressMsg
+					}
+					$item | Add-Member -MemberType "NoteProperty" -name "progress" -value ([string[]]$progresstext)
 				}
 			}
 			Write-Output $items
-		} else {
-			Get-ICAPI -Endpoint $Endpoint -where $where -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly
 		}
 	}
 }
 
-function Get-ICTaskItemProgress {
+function _Get-ICTaskItemProgress {
 	[cmdletbinding()]
 	param(
 		[parameter(
@@ -167,15 +232,14 @@ function Get-ICTaskItemProgress {
 			ValueFromPipeline,
 			ValueFromPipelineByPropertyName)]
 		[ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
+		[alias('userTaskItemId')]
 		[alias('id')]
 		[String]$taskItemId,
 
 		[parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
-        [HashTable]$where=@{},
-        
-		[String[]]$fields,
-		[Switch]$NoLimit,
-		[Switch]$CountOnly
+		[HashTable]$where=@{},
+		
+        [Switch]$NoLimit
 	)
 
 	PROCESS {
@@ -186,20 +250,43 @@ function Get-ICTaskItemProgress {
 		} else {
 			$where['taskItemId'] = $taskItemId
 		}
-		Get-ICAPI -Endpoint $Endpoint -where $where -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly
+		Get-ICAPI -Endpoint $Endpoint -where $where -fields @("createdOn", "text") -NoLimit:$NoLimit | Sort-Object createdOn -Descending
 	}
+}
+
+function Wait-ICTask {
+	[cmdletbinding()]
+	param(
+		[parameter(
+			Mandatory,
+			ValueFromPipeline,
+			ValueFromPipelineByPropertyName)]
+		[ValidateScript( { if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid." } })]
+		[alias('id')]
+		[alias('userTaskId')]
+		[String]$TaskId,
+
+		[parameter()]
+		[Switch]$IncludeProgress,
+
+		[parameter(HelpMessage = "This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
+		[HashTable]$Where = @{ },
+		[String[]]$Fields,
+		[Switch]$NoLimit,
+		[Switch]$CountOnly
+	)
 }
 
 function Get-ICLastScanTask {
 	[cmdletbinding()]
 	param(
-		[parameter()]
-		[ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
-		[String]$targetGroupId,
-
-		[parameter()]
+		[parameter(Mandatory, Position=0)]
 		[ValidateSet("Scan", "Enumerate")]
-		[String]$Type = "Enumerate"
+		[String]$Type,
+
+		[parameter(Position=1)]
+		[ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
+		[String]$targetGroupId
 	)
 
 	if ($targetGroupId) {
@@ -221,33 +308,14 @@ function Get-ICLastScanTask {
 		}
 	}
 
-	$Progress = Get-ICTaskItems -TaskId $Task.id -IncludeProgress -NoLimit | Select-Object name, createdOn, endedOn, progress
-	$Progress | % {
-		$accessible = $false
-		if ($_.endedOn) {
-			$totalSeconds = [math]::round(([datetime]$_.endedOn - [DateTime]$_.createdOn).TotalSeconds)
-		}
-		$_ | Add-Member -MemberType NoteProperty -Name "totalSeconds" -Value $totalSeconds
-		try {
-			$Message = ($_.progress.text | select-string "ACCESSIBLE").ToString()
-			if ($Message -match "^ACCESSIBLE") {
-				$accessible = $true
-			}
-		} catch {}	
-		$_ | Add-Member -MemberType NoteProperty -Name "message" -Value $Message
-		$_ | Add-Member -MemberType NoteProperty -Name "accessible" -Value $accessible
-	}
-
-	if ($Task.endedOn) {
-		$totalTime = [math]::round(([datetime]$Task.endedOn - [DateTime]$Task.createdOn).TotalSeconds)
-	}
+	$Progress = Get-ICTaskItems -TaskId $Task.id -IncludeProgress -NoLimit
 
 	$result = @{
 		userTaskId = $Task.Id
 		name = $Task.name
 		createdOn = $Task.createdOn
 		endedOn = $Task.endedOn
-		totalSeconds = $totalTime
+		totalSeconds = $task.totalSeconds
 		status = $Task.status
 		type = $Task.type
 		accessibleCount = ($Progress | Where-Object { $_.Accessible }).count

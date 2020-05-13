@@ -81,15 +81,20 @@ Describe "Get-ICDwellTime" {
     }
 }
 
-Describe "Get-ICFileDetail" {
+Describe "Get-ICFileDetail and ICNotes" {
     BeforeAll {
-        $file = Get-ICObject -Type "Process" -where @{ name = "powershell.exe" } | select -First 1
+        $file = Get-ICObject -Type "Process" -where @{ commentCount = @{ gte = 1}} | select -First 1
     }
 
     It "Gets file details" {
         $r = Get-ICFileDetail -sha1 $file.fileRepId
         $r | Should -Not -Be $null
+        $r.commentCount | Should -BeOfType int
+    }
+
+    It "Gets file notes" {
+        $r = Get-ICNotes -sha1 $file.fileRepId
+        $r | Should -Not -Be $null
+        $r.createdBy | Should -Not -Be $null
     }
 }
-
-    

@@ -103,7 +103,7 @@ function Get-ICExtension {
             $n = 1
             $c = $ext.count
             $ext | ForEach-Object {
-                $pc = [math]::Floor(($n/$c)*100)
+                try { $pc = [math]::Floor(($n/$c)*100) } catch { $pc = -1 }
                 $guid = $_.description
                 Write-Progress -Activity "Getting Extentions from Infocyte API" -status "Requesting Body from Extension $n of $c" -PercentComplete $pc
                 $_ | Add-Member -TypeName NoteProperty -NotePropertyName guid -NotePropertyValue $guid
@@ -279,9 +279,13 @@ function Import-ICExtension {
         Write-Verbose "Looking up user: $($ext.createdBy) and $($ext.updatedBy)"
         $ext.createdBy = (Get-ICAPI -endpoint users -where @{ id = $ext.createdBy } -fields email -ea 0).email
         $ext.updatedBy = (Get-ICAPI -endpoint users -where @{ id = $ext.updatedBy } -fields email -ea 0).email
+        if ($ext.Description -match $GUID_REGEX) {
+            $ext | Add-Member -Type NoteProperty -Name guid -Value $ext.Description
+        }
         Write-Output $ext
     }
 }
+
 function Update-ICExtension {
     <#
         Updates an existing extension with a new body from a file or string.
@@ -380,6 +384,9 @@ function Update-ICExtension {
             Write-Verbose "Looking up user: $($ext.createdBy) and $($ext.updatedBy)"
             $ext.createdBy = (Get-ICAPI -endpoint users -where @{ id = $ext.createdBy } -fields email -ea 0).email
             $ext.updatedBy = (Get-ICAPI -endpoint users -where @{ id = $ext.updatedBy } -fields email -ea 0).email
+            if ($ext.Description -match $GUID_REGEX) {
+                $ext | Add-Member -Type NoteProperty -Name guid -Value $ext.Description
+            }
             Write-Output $ext
         }
     }
@@ -467,6 +474,7 @@ function Import-ICOfficialExtensions {
             Write-Error "Could not download extensions from https://api.github.com/repos/Infocyte/extensions/contents/contrib/action"
         }
     }
+    $Results = @()
     $Extensions | ForEach-Object {
         $filename = ($_.name -split "\.")[0]
         try {
@@ -484,17 +492,16 @@ function Import-ICOfficialExtensions {
         if ($existingExt) {
             if ($Update) {
                 Write-Verbose "Updating extension $($header.name) [$($existingExt.id)] with guid $($header.guid):`n$existingExt"
-                Update-ICExtension -Id $existingExt.id -Body $ext
+                Update-ICExtension -Id $existingExt.id -Body $ext | Select-Object id, name, type, guid, active, versionCount    
             }
             else {
                 Write-Warning "Extension $($header.name) [$($existingExt.id)] with guid $($header.guid) already exists. Try using -Update to update it."
             }
         } else {
             Write-Verbose "Importing extension $($header.name) [$($header.Type)] with guid $($header.guid)"
-            Import-ICExtension -Body $ext -Active -Type $header.Type -Force:$Force
+            Import-ICExtension -Body $ext -Active -Type $header.Type -Force:$Force | Select-Object id, name, type, guid, active, versionCount    
         }
     }
-    return $true    
 }
 
 # For Extension Developers
