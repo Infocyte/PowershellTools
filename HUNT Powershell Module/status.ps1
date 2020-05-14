@@ -264,17 +264,19 @@ function Wait-ICTask {
 		[ValidateScript( { if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid." } })]
 		[alias('id')]
 		[alias('userTaskId')]
-		[String]$TaskId,
-
-		[parameter()]
-		[Switch]$IncludeProgress,
-
-		[parameter(HelpMessage = "This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
-		[HashTable]$Where = @{ },
-		[String[]]$Fields,
-		[Switch]$NoLimit,
-		[Switch]$CountOnly
+		[String]$TaskId
 	)
+
+	BEGIN {}
+	PROCESS {
+		$Task = Get-ICTaskItems -TaskId $TaskId -IncludeProgress
+		while (-NOT $Task.complete) {
+			Start-Sleep 20
+			$Task = Get-ICTaskItems -TaskId $TaskId -IncludeProgress
+		}
+		return $true
+	}
+	END{}
 }
 
 function Get-ICLastScanTask {
@@ -318,9 +320,9 @@ function Get-ICLastScanTask {
 		totalSeconds = $task.totalSeconds
 		status = $Task.status
 		type = $Task.type
-		accessibleCount = ($Progress | Where-Object { $_.Accessible }).count
-		inaccessibleCount = ($Progress | Where-Object { -NOT $_.Accessible }).count
-		totalItems = $Progress.count
+		accessibleCount 	= ([Array]($Progress | Where-Object { $_.Accessible })).count
+		inaccessibleCount 	= ([Array]($Progress | Where-Object { -NOT $_.Accessible })).count
+		totalItems        	= ([Array]$Progress).count
 		items = $Progress
 	}
 	$result['coverage'] = try { [math]::Round(($($result.accessibleCount)/$($result.totalItems)), 2) } catch { $null }
