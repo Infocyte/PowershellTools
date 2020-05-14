@@ -186,6 +186,58 @@ function Get-ICObject {
     }
 }
 
+function Get-ICExtensionResult {
+    [cmdletbinding()]
+    param(
+        [parameter(
+            ValueFromPipeline,
+            ValueFromPipelineByPropertyName
+        )]
+        [ValidateNotNullOrEmpty()]
+        [int]$Id,
+
+        [Switch]$AllLog
+    )
+
+    PROCESS {
+        $result = Get-ICAPI -endpoint "boxExtensionInstances\$id" -fields id,extensionId,extensionVersionId,output,outputString,hostScanId,success,threatStatus,compromised,name,hostId,scanId,scannedOn,hostname,ip,boxId
+            $result.output = $result.output.output
+            $OutputString = @()
+            $result.output | % {
+                $OutputString += $_.entry
+            }        
+            $result.outputString = $OutputString
+
+        if ($AllLog){
+            $n = 0
+            $result | % { 
+                $i = $_; 
+                $_.outputString | % { 
+                    $item = [PSCustomObject]@{
+                        id = "$($i.id)-$n"
+                        extensionInstanceId = $i.id
+                        extensionName = $i.name
+                        extensionId = $i.extensionId
+                        extensionVersionId = $i.extensionVersionId
+                        hostname = $i.hostname
+                        ip = $i.ip
+                        message = $_
+                        success = $i.success
+                        threatStatus = $i.threatStatus
+                        scannedOn = $i.scannedOn
+                        hostId = $i.hostId
+                        scanId = $i.scanId
+                    }
+                    Write-Output $item       
+                    $n += 1
+                }
+            }
+        } else {
+            Write-Output $result
+        }		 
+    }
+}
+
 function Get-ICVulnerability {
     [cmdletbinding()]
     param(
