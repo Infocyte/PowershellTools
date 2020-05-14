@@ -186,6 +186,58 @@ function Get-ICObject {
     }
 }
 
+function Get-ICExtensionResult {
+    [cmdletbinding()]
+    param(
+        [parameter(
+            ValueFromPipeline,
+            ValueFromPipelineByPropertyName
+        )]
+        [ValidateNotNullOrEmpty()]
+        [int]$Id,
+
+        [Switch]$AllLog
+    )
+
+    PROCESS {
+        $result = Get-ICAPI -endpoint "boxExtensionInstances\$id" -fields id,extensionId,extensionVersionId,output,outputString,hostScanId,success,threatStatus,compromised,name,hostId,scanId,scannedOn,hostname,ip,boxId
+            $result.output = $result.output.output
+            $OutputString = @()
+            $result.output | % {
+                $OutputString += $_.entry
+            }        
+            $result.outputString = $OutputString
+
+        if ($AllLog){
+            $n = 0
+            $result | % { 
+                $i = $_; 
+                $_.outputString | % { 
+                    $item = [PSCustomObject]@{
+                        id = "$($i.id)-$n"
+                        extensionInstanceId = $i.id
+                        extensionName = $i.name
+                        extensionId = $i.extensionId
+                        extensionVersionId = $i.extensionVersionId
+                        hostname = $i.hostname
+                        ip = $i.ip
+                        message = $_
+                        success = $i.success
+                        threatStatus = $i.threatStatus
+                        scannedOn = $i.scannedOn
+                        hostId = $i.hostId
+                        scanId = $i.scanId
+                    }
+                    Write-Output $item       
+                    $n += 1
+                }
+            }
+        } else {
+            Write-Output $result
+        }		 
+    }
+}
+
 function Get-ICVulnerability {
     [cmdletbinding()]
     param(
@@ -311,7 +363,43 @@ function Get-ICFileDetail {
     )
     PROCESS {
         Write-Verbose "Requesting FileReport on file with SHA1: $sha1"
-        Get-ICAPI -Endpoint "FileReps/$sha1"
+        $fileReport = Get-ICAPI -Endpoint "FileReps/$sha1" -fields $fields
+        $notes = Get-ICNotes -relatedId $sha1
+        if ($notes.count -eq $null) {
+            $cnt = 1
+        } else {
+            $cnt = $notes.count
+        }
+        $fileReport | Add-Member -Type NoteProperty -name CommentCount -value $cnt
+        $fileReport | Add-Member -Type NoteProperty -name Comments -value $notes
+        return $fileReport
+    }
+}
+
+function Get-ICNotes {
+    Param(
+        [parameter(Mandatory=$true, ValueFromPipeline, ValueFromPipelineByPropertyName)]
+        [ValidateScript({ if ($_ -match "\b[0-9a-f]{40}\b") { $true } else { throw "Incorrect input: $_.  Requires a relatedId or fileRepId (sha1) of 40 characters."} })]
+        [alias('fileRepId')]
+        [alias('sha1')]
+        [String]$relatedId,
+
+        [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter")]
+        [HashTable]$where
+    )
+    
+    PROCESS {
+        Write-Verbose "Getting notes/comments on object with id: $relatedId"
+        if (-NOT $where -AND $relatedId) {
+            $where += @{ relatedId = $relatedId }
+        }
+        $comments = Get-ICAPI -Endpoint "userComments" -where $where
+        $comments | ForEach-Object {
+            Write-Verbose "Looking up user: $($_.userId)"
+            $_ | Add-Member -Type Noteproperty -Name createdBy -Value (Get-ICAPI -endpoint users -where @{ id = $_.userId } -fields email -ea 0).email
+        }
+        $comments | Write-Output
+
     }
 }
 
@@ -326,6 +414,9 @@ function Get-ICAlert {
         [Switch]$IncludeArchived,
         [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
+
+        [parameter(HelpMessage="The field or fields to return.")]
+        [String[]]$fields,
         
         [Switch]$NoLimit,
         [Switch]$CountOnly
@@ -340,7 +431,7 @@ function Get-ICAlert {
         if (-NOT ($IncludeArchived -OR $Where['archived'])) {
             $Where += @{ archived = $FALSE }
         }
-        Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit -CountOnly:$CountOnly
+        Get-ICAPI -Endpoint $Endpoint -where $where -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly
     }
 }
 

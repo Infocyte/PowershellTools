@@ -1,5 +1,5 @@
 #Variables
-$Version = "1.4.0" 
+$Version = "1.4.2" 
 $GUID_REGEX = "^[A-Z0-9]{8}-([A-Z0-9]{4}-){3}[A-Z0-9]{12}$"
 
 Write-Verbose "Importing Infocyte HUNT API Powershell Module"
@@ -44,7 +44,7 @@ function Get-ICHelp {
 
     Write-Host "Analysis Data Retrieval Functions:"
     Write-Host -ForegroundColor Cyan "`tGet-ICBox, Set-ICBox,"
-    Write-Host -ForegroundColor Cyan "`tGet-ICObject (alias: Get-ICData), Get-ICVulnerability,"
+    Write-Host -ForegroundColor Cyan "`tGet-ICObject (alias: Get-ICData), Get-ICExtensionResult, Get-ICVulnerability, Get-ICNotes,"
     Write-Host -ForegroundColor Cyan "`tGet-ICAlert, Get-ICFileDetail, Get-ICActivityTrace`n"
 
     Write-Host "Scanning Functions:"

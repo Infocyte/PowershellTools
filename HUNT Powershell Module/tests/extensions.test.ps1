@@ -62,8 +62,6 @@ Describe "ICExtensions" {
     
         It "Imports all the official extensions" {
             $r = Import-ICOfficialExtensions
-            $r | Should -Be $true
-
             $r = Get-ICExtension
             $r.count | Should -GE 12
         }

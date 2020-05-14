@@ -60,19 +60,26 @@ function Invoke-ICScan {
 		[parameter(
 			Mandatory=$false, 
 			ParameterSetName = 'extensionIds')]
-		[String[]]$ExtensionIds = @()
+		[String[]]$ExtensionIds = @(),
+
+		
+        [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
+        [HashTable]$where
 	)
+
 	$TargetGroup = Get-ICTargetGroup -Id $TargetGroupId
 	if (-NOT $TargetGroup) {
 		Throw "TargetGroup with id $TargetGroupId does not exist!"
 	}
+
 	if ($FindHosts) {
 		Write-Progress -Activity "Performing discovery on $($TargetGroup.name)"
 		$stillactive = $true
-		$UserTask = Invoke-ICFindHosts -TargetGroupId $TargetGroupId
+		$UserTask = Invoke-ICFindHosts -TargetGroupId $TargetGroupId -where $where
 		While ($stillactive) {
-			Start-Sleep 10
-			$taskstatus = Get-ICUserTask -Id $UserTask.userTaskId -where @{ createdOn = @{ gt = (Get-Date).AddHours(-10) }; name = @{ regexp = $TargetGroup.name } } | Select-Object -first 1
+			Start-Sleep 20
+			# -where @{ createdOn = @{ gt = (Get-Date).AddHours(-10) }; name = @{ regexp = $TargetGroup.name } } 
+			$taskstatus = Get-ICUserTask -Id $UserTask.userTaskId
 			if ($taskstatus.status -eq "Active") {
 				Write-Progress -Activity "Performing discovery on $($TargetGroup.name)" -PercentComplete $($taskstatus.progress)
 			} elseif ($taskstatus.status -eq "Completed") {
@@ -94,7 +101,15 @@ function Invoke-ICScan {
 		$ScanOptions = New-ICScanOptions -ExtensionIds $ExtensionIds
 		$body = @{ options = $ScanOptions }
 	}
-	Invoke-ICAPI -Endpoint $Endpoint -body $body -method POST
+	if ($where) {
+		$body += @{ where = $where }
+	}
+	try {
+		Invoke-ICAPI -Endpoint $Endpoint -body $body -method POST
+	} catch {
+		Write-Error "Server Error. Could not find target with given filters: $($where | convertto-json -compress)"
+		return
+	}
 }
 
 function Invoke-ICFindHosts {
@@ -106,7 +121,10 @@ function Invoke-ICFindHosts {
 		[String]$TargetGroupId,
 
         [parameter()]
-		[String[]]$queryId
+		[String[]]$queryId,
+
+		[parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
+        [HashTable]$where
 	)
 	$TargetGroup = Get-ICTargetGroup -Id $TargetGroupId
 	$Queries = Get-ICQuery -TargetGroupId $TargetGroupId
@@ -126,6 +144,9 @@ function Invoke-ICFindHosts {
 			$body['queries'] += $Queries.Id
 		}
         Write-Verbose "Starting Enumeration of $($TargetGroup.name) with all associated queries.`n$($body['queries'] | convertto-json)"
+	}
+	if ($where) {
+		$body['where'] += $where
 	}
     Invoke-ICAPI -Endpoint $Endpoint -body $body -method POST
 }
@@ -180,7 +201,8 @@ function Invoke-ICScanTarget {
             $tg = Get-ICTargetGroup -where @{ name = $TargetGroupName}
             if (-NOT $tg) {
                 $tg = New-ICTargetGroup -Name $TargetGroupName -Force
-            }
+			}
+			$targetGroupId = $tg.id
 	        $body['targetGroup'] = @{ id = $tg.id }
 	    }
 
@@ -218,59 +240,114 @@ function Invoke-ICScanTarget {
 			$body['options'] = $ScanOptions
 		}
 
+		# Check for active agent
+		if (-NOT $body['credential']) {
+			$agent = Get-ICAgent -where @{ authorized = $true; or = @(  @{ hostname = $target }, @{ ipstring = $target }) }
+			if (-NOT $agent.active) {
+				#Check Address Table
+				$Addr = Get-ICAddress -targetId $targetGroupId -where @{ accessible = $true; or = @(  @{ hostname = $target }, @{ ipstring = $target }) } | Sort-Object lastAccessedOn -Descending | Select-Object -First 1
+				if (-NOT $addr) {
+					$Addr2 = Get-ICAddress -where @{ accessible = $true; or = @(  @{ hostname = $target }, @{ ipstring = $target }) } | Sort-Object lastAccessedOn -Descending | Select-Object -First 1
+					if ($Addr2) {
+						$ht = @{ }
+						$addr2.psobject.properties | ForEach-Object { $ht[$_.Name] = $_.Value }
+						$ht.Remove('id')
+						$ht.Remove('queryId')
+						$ht.Remove('taskId')
+						$ht['targetId'] = $TargetGroupId
+						$Addr = Invoke-ICAPI -Endpoint "Addresses" -Method POST -Body $ht			
+					}
+				}
+				if ($Addr) {
+					$where = @{ id = $Addr.id }
+					return Invoke-ICScan -TargetGroupId $TargetGroupId -ScanOptions $ScanOptions -where $where 
+				} else {
+					Write-Error "$target was not found with an active agent or accessible address within a Target Group."
+					return
+				}
+			}
+		}
+
 		# Initiating Scan
 		$Endpoint = "targets/scan"
 		Write-Verbose "Starting Scan of target $($target)"
-		$scanTask = Invoke-ICAPI -Endpoint $Endpoint -body $body -method POST
-		return [PSCustomObject]@{ userTaskId = $scanTask.scanTaskId } 
+		try {
+			$scanTask = Invoke-ICAPI -Endpoint $Endpoint -body $body -method POST
+			return [PSCustomObject]@{ userTaskId = $scanTask.scanTaskId } 
+		} catch {
+			Write-Error "$target was not found with an active agent or Target Group address entry."
+			return
+		}
 	}
 }
 
+enum ScanOptions {
+	process     
+	module       
+	driver       
+	memory       
+	account  
+	artifact
+	autostart
+	application
+	installed
+	hook
+	network
+	events
+}
+
 function New-ICScanOptions {
+	[cmdletbinding(DefaultParameterSetName = 'Options')]
     param(
-		[parameter(Mandatory=$false,
-			ValueFromPipeLine)]
+		[parameter(Mandatory=$false)]
 		[ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [String[]]$ExtensionIds,
 
-        [Switch]$ExtensionsOnly
-    )
-    BEGIN {
-        $ExtIds = @()
-    }
-    PROCESS {
-		if ($_) { $ExtIds += $_.ToString() }
-    }
-    END {
-        if (-NOT $ExtIds) {
-            $ExtIds = $ExtensionIds
-        }
-    	Write-Verbose 'ScanOption object properties should be set ($True or $False) and then passed into Invoke-ICScan or Add-ICScanSchedule'
-        if ($ExtensionsOnly) {
-            $default = $false
-        } else {
-            $default = $true
-        }
-    	$options = @{
-			process = $default
-			module = $default
-			driver = $default
-			memory = $default
-			account = $default
-    		artifact = $default
-    		autostart = $default
-			application = $default
-			installed = $false
-    		hook = $false
-    		network = $default
-            events = $default
+		[Parameter(ParameterSetName="Empty")]
+		[Switch]$Empty,
+
+		[parameter(ParameterSetName="Options")]
+		[ScanOptions[]]$Options
+
+	)
+
+	END {
+		Write-Verbose 'ScanOption object properties should be set ($True or $False) and then passed into Invoke-ICScan or Add-ICScanSchedule'
+		if ($Empty -OR $Options) {
+			$default = $false
+		}
+		else {
+			$default = $true
+		}
+		$opts = @{
+			process      = $default
+			module       = $default
+			driver       = $default
+			memory       = $default
+			account      = $default
+			artifact     = $default
+			autostart    = $default
+			application  = $default
+			installed    = $false
+			hook         = $false
+			network      = $default
+			events       = $default
 			extensionIds = @()
-        }
-        if ($ExtIds) {
-            $options['extensionIds'] = $ExtIds
-        }
-    	return [PSCustomObject]$options
-    }
+		}
+	
+		if ($Options) {
+			$Options | ForEach-Object {
+				Write-Verbose "Changing $_ to True"
+				$opts["$_"] = $true
+			}
+		}
+
+		if ($ExtensionIds) {
+			$opts['extensionIds'] = $ExtensionIds
+		}
+	
+		return [PSCustomObject]$opts
+	}
 }
 
 
@@ -278,15 +355,19 @@ function Invoke-ICResponse {
 	[cmdletbinding(DefaultParameterSetName = 'ByName')]
 	param(
 		[parameter(
-			Mandatory=$true, 
-			ValueFromPipeline=$true)]
+			Mandatory, 
+			ValueFromPipeline,
+			ValueFromPipelineByPropertyName)]
 		[ValidateNotNullOrEmpty()]
+		[alias("ip")]
+		[alias("hostname")]
 		[String]$Target,
 
 		[parameter()]
 		[ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
 		#[ValidatePattern("^(([0-9a-fA-F]){8}-([0-9a-fA-F]){4}-([0-9a-fA-F]){4}-([0-9a-fA-F]){4}-([0-9a-fA-F]){12})$")]
 		[String]$TargetGroupId,
+
 		[parameter()]
 		[String]$TargetGroupName = "OnDemand",
 
@@ -295,65 +376,38 @@ function Invoke-ICResponse {
 			ParameterSetName = 'ById')]
 		[ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
 		[String]$ExtensionId,
+
 		[parameter(
 			Mandatory=$true, 
 			ParameterSetName = 'ByName')]
 		[ValidateNotNullOrEmpty()]
 		[String]$ExtensionName
 	)
-	PROCESS {
-		if (-NOT $target -AND $_) {
-			Write-Debug "Taking input from raw pipeline (`$_): $_."
-			$target = $_
-		}
-		$body = @{
-	        target = $target
-		}
-		
-		# Select Target targetgroup
-		if ($TargetGroupId) {
-			$TargetGroup = Get-ICTargetGroup -Id $TargetGroupId
-			if (-NOT $TargetGroup) {
-				Throw "TargetGroup with id $TargetGroupid does not exist!"
-			} else {
-	            $body['targetGroup'] = @{ id = $targetGroupId}
-	        }
-		} else {
-	        Write-Verbose "Using Target Group Name [$TargetGroupName] -- will be created if it does not exist."
-            $tg = Get-ICTargetGroup -where @{ name = $TargetGroupName}
-            if (-NOT $tg) {
-                $tg = New-ICTargetGroup -Name $TargetGroupName -Force
-            }
-	        $body['targetGroup'] = @{ id = $tg.id }
-		}
-		
+
+	BEGIN {
 		if ($ExtensionId) {
 			$Ext = Get-ICExtension -Id $ExtensionId
 			if (-NOT $Ext) {
-				Write-Error "Extension with id $ExtensionId does not exist!"
-				return
+				Throw "Extension with id $ExtensionId does not exist!"
 			}
 			$ExtensionName = $Ext.name
 		}
 		else {
 			$Ext = Get-ICExtension -where @{ name = $ExtensionName } | Select-Object -First 1
 			if (-NOT $Ext) {
-				Write-Error "Extension with name $ExtensionName does not exist!"
-				return
+				Throw "Extension with name $ExtensionName does not exist!"
 			}
 			$ExtensionId = $Ext.Id
 		}
 		
-		$ScanOpts = New-ICScanOptions -ExtensionsOnly -ExtensionIds $ExtensionId
-		$ScanOpts.process = $true # remove when bug fixed
-		$ScanOpts.account = $true
-		$Body['options'] = $ScanOpts
-		
-		# Initiating Scan
-		$Endpoint = "targets/scan"
-		Write-Verbose "Executing response action $ExtensionName on target: $target"
-		$scanTask = Invoke-ICAPI -Endpoint $Endpoint -body $body -method POST
-		return [PSCustomObject]@{ userTaskId = $scanTask.scanTaskId } 
+		$ScanOptions = New-ICScanOptions -Empty -ExtensionIds $ExtensionId
+		$ScanOptions.process = $true # remove when bug fixed
+		$ScanOptions.account = $true
+	}
+
+	PROCESS {
+		$task = Invoke-ICScanTarget -target $target -TargetGroupId $TargetGroupId -TargetGroupName $TargetGroupName -ScanOptions $ScanOptions
+		return $task
 	}
 }
 

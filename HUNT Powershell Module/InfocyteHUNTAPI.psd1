@@ -8,7 +8,7 @@
 RootModule = 'InfocyteHUNTAPI.psm1'
 
 # Version number of this module.
-ModuleVersion = '1.4.0'
+ModuleVersion = '1.4.2'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -29,7 +29,7 @@ Copyright = '(c) 2019 Infocyte, Inc. All rights reserved.'
 Description = 'Functions and Cmdlets to interface with the Infocyte HUNT API'
 
 # Minimum version of the Windows PowerShell engine required by this module
-PowerShellVersion = '5.0'
+PowerShellVersion = '5.1'
 
 # Name of the Windows PowerShell host required by this module
 # PowerShellHostName = ''
@@ -75,11 +75,13 @@ FunctionsToExport = @(
     "Invoke-ICResponse",
     "Import-ICSurvey",
     "Get-ICObject",
+    "Get-ICExtensionResult",
     "Get-ICAlert",
     "Get-ICApplication",
     "Get-ICVulnerability",
     "Get-ICActivityTrace",
     "Get-ICFileDetail",
+    "Get-ICNotes",
     "New-ICToken",
     "New-ICTargetGroup",
     "Get-ICTargetGroup",

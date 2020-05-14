@@ -40,19 +40,19 @@ Describe "Get-ICLastScanTask" {
     }
 
     It "It gets the last enumerate task" {
-        $r = Get-ICLastScanTask
+        $r = Get-ICLastScanTask -type "Enumerate"
         $r.type | Should -Be "Enumerate"
         $r[0].userTaskId | Should -Match $GUID_REGEX  
-        $r.count | Should -BeExactly 1
+        ([array]$r).count | Should -BeExactly 1
     }
 
     It "It gets the last scan task" {
         $r = Get-ICLastScanTask -type "Scan"
         $r.type | Should -Be "Scan"
         $r[0].userTaskId | Should -Match $GUID_REGEX  
-        $r.count | Should -BeExactly 1
+        ([array]$r).count | Should -BeExactly 1
 
-        $r  = Get-ICTargetGroup -targetGroupId $task.relatedId
+        $r = Get-ICTargetGroup -targetGroupId $task.relatedId
         $r.controllerGroupId | Should -Match $GUID_REGEX  
     }
 

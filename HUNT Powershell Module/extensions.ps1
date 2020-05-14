@@ -1,45 +1,42 @@
 
 function Get-ICExtension {
-    [cmdletbinding(DefaultParameterSetName='List')]
+    [cmdletbinding(DefaultParameterSetName="List")]
     Param(
         [parameter(
-            Mandatory = $true, 
-            ValueFromPipeline = $true, 
-            ParameterSetName = 'Id')]
+            Mandatory, 
+            ValueFromPipeline,
+            ParameterSetName='Id')]
         [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('extensionId')]
         [String]$Id,
 
         [parameter(
-            Mandatory = $true, 
-            ValueFromPipeline = $true, 
-            ParameterSetName = 'guid')]
-        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
+            ParameterSetName='Guid')]
         [String]$Guid,
         
         [parameter(
-            ParameterSetName = 'Id')]
+            ParameterSetName='Id')]
         [parameter(
-            ParameterSetName = 'guid')]
+            ParameterSetName='Guid')]
         [Parameter(
-            ParameterSetName = 'List')]
+            ParameterSetName='List')]
         [Switch]$IncludeBody,
 
         [parameter(
-            ParameterSetName = 'List',
+            ParameterSetName='List',
             HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
 
         [parameter(
-            ParameterSetName = 'List')]
+            ParameterSetName='List')]
         [Switch]$NoLimit,
 
         [parameter(
-            ParameterSetName = 'List')]
+            ParameterSetName='List')]
         [Switch]$CountOnly,
 
         [Parameter(
-            ParameterSetName = 'Id',
+            ParameterSetName='Id',
             HelpMessage = "Filepath and name to save extension to. Recommending ending as .lua")]
         [ValidateScript( { Test-Path -Path $_ -IsValid })]
         [String]$SavePath
@@ -103,7 +100,7 @@ function Get-ICExtension {
             $n = 1
             $c = $ext.count
             $ext | ForEach-Object {
-                $pc = [math]::Floor(($n/$c)*100)
+                try { $pc = [math]::Floor(($n/$c)*100) } catch { $pc = -1 }
                 $guid = $_.description
                 Write-Progress -Activity "Getting Extentions from Infocyte API" -status "Requesting Body from Extension $n of $c" -PercentComplete $pc
                 $_ | Add-Member -TypeName NoteProperty -NotePropertyName guid -NotePropertyValue $guid
@@ -279,9 +276,13 @@ function Import-ICExtension {
         Write-Verbose "Looking up user: $($ext.createdBy) and $($ext.updatedBy)"
         $ext.createdBy = (Get-ICAPI -endpoint users -where @{ id = $ext.createdBy } -fields email -ea 0).email
         $ext.updatedBy = (Get-ICAPI -endpoint users -where @{ id = $ext.updatedBy } -fields email -ea 0).email
+        if ($ext.Description -match $GUID_REGEX) {
+            $ext | Add-Member -Type NoteProperty -Name guid -Value $ext.Description
+        }
         Write-Output $ext
     }
 }
+
 function Update-ICExtension {
     <#
         Updates an existing extension with a new body from a file or string.
@@ -380,6 +381,9 @@ function Update-ICExtension {
             Write-Verbose "Looking up user: $($ext.createdBy) and $($ext.updatedBy)"
             $ext.createdBy = (Get-ICAPI -endpoint users -where @{ id = $ext.createdBy } -fields email -ea 0).email
             $ext.updatedBy = (Get-ICAPI -endpoint users -where @{ id = $ext.updatedBy } -fields email -ea 0).email
+            if ($ext.Description -match $GUID_REGEX) {
+                $ext | Add-Member -Type NoteProperty -Name guid -Value $ext.Description
+            }
             Write-Output $ext
         }
     }
@@ -467,6 +471,7 @@ function Import-ICOfficialExtensions {
             Write-Error "Could not download extensions from https://api.github.com/repos/Infocyte/extensions/contents/contrib/action"
         }
     }
+    $Results = @()
     $Extensions | ForEach-Object {
         $filename = ($_.name -split "\.")[0]
         try {
@@ -484,17 +489,16 @@ function Import-ICOfficialExtensions {
         if ($existingExt) {
             if ($Update) {
                 Write-Verbose "Updating extension $($header.name) [$($existingExt.id)] with guid $($header.guid):`n$existingExt"
-                Update-ICExtension -Id $existingExt.id -Body $ext
+                Update-ICExtension -Id $existingExt.id -Body $ext | Select-Object id, name, type, guid, active, versionCount    
             }
             else {
                 Write-Warning "Extension $($header.name) [$($existingExt.id)] with guid $($header.guid) already exists. Try using -Update to update it."
             }
         } else {
             Write-Verbose "Importing extension $($header.name) [$($header.Type)] with guid $($header.guid)"
-            Import-ICExtension -Body $ext -Active -Type $header.Type -Force:$Force
+            Import-ICExtension -Body $ext -Active -Type $header.Type -Force:$Force | Select-Object id, name, type, guid, active, versionCount    
         }
     }
-    return $true    
 }
 
 # For Extension Developers
