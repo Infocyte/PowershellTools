@@ -1,45 +1,42 @@
 
 function Get-ICExtension {
-    [cmdletbinding(DefaultParameterSetName='List')]
+    [cmdletbinding(DefaultParameterSetName="List")]
     Param(
         [parameter(
-            Mandatory = $true, 
-            ValueFromPipeline = $true, 
-            ParameterSetName = 'Id')]
+            Mandatory, 
+            ValueFromPipeline,
+            ParameterSetName='Id')]
         [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('extensionId')]
         [String]$Id,
 
         [parameter(
-            Mandatory = $true, 
-            ValueFromPipeline = $true, 
-            ParameterSetName = 'guid')]
-        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
+            ParameterSetName='Guid')]
         [String]$Guid,
         
         [parameter(
-            ParameterSetName = 'Id')]
+            ParameterSetName='Id')]
         [parameter(
-            ParameterSetName = 'guid')]
+            ParameterSetName='Guid')]
         [Parameter(
-            ParameterSetName = 'List')]
+            ParameterSetName='List')]
         [Switch]$IncludeBody,
 
         [parameter(
-            ParameterSetName = 'List',
+            ParameterSetName='List',
             HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
 
         [parameter(
-            ParameterSetName = 'List')]
+            ParameterSetName='List')]
         [Switch]$NoLimit,
 
         [parameter(
-            ParameterSetName = 'List')]
+            ParameterSetName='List')]
         [Switch]$CountOnly,
 
         [Parameter(
-            ParameterSetName = 'Id',
+            ParameterSetName='Id',
             HelpMessage = "Filepath and name to save extension to. Recommending ending as .lua")]
         [ValidateScript( { Test-Path -Path $_ -IsValid })]
         [String]$SavePath

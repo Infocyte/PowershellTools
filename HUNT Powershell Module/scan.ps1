@@ -355,15 +355,19 @@ function Invoke-ICResponse {
 	[cmdletbinding(DefaultParameterSetName = 'ByName')]
 	param(
 		[parameter(
-			Mandatory=$true, 
-			ValueFromPipeline=$true)]
+			Mandatory, 
+			ValueFromPipeline,
+			ValueFromPipelineByPropertyName)]
 		[ValidateNotNullOrEmpty()]
+		[alias("ip")]
+		[alias("hostname")]
 		[String]$Target,
 
 		[parameter()]
 		[ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
 		#[ValidatePattern("^(([0-9a-fA-F]){8}-([0-9a-fA-F]){4}-([0-9a-fA-F]){4}-([0-9a-fA-F]){4}-([0-9a-fA-F]){12})$")]
 		[String]$TargetGroupId,
+
 		[parameter()]
 		[String]$TargetGroupName = "OnDemand",
 
@@ -372,53 +376,26 @@ function Invoke-ICResponse {
 			ParameterSetName = 'ById')]
 		[ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
 		[String]$ExtensionId,
-		
+
 		[parameter(
 			Mandatory=$true, 
 			ParameterSetName = 'ByName')]
 		[ValidateNotNullOrEmpty()]
 		[String]$ExtensionName
 	)
-	PROCESS {
-		if (-NOT $target -AND $_) {
-			Write-Debug "Taking input from raw pipeline (`$_): $_."
-			$target = $_
-		}
-		$body = @{
-	        target = $target
-		}
-		
-		# Select Target targetgroup
-		if ($TargetGroupId) {
-			$TargetGroup = Get-ICTargetGroup -Id $TargetGroupId
-			if (-NOT $TargetGroup) {
-				Throw "TargetGroup with id $TargetGroupid does not exist!"
-			} else {
-	            $body['targetGroup'] = @{ id = $targetGroupId}
-	        }
-		} else {
-	        Write-Verbose "Using Target Group Name [$TargetGroupName] -- will be created if it does not exist."
-            $tg = Get-ICTargetGroup -where @{ name = $TargetGroupName}
-            if (-NOT $tg) {
-                $tg = New-ICTargetGroup -Name $TargetGroupName -Force
-            }
-			$body['targetGroup'] = @{ id = $tg.id }
-			$targetGroupId  = $tg.id
-		}
-		
+
+	BEGIN {
 		if ($ExtensionId) {
 			$Ext = Get-ICExtension -Id $ExtensionId
 			if (-NOT $Ext) {
-				Write-Error "Extension with id $ExtensionId does not exist!"
-				return
+				Throw "Extension with id $ExtensionId does not exist!"
 			}
 			$ExtensionName = $Ext.name
 		}
 		else {
 			$Ext = Get-ICExtension -where @{ name = $ExtensionName } | Select-Object -First 1
 			if (-NOT $Ext) {
-				Write-Error "Extension with name $ExtensionName does not exist!"
-				return
+				Throw "Extension with name $ExtensionName does not exist!"
 			}
 			$ExtensionId = $Ext.Id
 		}
@@ -426,53 +403,11 @@ function Invoke-ICResponse {
 		$ScanOptions = New-ICScanOptions -Empty -ExtensionIds $ExtensionId
 		$ScanOptions.process = $true # remove when bug fixed
 		$ScanOptions.account = $true
-		$Body['options'] = $ScanOptions
+	}
 
-		# Check for active agent
-		if (-NOT $body['credential']) {
-			Write-Verbose "No credential provided, checking agent table."
-			$agent = Get-ICAgent -where @{ authorized = $true; or = @(  @{ hostname = $target }, @{ ipstring = $target }) }
-			if ($agent.installed -AND -NOT $agent.active) {
-				throw "$Target has an associated agent but is not active"
-			}
-			elseif (-NOT $agent.active) {
-				#Check Address Table
-				$Addr = Get-ICAddress -targetId $targetGroupId -where @{ accessible = $true; or = @(  @{ hostname = $target }, @{ ipstring = $target }) } | Sort-Object lastAccessedOn -Descending | Select-Object -First 1
-				if (-NOT $addr) {
-					$Addr2 = Get-ICAddress -where @{ accessible = $true; or = @(  @{ hostname = $target }, @{ ipstring = $target }) } | Sort-Object lastAccessedOn -Descending | Select-Object -First 1
-					if ($Addr2) {
-						$ht = @{ }
-						$addr2.psobject.properties | ForEach-Object { $ht[$_.Name] = $_.Value }
-						$ht.Remove('id')
-						$ht.Remove('queryId')
-						$ht.Remove('taskId')
-						$ht['targetId'] = $TargetGroupId
-						$Addr = Invoke-ICAPI -Endpoint "Addresses" -Method POST -Body $ht			
-						Write-Verbose "New Address Created in TargetGroup: $TargetGroupId`n$NewAddr"
-					}
-				}
-				if ($Addr) {
-					$where = @{ id = $Addr.id }
-					return Invoke-ICScan -TargetGroupId $TargetGroupId -ScanOptions $ScanOptions -where $where 
-				}
-				else {
-					Write-Error "$target was not found with an active agent or accessible address within a Target Group."
-					return
-				}
-			}
-		}
-
-		# Initiating Scan
-		$Endpoint = "targets/scan"
-		Write-Verbose "Executing response action $ExtensionName on target: $target"
-		try {
-			$scanTask = Invoke-ICAPI -Endpoint $Endpoint -body $body -method POST
-			return [PSCustomObject]@{ userTaskId = $scanTask.scanTaskId } 
-		}
-		catch {
-			Write-Error "$target was not found with an active agent or Target Group address entry."
-			return
-		}
+	PROCESS {
+		$task = Invoke-ICScanTarget -target $target -TargetGroupId $TargetGroupId -TargetGroupName $TargetGroupName -ScanOptions $ScanOptions
+		return $task
 	}
 }
 

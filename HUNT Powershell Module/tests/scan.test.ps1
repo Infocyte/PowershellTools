@@ -57,8 +57,9 @@ Describe "ICFindHosts and ICScan" {
     }
 
     It "Returns null on a scan on a target group with an unmatched filter" {
-        $r = Invoke-ICSCan -TargetGroupId $TgId -where @{ hostname = "fake" } -ErrorAction SilentlyContinue
-        $error[0].Exception.Message | Should -Match "Could not find target with given filters"
+        $r = Invoke-ICSCan -TargetGroupId $TgId -where @{ hostname = "fake" } -ErrorVariable err
+        $err.count | Should -Not -Be 0
+        $err[0].Exception.Message | Should -Match ".*Could not find target with given filters.*"
         $r | Should -Be $null
     }
 
@@ -88,11 +89,9 @@ Describe "ICScanTarget and ICResponse" {
     It "Invokes a scan on a single target" {
         $r = Invoke-ICScanTarget -target $testhost
         $r.userTaskId | Should -Match $GUID_REGEX
-    }
-
-    It "Returns null for a scan on a non-existant target" {
-        $r = Invoke-ICScanTarget -target "fake"
-        $r.userTaskId | Should -Be $null
+        Start-Sleep 2
+        $task = Get-ICTask -id $r.userTaskId
+        $task.status | Should -Be "Active"
     }
 
     It "Invokes a response on a target by extensionId" {
@@ -100,18 +99,25 @@ Describe "ICScanTarget and ICResponse" {
         $r.userTaskId | Should -Match $GUID_REGEX
     }
 
-    It "Returns null on a response on a target using non-existant extensionId" {
-        $r = Invoke-ICResponse -target $testhost -ExtensionId $ext.id
-        $r | Should -Be $null
-    }
-
     It "Invokes a response on a target by extensionName" {
         $r = Invoke-ICResponse -target $testhost -ExtensionName "Terminate Process"
         $r.userTaskId | Should -Match $GUID_REGEX
     }
 
-    It "Returns error on a response on a target using non-existant extensionName" {
-        { $r = Invoke-ICResponse -target $testhost -ExtensionName "Terminate Process" } | Should -Throw
+    It "Returns null for a scan on a non-existant target" {
+        $r = Invoke-ICScanTarget -target "fake" -ErrorVariable err
+        $err.count | Should -Not -Be 0
+        $err[0].Exception.Message | Should -Match "was not found with an active agent or accessible address within a Target Group"
+        $r.userTaskId | Should -Be $null
+    }
+
+    It "Throws on non-existant extensionId" {
+        { $r = Invoke-ICResponse -target $testhost -ExtensionId "1ffd7a3a-ba60-4414-8991-52aa54615e73" } | Should -Throw
+        $Error[0].Exception.Message | Should -Match "Extension with id 1ffd7a3a-ba60-4414-8991-52aa54615e73 does not exist!"
+    }
+
+    It "Throws error on non-existant extensionName" {
+        { $r = Invoke-ICResponse -target $testhost -ExtensionName "fake" } | Should -Throw
     }
 }
 
