@@ -75,7 +75,6 @@ FunctionsToExport = @(
     "Invoke-ICResponse",
     "Import-ICSurvey",
     "Get-ICObject",
-    "Get-ICExtensionResult",
     "Get-ICAlert",
     "Get-ICApplication",
     "Get-ICVulnerability",

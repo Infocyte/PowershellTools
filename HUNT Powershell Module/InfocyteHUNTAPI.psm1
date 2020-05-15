@@ -44,7 +44,7 @@ function Get-ICHelp {
 
     Write-Host "Analysis Data Retrieval Functions:"
     Write-Host -ForegroundColor Cyan "`tGet-ICBox, Set-ICBox,"
-    Write-Host -ForegroundColor Cyan "`tGet-ICObject (alias: Get-ICData), Get-ICExtensionResult, Get-ICVulnerability, Get-ICNotes,"
+    Write-Host -ForegroundColor Cyan "`tGet-ICObject (alias: Get-ICData), Get-ICVulnerability, Get-ICNotes,"
     Write-Host -ForegroundColor Cyan "`tGet-ICAlert, Get-ICFileDetail, Get-ICActivityTrace`n"
 
     Write-Host "Scanning Functions:"
