@@ -102,50 +102,56 @@ function Get-ICObject {
             }
         }
         "Extension" {
+            $Endpoint = 'BoxExtensionInstances'
             if (-NOT $Id) {
-                $fields = @("id", "extensionId", "extensionVersionId","ip","boxId","sha256",
-                "hostScanId","success","threatStatus","compromised","startedOn","endedOn",
-                "createdOn","name","hostId","scanId","scannedOn","hostname","output")
-            }
-            if ($AllInstances) {
-                $Endpoint = 'BoxExtensionInstances'
+                $fields = @("id", "extensionId", "extensionVersionId","hostname","ip","boxId","sha256",
+                "hostScanId","success","threatStatus","name","hostId","scanId","scannedOn","output")
+                if ($AllInstances) {
+                    $result = Get-ICAPI -Endpoint $Endpoint -where $where -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly
+                    $result | foreach-object {
+                        $_.output = $_.output.output
+                        $OutputString = @()
+                        $_.output | foreach-object {
+                            $OutputString += $_.entry
+                        }
+                        $_ | Add-Member -Type NoteProperty -name "outputString" -value $OutputString
+                    }
+                } else {
+                    $fields = @("extensionId", "extensionVersionId","boxId","sha256",
+                    "hostScanId","success","threatStatus","name","hostId","scanId")
+                    Write-Verbose "Aggregate Extensions."
+                    $extensioninstances = Get-ICObject -Type "Extension" -BoxId $BoxId -where $where -fields $fields -AllInstances
+                    $results = @()
+                    $extensioninstances | Select-Object $fields | Group-Object extensionId | ForEach-Object {
+                        $props = @{
+                            Id = $_.name # extensionId
+                            name = $_.group[0].name
+                            boxId = $_.group[0].boxId
+                            count = $_.count
+                            hosts = ($_.group | Select-Object hostId -unique).hostId.count
+                            success = 0
+                            Good = 0
+                            'Low Risk' = 0
+                            Unknown = 0
+                            Suspicious = 0
+                            Bad = 0
+                        }
+                        $_.Group | ForEach-Object {
+                            if ($_.success) { $props['success'] += 1}
+                        }
 
-            } else {
-                $fields = @("extensionId", "extensionVersionId","boxId","sha256",
-                "hostScanId","success","threatStatus","compromised","name","hostId","scanId")
-                Write-Verbose "Aggregate Extensions."
-                $extensioninstances = Get-ICObject -Type "Extension" -BoxId $BoxId -where $where -fields $fields -AllInstances
-                $results = @()
-                $extensioninstances | Select-Object $fields | Group-Object extensionId | ForEach-Object {
-                    $props = @{
-                        Id = $_.name # extensionId
-                        name = $_.group[0].name
-                        boxId = $_.group[0].boxId
-                        count = $_.count
-                        hosts = ($_.group | Select-Object hostId -unique).hostId.count
-                        success = 0
-                        compromised = $false
-                        Good = 0
-                        'Low Risk' = 0
-                        Unknown = 0
-                        Suspicious = 0
-                        Bad = 0
-                    }
-                    $_.Group | ForEach-Object {
-                        if ($_.success) { $props['success'] += 1}
-                    }
+                        $_.group | Group-Object threatStatus | ForEach-Object {
+                            $props[$_.Name] = $_.count
+                        }
 
-                    $_.group | Group-Object threatStatus | ForEach-Object {
-                        $props[$_.Name] = $_.count
+                        if ($_.group.compromised -contains $true) {
+                            $props['compromised'] = $true
+                        }
+                        $props['completion'] = ($($props.hosts)/$($_.count)).tostring("P")
+                        $results += New-Object PSObject -property $props
                     }
-
-                    if ($_.group.compromised -contains $true) {
-                        $props['compromised'] = $true
-                    }
-                    $props['completion'] = ($($props.hosts)/$($_.count)).tostring("P")
-                    $results += New-Object PSObject -property $props
+                    return $results
                 }
-                return $results
             }
         }
         "File" {
@@ -201,13 +207,6 @@ function Get-ICExtensionResult {
 
     PROCESS {
         $result = Get-ICAPI -endpoint "boxExtensionInstances\$id" -fields id,extensionId,extensionVersionId,output,outputString,hostScanId,success,threatStatus,compromised,name,hostId,scanId,scannedOn,hostname,ip,boxId
-            $result.output = $result.output.output
-            $OutputString = @()
-            $result.output | % {
-                $OutputString += $_.entry
-            }        
-            $result.outputString = $OutputString
-
         if ($AllLog){
             $n = 0
             $result | % { 
