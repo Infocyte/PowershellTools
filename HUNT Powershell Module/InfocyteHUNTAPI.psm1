@@ -10,8 +10,8 @@ if ($PSVersionTable.PSVersion.Major -lt 5) {
     Write-Verbose "Checking PSVersion [Minimum Supported: 5.0]: PASSED [$PS]!`n"
 }
 
-$Version = $a.Version.ToString()
 function Get-ICHelp {
+  $Version = (Get-Module -Name InfocyteHUNTAPI).Version.ToString()
     Write-Host "Infocyte Powershell Module version $Version"
     Write-Host "Pass your Infocyte API Token into Set-ICToken to connect to an instance of Infocyte."
     Write-Host "`tThis will store your login token and server into a global variable for use by the other commands"
