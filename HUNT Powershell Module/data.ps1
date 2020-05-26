@@ -1,7 +1,7 @@
 
 # General function for getting various objects (files, processes, memory injects, autostarts, etc.) from Infoyte
 function Get-ICObject {
-    [cmdletbinding()]
+    [cmdletbinding(DefaultParameterSetName="Box")]
     [alias("Get-ICData","Get-ICObjects")]
     param(
         [parameter(ValueFromPipeline)]
@@ -28,9 +28,17 @@ function Get-ICObject {
         )]
         [String]$Type,
 
-        [parameter(HelpMessage={"Boxes are the 7, 30, and 90 day views of target group or global data. Use Set-ICBox to set your default. CurrentDefault: $Global:ICCurrentBox"})]
+        [parameter(
+            ParameterSetName="Box",
+            HelpMessage={"Boxes are the 7, 30, and 90 day views of target group or global data. Use Set-ICBox to set your default. CurrentDefault: $Global:ICCurrentBox"})]
         [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [String]$BoxId=$Global:ICCurrentBox,
+
+        [parameter(
+            ParameterSetName = "Scan")]
+        [ValidateScript( { if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid." } })]
+        [string]$ScanId,
+
         [parameter(HelpMessage="Defaults to hash+path aggregation (normalized). Use this switch to get all raw instances of the object found.")]
         [Switch]$AllInstances,
 
@@ -54,64 +62,101 @@ function Get-ICObject {
         "Script"
     )
 
-    if ($where -AND $where['and']) {
-        if (-NOT $where['and'].boxId) {
-            $where['and'] += @{ 'boxId' = $BoxId }
+    if ($ScanId) {
+        if ($where -AND $where['and']) {
+            if (-NOT $where['and'].scanId -AND -NOT $where['and'].scanId) {
+                $where['and'] += @{ 'scanId' = $scanId }
+            }
         }
-    }
-    if ($where -AND $where['or']) {
-        # handle this wierd loopback thing where 'or' filters screw things up
-        # wrap everything in an explicit 'and'
-        Write-Warning "There is a known issue with Loopback where filters that cause problems with first level 'or' filters."
-        Write-Warning "You should wrap everything in an And filter to make sure this works. Doing this now."
-        $where = @{
-            and = @(
-                @{ or = $where['or'] },
-                @{ boxId = $BoxId }
-            )
+        if ($where -AND $where['or']) {
+            # handle this wierd loopback thing where 'or' filters screw things up
+            # wrap everything in an explicit 'and'
+            Write-Warning "There is a known issue with Loopback where filters that cause problems with first level 'or' filters."
+            Write-Warning "You should wrap everything in an And filter to make sure this works. Doing this now."
+            $where = @{
+                and = @(
+                    @{ or = $where['or'] },
+                    @{ scanId = $scanId }
+                )
+            }
+            $where += @{ scanId = $scanId }
+            Write-Warning "where-filter:$($where|ConvertTo-Json -depth 10)"
         }
-        $where += @{ boxId = $BoxId }
-        Write-Warning "where-filter:$($where|convertto-json -depth 10)"
+        elseif ($where) {
+            $where['scanId'] = $scanId
+        }
+        else {
+            $where += @{ scanId = $scanId }
+        }
+        $Box = "Scan"
     }
-    elseif ($where) {
-        $where['boxId'] = $BoxId
-    } else {
-        $where += @{ boxId = $BoxId }
+    else {
+        #BoxId
+        if ($where -AND $where['and']) {
+            if (-NOT $where['and'].boxId -AND -NOT $where['and'].boxId) {
+                $where['and'] += @{ 'boxId' = $BoxId }
+            }
+        }
+        if ($where -AND $where['or']) {
+            # handle this wierd loopback thing where 'or' filters screw things up
+            # wrap everything in an explicit 'and'
+            Write-Warning "There is a known issue with Loopback where filters that cause problems with first level 'or' filters."
+            Write-Warning "You should wrap everything in an And filter to make sure this works. Doing this now."
+            $where = @{
+                and = @(
+                    @{ or = $where['or'] },
+                    @{ boxId = $BoxId }
+                )
+            }
+            $where += @{ boxId = $BoxId }
+            Write-Warning "where-filter:$($where|ConvertTo-Json -depth 10)"
+        }
+        elseif ($where) {
+            $where['boxId'] = $BoxId
+        }
+        else {
+            $where += @{ boxId = $BoxId }
+        }
+        $Box = "Box"
     }
-
+    
     switch ( $Type ) {
         "Process" {
             if ($AllInstances) {
-                $Endpoint = "BoxProcessInstances"
+                $Endpoint = "$($Box)ProcessInstances"
             } else {
-                $Endpoint = "BoxProcesses"
+                $Endpoint = "$($Box)Processes"
             }
         }
         "Host" {
             if ($AllInstances) {
-                $Endpoint = 'BoxHostScans'
+                $Endpoint = "$($Box)HostScans"
             } else {
-                $Endpoint = 'BoxHosts'
+                $Endpoint = "$($Box)Hosts"
             }
         }
         "Account" {
             if ($AllInstances) {
-                $Endpoint = 'BoxAccountInstancesByHost'
+                $Endpoint = "$($Box)AccountInstancesByHost"
             } else {
-                $Endpoint = 'BoxAccounts'
+                $Endpoint = "$($Box)Accounts"
             }
         }
         "Extension" {
-            $Endpoint = 'BoxExtensionInstances'
-            $fields = @("id", "extensionId", "extensionVersionId", "hostname", "ip", "boxId", "sha256",
+            $Endpoint = "$($Box)ExtensionInstances"
+            $fields = @("id", "extensionId", "extensionVersionId", "hostname", "ip", "sha256",
                 "hostScanId", "success", "threatStatus", "name", "hostId", "scanId", "scannedOn", "startedOn", "endedOn", "output")
+            if (-NOT $ScanId) {
+                $fields += "boxId"
+            }
+
             if ($Id) {            
                 $Endpoint += "\$Id"
             }
             elseif ($AllInstances) {
                 $result = Get-ICAPI -Endpoint $Endpoint -where $where -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly
                 $result | foreach-object {
-                    $_.output = $_.output.output
+                    $_.output = $_.output.output.entry
                     $_ | Add-Member -Type NoteProperty -Name runTime -Value $null
                     if ($_.endedOn) {
                         $_.runTime = [math]::round(([datetime]$_.endedOn - [DateTime]$_.startedOn).TotalSeconds)
@@ -122,7 +167,11 @@ function Get-ICObject {
             elseif (-Not $Id) {
                 $fields = @("id","extensionId","extensionVersionId","boxId","hostScanId","success","threatStatus","name","hostId","scanId")
                 Write-Verbose "Aggregating Extensions."
-                $extensioninstances = Get-ICObject -Type "Extension" -BoxId $BoxId -where $where -fields $fields -AllInstances -NoLimit:$NoLimit
+                if ($ScanId) {
+                    $extensioninstances = Get-ICObject -Type "Extension" -ScanId $ScanId -where $where -fields $fields -AllInstances -NoLimit:$NoLimit
+                } else {
+                    $extensioninstances = Get-ICObject -Type "Extension" -BoxId $BoxId -where $where -fields $fields -AllInstances -NoLimit:$NoLimit
+                }
                 $results = @()
                 $extensioninstances | Group-Object extensionVersionId | ForEach-Object {
                     $props = @{
@@ -160,13 +209,21 @@ function Get-ICObject {
             $cnt = 0
             $Files | ForEach-Object {
                 if ($CountOnly) {
-                    $c = Get-ICObject -Type $_ -BoxId $BoxId -where $where -AllInstances:$AllInstances -CountOnly
+                    if ($ScanId) {
+                        $c = Get-ICObject -Type $_ -ScanId $ScanId -where $where -AllInstances:$AllInstances -CountOnly
+                    } else {
+                        $c = Get-ICObject -Type $_ -BoxId $BoxId -where $where -AllInstances:$AllInstances -CountOnly
+                    }
                     Write-Verbose "Found $c $_ Objects"
                     $cnt += $c
                 } else {
                     Write-Verbose "Querying $_"
-                    Get-ICObject -Type $_ -BoxId $BoxId -where $where -fields $fields -NoLimit:$NoLimit -AllInstances:$AllInstances
-                }
+                    if ($ScanId){
+                        Get-ICObject -Type $_ -ScanId $ScanId -where $where -fields $fields -NoLimit:$NoLimit -AllInstances:$AllInstances
+                    } else {
+                        Get-ICObject -Type $_ -BoxId $BoxId -where $where -fields $fields -NoLimit:$NoLimit -AllInstances:$AllInstances
+                    }
+                }    
             }
             if ($CountOnly) {
                 return $cnt
@@ -174,9 +231,9 @@ function Get-ICObject {
         }
         Default {
             if ($AllInstances) {
-                $Endpoint = "Box$($Type)Instances"
+                $Endpoint = "$($Box)$($Type)Instances"
             } else {
-                $Endpoint = "Box$($Type)s"
+                $Endpoint = "$($Box)$($Type)s"
             }
         }
     }
