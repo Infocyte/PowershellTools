@@ -1,6 +1,6 @@
 
-$ErrorActionPreference = 'Continue'
-$ProgressPreference = 'SilentlyContinue'
+#$ErrorActionPreference = 'Continue'
+#$ProgressPreference = 'SilentlyContinue'
 $GUID_REGEX = "^[A-Z0-9]{8}-([A-Z0-9]{4}-){3}[A-Z0-9]{12}$"
 
 Import-Module -Name Pester -Force -ErrorAction Stop
@@ -16,7 +16,6 @@ if (-Not $PSScriptRoot) {
 $config = [PesterConfiguration]::Default
 $config.CodeCoverage.Enabled = $true
 $config.Output.Verbosity = "Normal"
-$config.Should.ErrorAction = "Stop"
 
 # Test configs
 $Testname = "PSTest"

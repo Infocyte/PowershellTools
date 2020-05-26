@@ -291,7 +291,9 @@ function Get-ICAddress {
 function Remove-ICAddress {
     [cmdletbinding(SupportsShouldProcess=$true)]
     Param(
-        [parameter(ValueFromPipeLine=$true)]
+        [parameter(
+            ValueFromPipelineByPropertyName,
+            ValueFromPipeLine)]
         [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('AddressId')]
         [String]$id,

@@ -107,7 +107,7 @@ function Invoke-ICScan {
 	try {
 		Invoke-ICAPI -Endpoint $Endpoint -body $body -method POST
 	} catch {
-		Write-Error "Server Error. Could not find target with given filters: $($where | convertto-json -compress)"
+		Write-Error "Server Error. Could not find target with given filters: $($where | convertto-json -compress): [$($_.Message)]"
 		return
 	}
 }
@@ -177,7 +177,9 @@ function Invoke-ICScanTarget {
 		[parameter(
 			Mandatory=$false, 
 			ParameterSetName = 'extensionIds')]
-		[String[]]$ExtensionIds
+		[String[]]$ExtensionIds,
+
+		[Switch]$Wait
 	)
 	PROCESS {
 		if (-NOT $target -AND $_) {
@@ -190,7 +192,7 @@ function Invoke-ICScanTarget {
 
 		# Select Target targetgroup
 		if ($TargetGroupId) {
-			$TargetGroup = Get-ICTargetGroup -Id $TargetGroupId
+			$tg = Get-ICTargetGroup -Id $TargetGroupId
 			if (-NOT $TargetGroup) {
 				Throw "TargetGroup with id $TargetGroupid does not exist!"
 			} else {
@@ -244,11 +246,17 @@ function Invoke-ICScanTarget {
 		if (-NOT $body['credential']) {
 			$agent = Get-ICAgent -where @{ authorized = $true; or = @(  @{ hostname = $target }, @{ ipstring = $target }) }
 			if (-NOT $agent.active) {
+				Write-Verbose "No active agent found, looking for existing address entry in target group $tg"
 				#Check Address Table
 				$Addr = Get-ICAddress -targetId $targetGroupId -where @{ accessible = $true; or = @(  @{ hostname = $target }, @{ ipstring = $target }) } | Sort-Object lastAccessedOn -Descending | Select-Object -First 1
 				if (-NOT $addr) {
+					Write-Verbose "No accessible address entry in target group $tg, looking at all target groups"
 					$Addr2 = Get-ICAddress -where @{ accessible = $true; or = @(  @{ hostname = $target }, @{ ipstring = $target }) } | Sort-Object lastAccessedOn -Descending | Select-Object -First 1
 					if ($Addr2) {
+						# Transfer over an existing accessible address entry
+						Write-Verbose "Found accessible address entry, transfering it over to target group $tg"
+						$existingAddr = Get-ICAddress -targetId $targetGroupId -where @{ or = @(  @{ hostname = $target }, @{ ipstring = $target }) }
+						if ($existingAddr) { $existingAddr | Remove-ICAddress }
 						$ht = @{ }
 						$addr2.psobject.properties | ForEach-Object { $ht[$_.Name] = $_.Value }
 						$ht.Remove('id')
@@ -256,15 +264,29 @@ function Invoke-ICScanTarget {
 						$ht.Remove('taskId')
 						$ht['targetId'] = $TargetGroupId
 						$Addr = Invoke-ICAPI -Endpoint "Addresses" -Method POST -Body $ht			
+					} else {
+						Write-Verbose "No accessible address entry found for $target"
 					}
 				}
+
 				if ($Addr) {
 					$where = @{ id = $Addr.id }
-					return Invoke-ICScan -TargetGroupId $TargetGroupId -ScanOptions $ScanOptions -where $where 
-				} else {
-					Write-Error "$target was not found with an active agent or accessible address within a Target Group."
-					return
-				}
+					$task = Invoke-ICScan -TargetGroupId $TargetGroupId -ScanOptions $ScanOptions -where $where 
+					if ($Wait) {
+						$timer = [system.diagnostics.stopwatch]::StartNew()
+						while ($task.status -eq "Active"){
+							$t = $timer.Elapsed
+							Write-Progress -Activity "Scanning $target" -Status "[$($t.TotalSeconds.ToString("#.#"))] Status=$($task.message)"
+							Start-Sleep 5
+							$task = Get-ICTask -id $task.userTaskId
+						}
+						$timer.Stop()
+						$TotalTime = $timer.Elapsed
+						Write-Progress -Activity "Scanning $target" -Status "[$($TotalTime.TotalSeconds.ToString("#.#"))] Status=$($task.message)" -Completed
+						Write-Verbose "Task $($task.status). Completed in $($TotalTime.TotalSeconds.ToString("#.#")) Seconds."
+					}
+					return $task
+				} 
 			}
 		}
 
@@ -272,10 +294,24 @@ function Invoke-ICScanTarget {
 		$Endpoint = "targets/scan"
 		Write-Verbose "Starting Scan of target $($target)"
 		try {
-			$scanTask = Invoke-ICAPI -Endpoint $Endpoint -body $body -method POST
-			return [PSCustomObject]@{ userTaskId = $scanTask.scanTaskId } 
+			$Task = Invoke-ICAPI -Endpoint $Endpoint -body $body -method POST
+			$Task = [PSCustomObject]@{ userTaskId = $Task.scanTaskId } 
+			if ($Wait) {
+				$timer = [system.diagnostics.stopwatch]::StartNew()
+				while ($task.status -eq "Active"){
+					$t = $timer.Elapsed
+					Write-Progress -Activity "Scanning $target" -Status "[$($t.TotalSeconds.ToString("#.#"))] Status=$($task.message)"
+					Start-Sleep 5
+					$task = Get-ICTask -id $task.userTaskId
+				}
+				$timer.Stop()
+				$TotalTime = $timer.Elapsed
+				Write-Progress -Activity "Scanning $target" -Status "[$($TotalTime.TotalSeconds.ToString("#.#"))] Status=$($task.message)" -Completed
+				Write-Verbose "Task $($task.status). Completed in $($TotalTime.TotalSeconds.ToString("#.#")) Seconds."
+			}
+			return $task
 		} catch {
-			Write-Error "$target was not found with an active agent or Target Group address entry."
+			Write-Error "$target was not found with an active agent or accessible address entry within a Target Group."
 			return
 		}
 	}
@@ -381,7 +417,9 @@ function Invoke-ICResponse {
 			Mandatory=$true, 
 			ParameterSetName = 'ByName')]
 		[ValidateNotNullOrEmpty()]
-		[String]$ExtensionName
+		[String]$ExtensionName,
+
+		[Switch]$Wait
 	)
 
 	BEGIN {
@@ -406,7 +444,7 @@ function Invoke-ICResponse {
 	}
 
 	PROCESS {
-		$task = Invoke-ICScanTarget -target $target -TargetGroupId $TargetGroupId -TargetGroupName $TargetGroupName -ScanOptions $ScanOptions
+		$task = Invoke-ICScanTarget -target $target -TargetGroupId $TargetGroupId -TargetGroupName $TargetGroupName -ScanOptions $ScanOptions -Wait:$Wait
 		return $task
 	}
 }

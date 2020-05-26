@@ -36,8 +36,11 @@ Describe "ICFindHosts and ICScan" {
     }
 
     AfterEach {
-        Start-Sleep 2
-        Invoke-ICAPI -Method POST -endpoint "userTasks/$($r.userTaskId)/cancel"
+        if ($r.userTaskId) {
+            Start-Sleep 2
+            Invoke-ICAPI -Method POST -endpoint "userTasks/$($r.userTaskId)/cancel"
+        }
+        $r = $null
     }
     
     It "Invokes an enumeration on a target group" {
@@ -58,9 +61,9 @@ Describe "ICFindHosts and ICScan" {
 
     It "Returns null on a scan on a target group with an unmatched filter" {
         $r = Invoke-ICSCan -TargetGroupId $TgId -where @{ hostname = "fake" } -ErrorVariable err
-        $err.count | Should -Not -Be 0
-        $err[0].Exception.Message | Should -Match ".*Could not find target with given filters.*"
         $r | Should -Be $null
+        #$err.count | Should -Not -Be 0
+        $err.Exception[-1].Message | Should -Match ".*Could not find target with given filters.*"   
     }
 
     It "Task errors on a scan on a target group with a illegal filter" {
@@ -82,8 +85,11 @@ Describe "ICScanTarget and ICResponse" {
         $ext = $Extensions | Where-Object { $_.name -eq "Terminate Process" } | Select-Object -First 1
     }
     AfterEach {
-        Start-Sleep 2
-        Invoke-ICAPI -Method POST -endpoint "userTasks/$($r.userTaskId)/cancel"
+        if ($r.userTaskId) {
+            Start-Sleep 2
+            Invoke-ICAPI -Method POST -endpoint "userTasks/$($r.userTaskId)/cancel"
+        }
+        $r = $null
     }
 
     It "Invokes a scan on a single target" {
@@ -106,9 +112,10 @@ Describe "ICScanTarget and ICResponse" {
 
     It "Returns null for a scan on a non-existant target" {
         $r = Invoke-ICScanTarget -target "fake" -ErrorVariable err
-        $err.count | Should -Not -Be 0
-        $err[0].Exception.Message | Should -Match "was not found with an active agent or accessible address within a Target Group"
         $r.userTaskId | Should -Be $null
+        $err.count | Should -Not -Be 0
+        $err.Exception[-1].Message | Should -Match "was not found with an active agent or accessible address entry within a Target Group"
+        
     }
 
     It "Throws on non-existant extensionId" {
@@ -118,7 +125,64 @@ Describe "ICScanTarget and ICResponse" {
 
     It "Throws error on non-existant extensionName" {
         { $r = Invoke-ICResponse -target $testhost -ExtensionName "fake" } | Should -Throw
+        $Error[0].Exception.Message | Should -Match "Extension with name fake does not exist!"
     }
+}
+
+Describe "ICScanTarget Results" {
+
+    It "Invokes a scan on a single target" {
+        $scan = Invoke-ICScanTarget -target $testhost
+        $scan.userTaskId | Should -Match $GUID_REGEX
+    }
+
+    It "Gets scan status" {
+        Start-Sleep 2
+        $task = Get-ICTask -id $scan.userTaskId
+        $task.status | Should -Be "Active"
+        while ($task.status -eq "Active")
+        {
+            Start-Sleep 5
+            $task = Get-ICTask -id $scan.userTaskId
+        }
+        $task.status | Should -Be "Completed"
+    }
+
+    It "Gets scan results" {
+        $results = Get-ICScan -id $task.data.scanId
+        $results.hostCount | Should -Be 1
+    }
+}
+
+Describe "ICResponse Results" {
+    BeforeAll {
+        $Extensions = Get-ICExtension
+        $ext = $Extensions | Where-Object { $_.name -eq "Terminate Process" } | Select-Object -First 1
+    }
+
+    It "Invokes a response on a target by extensionName" {
+        $r = Invoke-ICResponse -target $testhost -ExtensionName "Terminate Process"
+        $r.userTaskId | Should -Match $GUID_REGEX
+    }
+    
+    It "Gets scan status" {
+        Start-Sleep 2
+        $task = Get-ICTask -id $r.userTaskId
+        $task.status | Should -Be "Active"
+        while ($task.status -eq "Active") {
+            Start-Sleep 5
+            $task = Get-ICTask -id $r.userTaskId
+        }
+        $task.status | Should -Be "Completed"
+    }
+
+    It "Gets response results" {
+        $results = Get-ICObject -Type Extension -ScanId $task.data.scanId -AllInstances
+        $results.extensionId | Should -Be $ext.id
+        $results.success | Should -Be $true
+        $results.threatStatus | Should -Be "Unknown"
+    }
+
 }
 
 
