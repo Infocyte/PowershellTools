@@ -507,19 +507,26 @@ function Test-ICExtension {
 	[alias("Invoke-ICExtension")]
 	param(
 		[parameter(mandatory=$true)]
-	  	[String]$Path
+          [String]$Path,
+          
+          [Switch]$Legacy
 	  )
 	  
-	If ($env:OS -match "windows" -AND (-NOT [Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
+	If ($env:OS -match "windows" -AND (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator"))) {
 		Write-Error "You do not have Administrator rights to run this script!`nPlease re-run this script as an Administrator!"
 		return
-    } elseif ($IsLinux -AND (id -u) -eq 0) {
+    } elseif ($IsLinux -AND (id -u) -ne 0) {
         Write-Error "You do not have permissions to run this script!`nPlease re-run this with sudo!"
 		return
     }
     
     # Clear-Host
-    $agentname = "agent.exe"
+    if ($Legacy){
+        $agentname = "s1.exe"
+    }
+    else {
+        $agentname = "agent.exe"
+    }
     if ($IsWindows -OR $env:OS -match "windows") {
         $Devpath = "C:/Program Files/Infocyte/dev"
         $AgentPath = "C:/Program Files/Infocyte/Agent"
@@ -532,11 +539,20 @@ function Test-ICExtension {
 
     # Check for Agent
     if (Test-Path "$DevPath/$agentname") {
-        $DevVer = (& "$DevPath/$agentname" "--version").split(" ")[2]
+        if ($Legacy){
+             $DevVer = (& "$DevPath/$agentname" "--version").split(" ")[2]
+        } else {
+            $DevVer = (& "$DevPath/$agentname" "--version").split(" ")[3]
+        }
     } else {
 		New-Item $Devpath -ItemType Directory | Out-Null
 		if (Test-Path "$AgentPath/$agentname") {
-            $AgentVer = (& "$AgentPath/$agentname" "--version").split(" ")[2]
+            if ($Legacy) {
+                $AgentVer = (& "$AgentPath/$agentname" "--version").split(" ")[2]
+            }
+            else {
+                $AgentVer = (& "$AgentPath/$agentname" "--version").split(" ")[3]
+            }
 			Write-Warning "$Devpath/$agentname not found but latest version ($Ver2) was found within your agent folder ($AgentPath). Copying this over."
 			Copy-Item -Path "$AgentPath/$agentname" -Destination "$Devpath" | Out-Null
 		} else {
@@ -546,7 +562,12 @@ function Test-ICExtension {
 	}
     # Update Agent
     if (Test-Path "$AgentPath/$agentname") {
-        $AgentVer = (& "$AgentPath/$agentname" "--version").split(" ")[2]
+        if ($Legacy) {
+            $AgentVer = (& "$AgentPath/$agentname" "--version").split(" ")[2]
+        }
+        else {
+            $AgentVer = (& "$AgentPath/$agentname" "--version").split(" ")[3]
+        }
         if ($AgentVer -gt $DevVer) {
             Write-Warning "$agentname ($DevVer) has an update: ($AgentVer). Copy '$AgentPath/$agentname' to '$Devpath/$agentname'.`n
                 `tRun this command to do so: Copy-Item -Path '$AgentPath/$agentname' -Destination '$Devpath/$agentname'"
@@ -555,10 +576,10 @@ function Test-ICExtension {
 
     $Path = Get-item $Path | Select-Object -ExpandProperty FullName
     $ext = Get-item $Path | Select-Object -ExpandProperty name
-    Write-Verbose "Executing $ext with $agentname (Version: $Ver)"
+    Write-Verbose "Executing $ext with $agentname (Version: $DevVer)"
     
 
-	if ($isWindows -AND (-NOT (Test-Path "$DevPath/luacheck.exe"))) {
+    if (($env:OS -match "windows" -OR $isWindows) -AND (-NOT (Test-Path "$DevPath/luacheck.exe"))) {
 		$url = "https://github.com/mpeterv/luacheck/releases/download/0.23.0/luacheck.exe"
 		Write-Warning "$Devpath/luacheck.exe not found (used for debugging). Attempting to download from Github."
 		# Download luacheck from Github
@@ -573,13 +594,22 @@ function Test-ICExtension {
 		}
 	}
 
-	# & "agent.exe --no-delete --no-compress --verbose --only-extensions --extensions $Path"
-	$a = @()
-    $a += "survey"
-    $a += "--no-compress"
-	$a += "--only-extensions"
-	$a += "--extensions $Path"
+    # & "agent.exe --no-delete --no-compress --verbose --only-extensions --extensions $Path"
+    $a = @()
+    if ($Legacy) {
+        $a += "--no-compress"
+        $a += "--no-install"
+        $a += "--only-extensions"
+        $a += "--extensions $Path"
+    } else {
+        $a += "survey"
+        $a += "--no-install"
+        $a += "--no-compress"
+        $a += "--only-extensions"
+        $a += "--extensions $Path"
 	
+    }
+
 	#$p = Start-Process -NoNewWindow -FilePath "$Devpath\agent.exe" -ArgumentList $a -PassThru
 	
 	$psi = New-object System.Diagnostics.ProcessStartInfo
