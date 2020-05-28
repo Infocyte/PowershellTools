@@ -142,7 +142,7 @@ function Set-ICToken {
 				$Global:ICToken = $Token
 				Write-Verbose "Setting Auth Token for $Global:HuntServerAddress to $Token"
 		} else {
-			Throw Exception "Invalide token. Must be a 64 character string generated within your profile or admin panel within Infocyte HUNT's web console"
+			Throw "Invalide token. Must be a 64 character string generated within your profile or admin panel within Infocyte HUNT's web console"
 			return
 		}
 	} else {
@@ -151,9 +151,7 @@ function Set-ICToken {
 			Write-Verbose "Setting auth token from credential file: $credentialfile"
 			$Global:ICToken = $Global:ICCredentials[$Global:HuntServerAddress]
 		} else {
-			Write-Error "No Token found for $($Global:HuntServerAddress) in credential file!"
-			Write-Warning "Please provide credentials with -Save switch to save them to credential file first."
-			return
+			Throw "No Token found for $($Global:HuntServerAddress) in credential file! Please provide credentials with -Save switch to save them to credential file first."
 		}
 	}
 
@@ -190,8 +188,7 @@ function Set-ICToken {
 		Write-Verbose "All analysis data & object retrieval will default to this box."
 		Write-Verbose "Use Set-ICBox to change the default in this session."
 	} else {
-		Write-Error "Your connection to $Global:HuntServerAddress failed!"
-		Write-Warning "`nInfocyte API URI: $Global:HuntServerAddress`nToken: $Global:ICToken`nProxy: $Global:Proxy`nProxyUser: $($Global:ICCredentials["ProxyUser"])"
+		Throw "Your connection to $Global:HuntServerAddress failed using Infocyte API URI: $Global:HuntServerAddress`nToken: $Global:ICToken`nProxy: $Global:Proxy`nProxyUser: $($Global:ICCredentials['ProxyUser'])"
 	}
 
 

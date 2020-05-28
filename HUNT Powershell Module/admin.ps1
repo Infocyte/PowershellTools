@@ -39,9 +39,8 @@ function New-ICFlag {
     if ($f) {
         Throw "There is already a flag named $Name"
     } else {
-        Invoke-ICAPI -Endpoint $Endpoint -body $body -method POST
-        Write-Verbose "Added new flag with Color $Color named $Name [Weight: $Weight]"
-        return $true        
+        Write-Verbose "Added new flag with Color $Color named $Name [Weight: $Weight]"   
+        return Invoke-ICAPI -Endpoint $Endpoint -body $body -method POST
     }
 }
 
@@ -94,12 +93,13 @@ function Update-ICFlag  {
         $Endpoint = "flags/$Id"
         $obj = Get-ICFlag -id $Id
         if (-NOT $obj) {
-            Write-Error "Flag not found with id: $id"
+            Write-Warning "Flag not found with id: $id"
+            return
         }
         if ($Name) { $body['name'] = $Name; $n+=1 }
         if ($Color) { $body['color'] = $Color; $n+=1 }
         if ($Weight) { $body['weight'] = $Weight; $n+=1 }
-        if ($n -eq 0) { Write-Error "Not Enough Parameters"; return }
+        if ($n -eq 0) { Throw "Not Enough Parameters" }
 
         Write-Verbose "Updating flag with id $($Id):`n$($body|convertto-json)"
         if ($PSCmdlet.ShouldProcess($($obj.name), "Will update flag $($obj.name) [$Id]")) {
@@ -123,7 +123,7 @@ function Remove-ICFlag {
         $obj = Get-ICFlag -Id $Id
         if ($obj) {
             if ($obj | Where-Object { ($_.name -eq "Verified Good") -OR ($_.name -eq "Verified Bad")}) {
-                Write-Warning "Cannot Delete 'Verified Good' or 'Verified Bad' flags. They are a special case and would break the user interface"
+                Write-Error "Cannot Delete 'Verified Good' or 'Verified Bad' flags. They are a special case and would break the user interface"
                 return
             }
             if ($PSCmdlet.ShouldProcess($obj.name, "Will remove $($obj.name) [$($obj.color)] with flagId '$Id'")) {
@@ -133,7 +133,7 @@ function Remove-ICFlag {
                 return $true
             }
         } else {
-            Write-Error "No Agent found with id: $Id"
+            Write-Warning "No Agent found with id: $Id"
         }
         return $Obj
     }

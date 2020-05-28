@@ -72,8 +72,8 @@ function Get-ICTask {
 		[parameter(ValueFromPipeline, ValueFromPipelineByPropertyName)]
 		[ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
 		[alias('id')]
-		[alias('userTaskId')]
-		[String]$TaskId,
+		[alias('taskId')]
+		[String]$userTaskId,
 
 		[Switch]$All,
 
@@ -86,9 +86,9 @@ function Get-ICTask {
 
 	PROCESS {
 		$endpoint = "usertasks"
-		if ($TaskId) {
+		if ($userTaskId) {
 			$CountOnly = $false
-			$endpoint += "/$TaskId"
+			$endpoint += "/$userTaskId"
 		} else {
 			if (-NOT $All -AND $where.keys.count -eq 0) {
 				Write-Verbose "Filtering for running and recently ended tasks (Default)."
@@ -122,8 +122,8 @@ function Get-ICTaskItems {
 			ValueFromPipelineByPropertyName)]
 		[ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
 		[alias('id')]
-		[alias('userTaskId')]
-		[String]$TaskId,
+		[alias('TaskId')]
+		[String]$userTaskId,
 
 		[parameter()]
 		[Switch]$IncludeProgress,
@@ -137,13 +137,13 @@ function Get-ICTaskItems {
 
 	PROCESS {
 		$Endpoint = "userTaskItems"
-		$where['userTaskId'] = $TaskId
+		$where['userTaskId'] = $userTaskId
 		
 		if ($CountOnly) {
 			return (Get-ICAPI -Endpoint $Endpoint -where $where -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly)
 		}
 
-		Write-Verbose "Getting All TaskItems with TaskId $TaskId."
+		Write-Verbose "Getting All TaskItems with TaskId $userTaskId."
 		$Items = Get-ICAPI -Endpoint $Endpoint -where $where -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly
 		ForEach ($item in $items) {
 			$item | Add-Member -Type NoteProperty -Name totalSeconds -Value $null
@@ -269,10 +269,10 @@ function Wait-ICTask {
 
 	BEGIN {}
 	PROCESS {
-		$Task = Get-ICTaskItems -TaskId $TaskId -IncludeProgress
+		$Task = Get-ICTaskItems -userTaskId $TaskId -IncludeProgress
 		while (-NOT $Task.complete) {
 			Start-Sleep 20
-			$Task = Get-ICTaskItems -TaskId $TaskId -IncludeProgress
+			$Task = Get-ICTaskItems -userTaskId $TaskId -IncludeProgress
 		}
 		return $true
 	}
@@ -310,7 +310,7 @@ function Get-ICLastScanTask {
 		}
 	}
 
-	$Progress = Get-ICTaskItems -TaskId $Task.id -IncludeProgress -NoLimit
+	$Progress = Get-ICTaskItems -userTaskId $Task.id -IncludeProgress -NoLimit
 
 	$result = @{
 		userTaskId = $Task.Id

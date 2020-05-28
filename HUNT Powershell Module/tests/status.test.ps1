@@ -64,7 +64,7 @@ Describe "Get-ICTaskItems" {
     }
 
     It "It gets TaskItems" {
-        $r = Get-ICTaskItems -taskId $task.Id
+        $r = Get-ICTaskItems -usertaskId $task.Id
         $r[0].userTaskId | Should -Match $GUID_REGEX  
 
         $r2 = $task.Id | Get-ICTaskItems

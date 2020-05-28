@@ -25,7 +25,8 @@ Describe "ICFlag" {
     }
 
     It "Throws if it tries to create an existing flag name" {
-        { New-ICFlag -Name $Testname -Color "blue" -Weight 5 } | Should -Throw
+        { $r = New-ICFlag -Name $Testname -Color "blue" -Weight 5 } | Should -Throw
+        $r.id | Should -Be $null
     }
 
     It "Updates a flag" {

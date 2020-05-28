@@ -1,8 +1,10 @@
 
 Describe "Get-ICObject" {
-
+    BeforeAll {
+        Set-ICBox -Global -Last 90
+    }
+    
     It "Gets a Powershell.exe object from processes" {
-        $r = Get-ICObject -Type "Process" -where @{ name = "powershell.exe" }
         $r = Get-ICObject -Type "Process" -where @{ name = "powershell.exe" }
         $r.Count | Should -GE 1
     }
@@ -93,7 +95,7 @@ Describe "Get-ICFileDetail and ICNotes" {
     }
 
     It "Gets file notes" {
-        $r = Get-ICNotes -sha1 $file.fileRepId
+        $r = Get-ICNote -sha1 $file.fileRepId
         $r | Should -Not -Be $null
         $r.createdBy | Should -Not -Be $null
     }

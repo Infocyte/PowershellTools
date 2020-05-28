@@ -107,7 +107,7 @@ function Invoke-ICScan {
 	try {
 		Invoke-ICAPI -Endpoint $Endpoint -body $body -method POST
 	} catch {
-		Write-Error "Server Error. Could not find target with given filters: $($where | convertto-json -compress): [$($_.Message)]"
+		Write-Warning "Server Error. Could not find accessible targets with given filters: $($where | convertto-json -compress): [$($_.Message)]"
 		return
 	}
 }
@@ -221,9 +221,7 @@ function Invoke-ICScanTarget {
 	        $Credential =  Get-ICCredential | Where-Object { $_.name -eq $CredentialName }
 			if ($Credential) {
 				$body['credential'] = @{ name = $CredentialName }
-				Write-Error "Credential with name [$CredentialName] does not exist!"
-				Write-Warning "Please create it or specify a different credential (referenced by id or name)"
-				return
+				Throw "Credential with name [$CredentialName] does not exist! Please create it or specify a different credential (referenced by id or name)"
 	  	    }
 	    }
 
@@ -271,21 +269,22 @@ function Invoke-ICScanTarget {
 
 				if ($Addr) {
 					$where = @{ id = $Addr.id }
-					$task = Invoke-ICScan -TargetGroupId $TargetGroupId -ScanOptions $ScanOptions -where $where 
+					$scan = Invoke-ICScan -TargetGroupId $TargetGroupId -ScanOptions $ScanOptions -where $where 
+					$task = Get-ICTask -id $scan.userTaskId
 					if ($Wait) {
 						$timer = [system.diagnostics.stopwatch]::StartNew()
 						while ($task.status -eq "Active"){
 							$t = $timer.Elapsed
 							Write-Progress -Activity "Scanning $target" -Status "[$($t.TotalSeconds.ToString("#.#"))] Status=$($task.message)"
 							Start-Sleep 5
-							$task = Get-ICTask -id $task.userTaskId
+							$task = Get-ICTask -id $scan.userTaskId
 						}
 						$timer.Stop()
 						$TotalTime = $timer.Elapsed
 						Write-Progress -Activity "Scanning $target" -Status "[$($TotalTime.TotalSeconds.ToString("#.#"))] Status=$($task.message)" -Completed
 						Write-Verbose "Task $($task.status). Completed in $($TotalTime.TotalSeconds.ToString("#.#")) Seconds."
 					}
-					return $task
+					return $scan
 				} 
 			}
 		}
@@ -294,24 +293,25 @@ function Invoke-ICScanTarget {
 		$Endpoint = "targets/scan"
 		Write-Verbose "Starting Scan of target $($target)"
 		try {
-			$Task = Invoke-ICAPI -Endpoint $Endpoint -body $body -method POST
-			$Task = [PSCustomObject]@{ userTaskId = $Task.scanTaskId } 
+			$scan = Invoke-ICAPI -Endpoint $Endpoint -body $body -method POST
+			$scan = [PSCustomObject]@{ userTaskId = $scan.scanTaskId } 
 			if ($Wait) {
 				$timer = [system.diagnostics.stopwatch]::StartNew()
+				$task = Get-ICTask -id $scan.userTaskId
 				while ($task.status -eq "Active"){
 					$t = $timer.Elapsed
 					Write-Progress -Activity "Scanning $target" -Status "[$($t.TotalSeconds.ToString("#.#"))] Status=$($task.message)"
 					Start-Sleep 5
-					$task = Get-ICTask -id $task.userTaskId
+					$task = Get-ICTask -id $scan.userTaskId
 				}
 				$timer.Stop()
 				$TotalTime = $timer.Elapsed
 				Write-Progress -Activity "Scanning $target" -Status "[$($TotalTime.TotalSeconds.ToString("#.#"))] Status=$($task.message)" -Completed
 				Write-Verbose "Task $($task.status). Completed in $($TotalTime.TotalSeconds.ToString("#.#")) Seconds."
 			}
-			return $task
+			return $scan
 		} catch {
-			Write-Error "$target was not found with an active agent or accessible address entry within a Target Group."
+			Write-Warning "No active agent or accessible address entry found for '$target'."
 			return
 		}
 	}

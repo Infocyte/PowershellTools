@@ -98,7 +98,9 @@ function Get-ICExtension {
             $ext = Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit -CountOnly:$CountOnly
             if ($CountOnly) { return $ext }
             $n = 1
-            $c = $ext.count
+            if ($ext -eq $null) { $c = 0}
+            elseif ($ext.count -eq $null) { $c = 1}
+            else { $c -eq $ext.count }
             $ext | ForEach-Object {
                 try { $pc = [math]::Floor(($n/$c)*100) } catch { $pc = -1 }
                 $guid = $_.description
@@ -428,8 +430,9 @@ function Remove-ICExtension {
         if ($PSCmdlet.ShouldProcess($($ext.Id), "Will remove $($ext.name) with extensionId '$($ext.Id)'")) {
             if (Invoke-ICAPI -Endpoint $Endpoint -method DELETE) {
                 Write-Verbose "Removed extension $($ext.name) [$($ext.Id)]"
+                return $true
             } else {
-                Throw "Extension $($ext.name) [$($ext.Id)] could not be removed!"
+                Write-Error "Extension $($ext.name) [$($ext.Id)] could not be removed!"
             }
         }
     }
@@ -448,13 +451,13 @@ function Import-ICOfficialExtensions {
         $Extensions = Invoke-WebRequest -Uri "https://api.github.com/repos/Infocyte/extensions/contents/official/collection" | Select-Object -ExpandProperty content | ConvertFrom-Json
     }
     catch {
-        Write-Error "Could not download extensions from https://api.github.com/repos/Infocyte/extensions/contents/official/collection"
+        Write-Warning "Could not download extensions from https://api.github.com/repos/Infocyte/extensions/contents/official/collection"
     }
     try {
         $Extensions += Invoke-WebRequest -Uri "https://api.github.com/repos/Infocyte/extensions/contents/official/action" | Select-Object -ExpandProperty content | ConvertFrom-Json
     }
     catch {
-        Write-Error "Could not download extensions from https://api.github.com/repos/Infocyte/extensions/contents/official/action"
+        Write-Warning "Could not download extensions from https://api.github.com/repos/Infocyte/extensions/contents/official/action"
     }
     If ($IncludeContributed) {
         Write-Verbose "Pulling Official Extensions from Github: https://api.github.com/repos/Infocyte/extensions/contents/contrib/"
@@ -462,13 +465,13 @@ function Import-ICOfficialExtensions {
             $Extensions += Invoke-WebRequest -Uri "https://api.github.com/repos/Infocyte/extensions/contents/contrib/collection" | Select-Object -ExpandProperty content | ConvertFrom-Json
         }
         catch {
-            Write-Error "Could not download extensions from https://api.github.com/repos/Infocyte/extensions/contents/contrib/collection"
+            Write-Warning "Could not download extensions from https://api.github.com/repos/Infocyte/extensions/contents/contrib/collection"
         }
         try {
             $Extensions += Invoke-WebRequest -Uri "https://api.github.com/repos/Infocyte/extensions/contents/contrib/action" | Select-Object -ExpandProperty content | ConvertFrom-Json
         }
         catch {
-            Write-Error "Could not download extensions from https://api.github.com/repos/Infocyte/extensions/contents/contrib/action"
+            Write-Warning "Could not download extensions from https://api.github.com/repos/Infocyte/extensions/contents/contrib/action"
         }
     }
     $Results = @()
@@ -477,13 +480,14 @@ function Import-ICOfficialExtensions {
         try {
             $ext = (new-object Net.WebClient).DownloadString($_.download_url)
         } catch {
-            Write-Error "Could not download extension. [$_]"
-            return
+            Write-Warning "Could not download extension. [$_]"
+            continue
         }
         try {
             $header = Parse-ICExtensionHeader $ext
         } catch {
-            Write-Warning "Could not parse header on $($filename)"; return
+            Write-Warning "Could not parse header on $($filename)"; 
+            continue
         }       
         $existingExt = $InstanceExtensions | Where-Object { $_.guid -eq $header.guid }
         if ($existingExt) {
@@ -513,11 +517,9 @@ function Test-ICExtension {
 	  )
 	  
 	If ($env:OS -match "windows" -AND (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator"))) {
-		Write-Error "You do not have Administrator rights to run this script!`nPlease re-run this script as an Administrator!"
-		return
+		Throw "You do not have Administrator rights to run this script!`nPlease re-run this script as an Administrator!"
     } elseif ($IsLinux -AND (id -u) -ne 0) {
-        Write-Error "You do not have permissions to run this script!`nPlease re-run this with sudo!"
-		return
+        Throw "You do not have permissions to run this script!`nPlease re-run this with sudo!"
     }
     
     # Clear-Host
@@ -556,7 +558,7 @@ function Test-ICExtension {
 			Write-Warning "$Devpath/$agentname not found but latest version ($Ver2) was found within your agent folder ($AgentPath). Copying this over."
 			Copy-Item -Path "$AgentPath/$agentname" -Destination "$Devpath" | Out-Null
 		} else {
-            Write-Error "Infocyte Agent not found. Install an Agent or download it into $DevPath"
+            Write-Warning "Infocyte Agent not found. Install an Agent or download it into $DevPath"
             return
         }
 	}
@@ -664,7 +666,8 @@ function Parse-ICExtensionHeader ($ExtensionBody){
     if ($ExtensionBody -match '(?si)^--\[\[[\n\r]+(?<preamble>.+?)-*\]\]') {
         $preamble = $matches.preamble
     } else {
-        Throw [System.FormatException]::New("Could not parse header (should be a comment section wrapped by --[[ <header> --]] )")
+        Write-Error "Could not parse header (should be a comment section wrapped by --[[ <header> --]] )"
+        return
     }
 
     #$regex = '(?mi)\s*Name:\s(?<name>.+?)\n|\s*Type:\s(?<type>.+?)\n|\s*Description:\s(\|(?<description>.+?)\||(?<description>.+?)\n)|\s*Updated:\s(?<updated>.+?)\n|\s*Guid:\s(?<guid>.+?)\n'
@@ -680,7 +683,7 @@ function Parse-ICExtensionHeader ($ExtensionBody){
         $header.updated = ($matches[1].split(" ")[0] | ForEach-Object { get-date -year $_.substring(0,4) -Month $_.substring(4,2) -Day $_.substring(6,2) }).date 
     }
     if ($header.guid -notmatch $GUID_REGEX) { 
-        Write-Warning "Incorrect guid format: $($header.guid).  Should be a guid of form: $GUID_REGEX. 
+        Write-Error "Incorrect guid format: $($header.guid).  Should be a guid of form: $GUID_REGEX. 
             Use the following command to generate a new one: [guid]::NewGuid().Guid" 
     }
     return $header
