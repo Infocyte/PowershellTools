@@ -32,7 +32,7 @@ function Get-ICHelp {
 
     Write-Host "Admin/Misc Functions:"
     Write-Host -ForegroundColor Cyan "`tNew-ICFlag, Update-ICFlag, Remove-ICFlag, Get-ICFlagColors"
-    Write-Host -ForegroundColor Cyan "`tGet-ICUsers, Get-ICUserAuditLog,"
+    Write-Host -ForegroundColor Cyan "`tGet-ICUser, Get-ICUserAuditLog,"
     Write-Host -ForegroundColor Cyan "`tAdd-ICComment", "Get-ICDwellTime`n"
 
     Write-Host "Target Group Management Functions:"
@@ -44,13 +44,17 @@ function Get-ICHelp {
 
     Write-Host "Analysis Data Retrieval Functions:"
     Write-Host -ForegroundColor Cyan "`tGet-ICBox, Set-ICBox,"
-    Write-Host -ForegroundColor Cyan "`tGet-ICObject (alias: Get-ICData), Get-ICVulnerability, Get-ICNotes,"
+    Write-Host -ForegroundColor Cyan "`tGet-ICObject (alias: Get-ICData), Get-ICVulnerability, Get-ICNote,"
     Write-Host -ForegroundColor Cyan "`tGet-ICAlert, Get-ICFileDetail, Get-ICActivityTrace`n"
 
     Write-Host "Scanning Functions:"
     Write-Host -ForegroundColor Cyan "`tInvoke-ICFindHosts, New-ICScanOptions,"
-    Write-Host -ForegroundColor Cyan "`tGet-ICScan, Invoke-ICScan, Invoke-ICScanTarget, Invoke-ICResponse,"
+    Write-Host -ForegroundColor Cyan "`tGet-ICScan, Invoke-ICScan,"
     Write-Host -ForegroundColor Cyan "`tAdd-ICScanSchedule, Get-ICScanSchedule, Remove-ICScanSchedule`n"
+
+    Write-Host "Response Functions:"
+    Write-Host -ForegroundColor Cyan "`tInvoke-ICScanTarget, Invoke-ICResponse,"
+    Write-Host -ForegroundColor Cyan "`tGet-ICResponseResult", "Get-ICHostScanResult`n"
 
     Write-Host "Task Status Functions:"
     Write-Host -ForegroundColor Cyan "`tGet-ICTask, Get-ICTaskItems, Get-ICLastScanTask`n"

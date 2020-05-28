@@ -246,6 +246,103 @@ function Get-ICObject {
     }
 }
 
+function Get-ICHostScanResult {
+    [cmdletbinding()]
+    param(
+        [parameter(
+            Mandatory
+        )]
+        [ValidateScript( { if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid." } })]
+        [alias('id')]
+        [String]$scanId,
+
+        [parameter()]
+        [String]$Hostname
+    )
+
+    $Scan = Get-ICScan -id $scanId
+    if (-NOT $Scan) {
+        Write-Error "ScanId does not exist"
+        return
+    }
+    
+    if ($hostname) {
+        $where = @{ hostname = @{ ilike = $hostname }} 
+    }
+    $HostResult = Get-ICObject -Type Host -scanId $scanId -where $where | Select-Object -Last 1
+    if (-NOT $HostResult) {
+        Write-Error "No data found for $hostname"
+        return
+    }
+    if (-NOT $where) {
+        $where = @{ scanId = $scanId }
+    } else {
+        $where['scanId'] = $scanId
+    }
+    $Alerts = @()
+    $Alerts += Get-ICAlert -where $where
+
+    return [PSCustomObject]@{
+        scanId              = $scanId
+        hostId              = $HostResult.hostId
+        os                  = $HostResult.osVersion
+        success             = $(-NOT $HostResult.failed)
+        compromised         = $HostResult.compromised
+        completedOn         = $HostResult.completedOn
+        alerts              = $Alerts
+        hostname            = $HostResult.hostname
+        ip                  = $HostResult.ip
+    }
+}
+
+function Get-ICResponseResult {
+    [cmdletbinding()]
+    param(
+        [parameter(
+            Mandatory)]
+        [ValidateScript( { if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid." } })]
+        [alias('id')]
+        [String]$scanId,
+
+        [parameter()]
+        [String]$hostname
+    )
+
+    $Scan = Get-ICScan -id $scanId
+    if (-NOT $Scan) {
+        throw "ScanId does not exist"
+    }
+    if ($hostname) {
+        $where = @{ hostname = @{ ilike = $hostname }} 
+    }
+    $HostResult = Get-ICObject -Type Host -scanId $scanId -where $where | Select-Object -Last 1
+    if (-NOT $HostResult) {
+        throw "No data found for $hostname"
+    }
+    if (-NOT $HostResult.failed) {
+        $ExtensionResult = Get-ICObject -Type Extension -scanId $scanId -where $where -allinstances | Select-Object -Last 1
+        $success = $ExtensionResult.success
+    } else {
+        $success = $false
+    }
+    
+    return [PSCustomObject]@{
+        scanId             = $scanId
+        hostId             = $HostResult.hostId
+        extensionId        = $ExtensionResult.ExtensionId
+        os                 = $HostResult.osVersion
+        success            = $success
+        threatStatus       = $ExtensionResult.threatStatus
+        compromised        = $HostResult.compromised
+        completedOn        = $HostResult.completedOn
+        runTime            = $ExtensionResult.runTime
+        extensionName      = $ExtensionResult.name
+        messages           = $ExtensionResult.output
+        hostname           = $HostResult.hostname
+        ip                 = $HostResult.ip
+    }
+}
+
 function Get-ICVulnerability {
     [cmdletbinding()]
     param(
@@ -292,7 +389,7 @@ function Get-ICVulnerability {
             if ($a) {
                 $apps += $a
             } else {
-                Write-Error "No application found with applicationId: $Id in BoxId: $BoxId"
+                Write-Warning "No application found with applicationId: $Id in BoxId: $BoxId"
                 return
             }
         } else {
@@ -319,7 +416,7 @@ function Get-ICVulnerability {
             $appvulns = $appvulns | Where-Object  { $appids -contains $_.applicationId }
             $apps = $apps | Where-Object  { $appvulns.applicationId -contains $_.applicationId }
         } else {
-            Write-Verbose "No Results found."
+            Write-Warning "No Results found."
             return
         }
 
@@ -372,7 +469,7 @@ function Get-ICFileDetail {
     PROCESS {
         Write-Verbose "Requesting FileReport on file with SHA1: $sha1"
         $fileReport = Get-ICAPI -Endpoint "FileReps/$sha1" -fields $fields
-        $notes = Get-ICNotes -relatedId $sha1
+        $notes = Get-ICNote -relatedId $sha1
         if ($notes.count -eq $null) {
             $cnt = 1
         } else {
@@ -384,9 +481,14 @@ function Get-ICFileDetail {
     }
 }
 
-function Get-ICNotes {
+function Get-ICNote {
+    [cmdletbinding()]
+    [alias("Get-ICComment")]
     Param(
-        [parameter(Mandatory=$true, ValueFromPipeline, ValueFromPipelineByPropertyName)]
+        [parameter(
+            Mandatory=$false, 
+            ValueFromPipeline, 
+            ValueFromPipelineByPropertyName)]
         [ValidateScript({ if ($_ -match "\b[0-9a-f]{40}\b") { $true } else { throw "Incorrect input: $_.  Requires a relatedId or fileRepId (sha1) of 40 characters."} })]
         [alias('fileRepId')]
         [alias('sha1')]
@@ -397,14 +499,20 @@ function Get-ICNotes {
     )
     
     PROCESS {
-        Write-Verbose "Getting notes/comments on object with id: $relatedId"
+        
         if (-NOT $where -AND $relatedId) {
+            Write-Verbose "Getting notes/comments on object with id: $relatedId"
             $where += @{ relatedId = $relatedId }
         }
+        else {
+            Write-Verbose "Getting notes/comments on all objects."
+        }
         $comments = Get-ICAPI -Endpoint "userComments" -where $where
+        $users = Get-ICAPI -endpoint "users" -fields id, username
         $comments | ForEach-Object {
-            Write-Verbose "Looking up user: $($_.userId)"
-            $_ | Add-Member -Type Noteproperty -Name createdBy -Value (Get-ICAPI -endpoint users -where @{ id = $_.userId } -fields email -ea 0).email
+            $userId = $_.userId
+            $user = $users | Where-Object { $_.id -eq $userId }
+            $_ | Add-Member -Type Noteproperty -Name createdBy -Value $user.username
         }
         $comments | Write-Output
 
@@ -694,7 +802,6 @@ function Set-ICBox {
     param(
         [parameter(
             Mandatory=$true, 
-            ValueFromPipeLine=$true,
             ValueFromPipelineByPropertyName,
             ParameterSetName="Id"
             )]
@@ -740,7 +847,7 @@ function Set-ICBox {
                 Get-ICBox -targetGroupId $targetGroupId -Last $Last | Set-ICBox
             } else {
                 #Global
-                Get-ICBox -Last $Last | Set-ICBox
+                Get-ICBox -Global:$Global -Last $Last | Set-ICBox
             }
         }
     }
