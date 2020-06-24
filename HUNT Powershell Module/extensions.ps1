@@ -665,7 +665,7 @@ function Test-ICExtension {
                 #Color code output
                 Switch ($AgentOutput.level) {
                     "ERROR" { $color = 'Red' }
-                    "WARN" { $color = 'Orange' }
+                    "WARN" { $color = 'DarkYellow' }
                     "DEBUG" { $color = 'Yellow' }
                     "VERBOSE" { $color = 'Yellow' }
                     "TRACE" { $color = 'Yellow' }
