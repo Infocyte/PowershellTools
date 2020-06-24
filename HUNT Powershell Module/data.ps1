@@ -542,9 +542,10 @@ function Get-ICAlert {
         $Endpoint = "AlertDetails"
         if ($Id) {
             $CountOnly = $false
-            $Endpoint += "/$Id"
+            $where = @{ id = $Id }
+            #$Endpoint += "/$Id" (currently broken)
         }
-        if (-NOT ($IncludeArchived -OR $Where['archived'])) {
+        elseif (-NOT ($IncludeArchived -OR $Where['archived'])) {
             $Where += @{ archived = $FALSE }
         }
         Get-ICAPI -Endpoint $Endpoint -where $where -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly
