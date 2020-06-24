@@ -71,8 +71,7 @@ function Get-ICExtension {
             if ($SavePath) {
                 $ext.body | Out-File $SavePath | Out-Null
             }
-            Write-Output $ext
-
+            $ext
         } 
         elseif ($Guid) {
             Write-Verbose "Looking up extension by Guid."
@@ -86,7 +85,7 @@ function Get-ICExtension {
                 }
             #>
             if ($ext) {
-                return $ext
+                $ext
             } else {
                 Write-Warning "Could not find extension with Guid: $($Guid)"
                 return
@@ -107,12 +106,12 @@ function Get-ICExtension {
                 Write-Progress -Activity "Getting Extentions from Infocyte API" -status "Requesting Body from Extension $n of $c" -PercentComplete $pc
                 $_ | Add-Member -TypeName NoteProperty -NotePropertyName guid -NotePropertyValue $guid
                 if ($IncludeBody) {
-                    Write-Output (Get-ICExtension -id $_.Id)
+                    Get-ICExtension -id $_.Id
                 } else {
                     Write-Verbose "Looking up user: $($_.createdBy) and $($_.updatedBy)"
                     $_.createdBy = (Get-ICAPI -endpoint users -where @{ id = $_.createdBy } -fields email).email
                     $_.updatedBy = (Get-ICAPI -endpoint users -where @{ id = $_.updatedBy } -fields email).email
-                    Write-Output $_
+                    $_
                 }
                 $n += 1
             }
@@ -430,7 +429,7 @@ function Remove-ICExtension {
         if ($PSCmdlet.ShouldProcess($($ext.Id), "Will remove $($ext.name) with extensionId '$($ext.Id)'")) {
             if (Invoke-ICAPI -Endpoint $Endpoint -method DELETE) {
                 Write-Verbose "Removed extension $($ext.name) [$($ext.Id)]"
-                return $true
+                $true
             } else {
                 Write-Error "Extension $($ext.name) [$($ext.Id)] could not be removed!"
             }
@@ -733,5 +732,5 @@ function Parse-ICExtensionHeader ($ExtensionBody){
         Write-Error "Incorrect guid format: $($header.guid).  Should be a guid of form: $GUID_REGEX. 
             Use the following command to generate a new one: [guid]::NewGuid().Guid" 
     }
-    return $header
+    $header
 }
