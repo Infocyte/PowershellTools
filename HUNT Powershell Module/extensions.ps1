@@ -69,7 +69,7 @@ function Get-ICExtension {
             $ext.createdBy = (Get-ICAPI -endpoint users -where @{ id = $ext.createdBy } -fields email -ea 0).email
             $ext.updatedBy = (Get-ICAPI -endpoint users -where @{ id = $ext.updatedBy } -fields email -ea 0).email
             if ($SavePath) {
-                $ext.body | Out-File $SavePath
+                $ext.body | Out-File $SavePath | Out-Null
             }
             Write-Output $ext
 
@@ -510,16 +510,22 @@ function Test-ICExtension {
 	[cmdletbinding()]
 	[alias("Invoke-ICExtension")]
 	param(
-		[parameter(mandatory=$true)]
-          [String]$Path,
-          
-          [Switch]$Legacy
-	  )
-	  
+	    [parameter(mandatory=$true)]
+        [String]$Path,
+        
+        [Switch]$Legacy
+    )
+
+    $LoggingColor = 'Green'
+      	  
 	If ($env:OS -match "windows" -AND (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator"))) {
 		Throw "You do not have Administrator rights to run this script!`nPlease re-run this script as an Administrator!"
     } elseif ($IsLinux -AND (id -u) -ne 0) {
         Throw "You do not have permissions to run this script!`nPlease re-run this with sudo!"
+    }
+
+    if (-NOT (Test-Path $Path)) {
+        Throw "$Path not found"
     }
     
     # Clear-Host
@@ -537,14 +543,12 @@ function Test-ICExtension {
         $AgentPath = "opt/infocyte/agent"
     }
 
-	$URL = ""
-
     # Check for Agent
     if (Test-Path "$DevPath/$agentname") {
         if ($Legacy){
              $DevVer = (& "$DevPath/$agentname" "--version").split(" ")[2]
         } else {
-            $DevVer = (& "$DevPath/$agentname" "--version").split(" ")[3]
+            $DevVer = (& "$DevPath/$agentname" "--version").split(" ")[2]
         }
     } else {
 		New-Item $Devpath -ItemType Directory | Out-Null
@@ -553,7 +557,7 @@ function Test-ICExtension {
                 $AgentVer = (& "$AgentPath/$agentname" "--version").split(" ")[2]
             }
             else {
-                $AgentVer = (& "$AgentPath/$agentname" "--version").split(" ")[3]
+                $AgentVer = (& "$AgentPath/$agentname" "--version").split(" ")[2]
             }
 			Write-Warning "$Devpath/$agentname not found but latest version ($Ver2) was found within your agent folder ($AgentPath). Copying this over."
 			Copy-Item -Path "$AgentPath/$agentname" -Destination "$Devpath" | Out-Null
@@ -568,7 +572,7 @@ function Test-ICExtension {
             $AgentVer = (& "$AgentPath/$agentname" "--version").split(" ")[2]
         }
         else {
-            $AgentVer = (& "$AgentPath/$agentname" "--version").split(" ")[3]
+            $AgentVer = (& "$AgentPath/$agentname" "--version").split(" ")[2]
         }
         if ($AgentVer -gt $DevVer) {
             Write-Warning "$agentname ($DevVer) has an update: ($AgentVer). Copy '$AgentPath/$agentname' to '$Devpath/$agentname'.`n
@@ -578,12 +582,11 @@ function Test-ICExtension {
 
     $Path = Get-item $Path | Select-Object -ExpandProperty FullName
     $ext = Get-item $Path | Select-Object -ExpandProperty name
-    Write-Verbose "Executing $ext with $agentname (Version: $DevVer)"
     
 
     if (($env:OS -match "windows" -OR $isWindows) -AND (-NOT (Test-Path "$DevPath/luacheck.exe"))) {
 		$url = "https://github.com/mpeterv/luacheck/releases/download/0.23.0/luacheck.exe"
-		Write-Warning "$Devpath/luacheck.exe not found (used for debugging). Attempting to download from Github."
+        Write-Host -ForegroundColor $LoggingColor "$Devpath/luacheck.exe not found (used for linting). Attempting to download from Github."
 		# Download luacheck from Github
 		#[Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls13
 		$wc = New-Object Net.WebClient
@@ -592,9 +595,19 @@ function Test-ICExtension {
 		try {
 			$wc.DownloadFile($URL, "$Devpath/luacheck.exe")
 		} catch {
-			Write-Warning "Could not download luacheck.exe from $URL."
-		}
-	}
+            Write-Warning "Could not download luacheck.exe from $URL."
+        }
+        $Config = "C:\Program Files\Infocyte\dev\.luacheckrc"
+        if (-NOT (Test-Path $Config)) {
+            'globals = { "hunt" }' > $Config
+            'allow_defined = true' >> $Config
+            'ignore = { "611", "612", "613", "614" }' >> $Config
+        }
+    }
+    if (($env:OS -match "windows" -OR $isWindows) -AND (Test-Path "$DevPath/luacheck.exe")) {
+        Write-Host -ForegroundColor $LoggingColor "Linting $Path"
+        Get-Content $Path | & "$Devpath\luacheck.exe" - --codes --config "C:\Program Files\Infocyte\dev\.luacheckrc"
+    }
 
     # & "agent.exe --no-delete --no-compress --verbose --only-extensions --extensions $Path"
     $a = @()
@@ -604,16 +617,13 @@ function Test-ICExtension {
         $a += "--only-extensions"
         $a += "--extensions $Path"
     } else {
-        $a += "survey"
-        $a += "--no-install"
-        $a += "--no-compress"
-        $a += "--only-extensions"
-        $a += "--extensions $Path"
-	
+        $a += "--verbose"
+        $a += "--extension $Path"
+        $a += "survey --no-compress --only-extensions"
     }
 
-	#$p = Start-Process -NoNewWindow -FilePath "$Devpath\agent.exe" -ArgumentList $a -PassThru
-	
+    Write-Host -ForegroundColor $LoggingColor "Executing $ext with $agentname (Version: $DevVer)"
+    Write-Host -ForegroundColor $LoggingColor "$Devpath/$agentname $a"
 	$psi = New-object System.Diagnostics.ProcessStartInfo
 	$psi.CreateNoWindow = $true
 	$psi.UseShellExecute = $false
@@ -625,31 +635,68 @@ function Test-ICExtension {
 	$process.StartInfo = $psi
 	$process.Start() | Out-Null
 	#$process.WaitForExit()
-
-	$line = $process.StandardOutput.ReadLine()
-	#$output = "`n$line"
+    $line = $true
+    if ($process.HasExited) {
+        Write-Warning "Something went wrong on survey running: $Devpath/$agentname $($a.ToString())"
+    }
+    #$output = "`n$line"
+    $completedsuccessfully = $false
+    $agentOutputRegex = '^\[(?<datestamp>\d{4}-\d{1,2}-\d{1,2}\s\d{1,2}:\d{1,2}:\d{1,2}\.\d+\sUTC)\]\[(?<level>!?.+)\]\[(?<logtype>!?.+)\]\s(?<msg>.+)'
+    $color = 'green'
 	while ($line -OR -NOT $process.HasExited) {
-        $reg = $line -Match "\d{4}-\d+-\d+T\d+:\d+:\d+\.\d+-\d+:\d+\s(?<type>!?.+)\shunt_survey\s-\sCompleted"
-        if ($reg1) {
-            Write-Output "[$($Matches.type)] Survey Completed"
-            return
-        }
-        $reg = $line -Match "\d{4}-\d+-\d+T\d+:\d+:\d+\.\d+-\d+:\d+\s(?<type>!?.+)\ssurvey_types::(response|extensions.*?)\s-\s(?<message>.+)"
-        if ($reg) {
-			Write-Output "[$($Matches.type)] $($Matches.message)"
-        } else { 
-            if ($line -Match "^([^\d]{4}|\s+)" ) {
-                Write-Host -ForegroundColor DarkGray ": $line"
-            } 
-            elseif ("" -eq $line -OR $null -eq $line) {
-                Write-Host -ForegroundColor DarkGray ""
-            } 
-            else {
+        $line = $process.StandardOutput.ReadLine()
+        if ($line -Match $agentOutputRegex) {
+            if ($exitError) {
+                return $false
+            }
+            $AgentOutput = $Matches
+            
+            # End
+            if ($AgentOutput.msg -match "System inspections complete") {
+                Write-Verbose "Completed!"
+                return $true
+            }
+            elseif ($AgentOutput.logtype -eq "agent::survey") {
                 Write-Verbose "$line"
             }
+            elseif ($AgentOutput.msg -match "Logging initialized") {
+                Write-Host -ForegroundColor $LoggingColor "Running Extension..."
+            }
+            else {
+                #Color code output
+                Switch ($AgentOutput.level) {
+                    "ERROR" { $color = 'Red' }
+                    "WARN" { $color = 'Orange' }
+                    "DEBUG" { $color = 'Yellow' }
+                    "VERBOSE" { $color = 'Yellow' }
+                    "TRACE" { $color = 'Yellow' }
+                    "INFO" { $color = 'Blue' }
+                    default {
+                        Write-Warning "[Unknown] $($AgentOutput.msg)"        
+                    }
+                } 
+
+                if ($AgentOutput.logtype -eq "agent::extensions" -AND $AgentOutput.level -eq "ERROR") {
+                    Write-Host -ForegroundColor $color "[$($AgentOutput.level)][$($AgentOutput.logtype)] $($AgentOutput.msg)"
+                    $exitError = $true
+                }
+                else {
+                    Write-Host -ForegroundColor $color "[$($AgentOutput.level)] $($AgentOutput.msg)"
+                }
+            } 
+        } else {
+            # print and error output
+            if ($color -eq 'Red') {
+                Write-Host -ForegroundColor Red "$line"
+            } else {
+                Write-Host -ForegroundColor DarkGray "[PRINT] $line"
+            }
         }
-        $line = $process.StandardOutput.ReadLine()
-	}
+    }
+    if ($exitError) {
+        Write-Warning "Survey did not complete successfully. Address any bugs in the extension and try again."
+    }
+    -NOT $exitError
 }
 
 function Parse-ICExtensionHeader ($ExtensionBody){
