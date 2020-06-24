@@ -640,7 +640,7 @@ function Test-ICExtension {
     }
     #$output = "`n$line"
     $completedsuccessfully = $false
-    $agentOutputRegex = '^\[(?<datestamp>\d{4}-\d{1,2}-\d{1,2}\s\d{1,2}:\d{1,2}:\d{1,2}\.\d+\sUTC)\]\[(?<level>!?.+)\]\[(?<logtype>!?.+)\]\s(?<msg>.+)'
+    $agentOutputRegex = '^\[(?<datestamp>\d{4}-\d{1,2}-\d{1,2}\s\d{1,2}:\d{1,2}:\d{1,2}\.\d+\sUTC)\]\[(?<level>.+?)\]\[(?<logtype>.+?)\]\s(?<msg>.+)'
     $color = 'green'
 	while ($line -OR -NOT $process.HasExited) {
         $line = $process.StandardOutput.ReadLine()
