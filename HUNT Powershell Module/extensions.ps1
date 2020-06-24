@@ -515,7 +515,7 @@ function Test-ICExtension {
         [Switch]$Legacy
     )
 
-    $LoggingColor = 'Green'
+    $LoggingColor = 'DarkCyan'
       	  
 	If ($env:OS -match "windows" -AND (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator"))) {
 		Throw "You do not have Administrator rights to run this script!`nPlease re-run this script as an Administrator!"
@@ -616,7 +616,7 @@ function Test-ICExtension {
         $a += "--only-extensions"
         $a += "--extensions $Path"
     } else {
-        $a += "--verbose"
+        $a += "--debug"
         $a += "--extension $Path"
         $a += "survey --no-compress --only-extensions"
     }
