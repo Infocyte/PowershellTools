@@ -246,10 +246,10 @@ function Invoke-ICScanTarget {
 			if (-NOT $agent.active) {
 				Write-Verbose "No active agent found, looking for existing address entry in target group $tg"
 				#Check Address Table
-				$Addr = Get-ICAddress -targetId $targetGroupId -where @{ accessible = $true; or = @(  @{ hostname = $target }, @{ ipstring = $target }) } | Sort-Object lastAccessedOn -Descending | Select-Object -First 1
+				$Addr = Get-ICAddress -targetId $targetGroupId -where @{ accessible = $true; or = @(  @{ hostname = $target }, @{ ipstring = $target }) } | Sort-Object lastAccessedOn -Descending | Select-Object -Last 1
 				if (-NOT $addr) {
 					Write-Verbose "No accessible address entry in target group $tg, looking at all target groups"
-					$Addr2 = Get-ICAddress -where @{ accessible = $true; or = @(  @{ hostname = $target }, @{ ipstring = $target }) } | Sort-Object lastAccessedOn -Descending | Select-Object -First 1
+					$Addr2 = Get-ICAddress -where @{ accessible = $true; or = @(  @{ hostname = $target }, @{ ipstring = $target }) } | Sort-Object lastAccessedOn -Descending | Select-Object -Last 1
 					if ($Addr2) {
 						# Transfer over an existing accessible address entry
 						Write-Verbose "Found accessible address entry, transfering it over to target group $tg"
@@ -311,8 +311,16 @@ function Invoke-ICScanTarget {
 			}
 			return $scan
 		} catch {
-			Write-Warning "No active agent or accessible address entry found for '$target'."
-			return
+			$statuscode = $_.Exception.Response.StatusCode.value__
+			Switch -regex ($statuscode) {
+				"5\d\d" {
+					Write-Warning "No active agent or accessible address entry found for '$target' [error=$statuscode - $($_.Exception.Message)]"
+					return
+				}
+				default {
+					Throw $_.Exception.Message
+				}
+			}
 		}
 	}
 }
@@ -431,7 +439,7 @@ function Invoke-ICResponse {
 			$ExtensionName = $Ext.name
 		}
 		else {
-			$Ext = Get-ICExtension -where @{ name = $ExtensionName } | Select-Object -First 1
+			$Ext = Get-ICExtension -where @{ name = $ExtensionName } | Select-Object -Last 1
 			if (-NOT $Ext) {
 				Throw "Extension with name $ExtensionName does not exist!"
 			}
