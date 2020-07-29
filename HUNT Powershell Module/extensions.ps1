@@ -700,7 +700,7 @@ function Test-ICExtension {
 
 function Parse-ICExtensionHeader ($ExtensionBody){
 
-    $header = [PSCustomObject]@{
+    $header = @{
         name = $null
         type = $null
         description = $null
@@ -709,28 +709,30 @@ function Parse-ICExtensionHeader ($ExtensionBody){
         created = $null
         updated = $null
     }
-    if ($ExtensionBody -match '(?si)^--\[\[[\n\r]+(?<preamble>.+?)-*\]\]') {
+    if ($ExtensionBody -match '(?si)^--\[=\[[\n\r]+(?<preamble>.+?)[\n\r]+\]=\]') {
         $preamble = $matches.preamble
     } else {
-        Write-Error "Could not parse header (should be a comment section wrapped by --[[ <header> --]] )"
+        Write-Error "Could not parse header (should be a comment section wrapped by --[=[ <header> ]=] )"
         return
     }
+    Add-Type -Path "$PSScriptRoot\lib\nett.dll"
+    $toml = [Toml]::ReadString($preamble.trim())
+    if ($toml['filetype'].value -ne "Infocyte Extension") {
+        Throw "Invalid filetype. File is not an Infocyte Extension."
+    }
 
-    #$regex = '(?mi)\s*Name:\s(?<name>.+?)\n|\s*Type:\s(?<type>.+?)\n|\s*Description:\s(\|(?<description>.+?)\||(?<description>.+?)\n)|\s*Updated:\s(?<updated>.+?)\n|\s*Guid:\s(?<guid>.+?)\n'
-    if ($preamble -match '(?mi)^\s*Name:\s(.+?)\n') { $header.name = $Matches[1] }
-    if ($preamble -match '(?mi)^\s*Guid:\s(.+?)\n') { $header.guid = $Matches[1] }
-    if ($preamble -match '(?mi)^\s*Author:\s(.+?)\n') { $header.author = $Matches[1] }
-    if ($preamble -match '(?si)\s*Description:\s(?<a>\|\s*(?<desc>.+?)\s*\||(?<desc>.+?)\n)') { $header.description = $Matches.desc }
-    if ($preamble -match '(?mi)^\s*Type:\s(.+?)\n') { $header.type = $Matches[1] }
-    if ($preamble -match '(?mi)^\s*Created:\s(\d{8})\s*') {
-        $header.created = ($matches[1].split(" ")[0] | ForEach-Object { get-date -year $_.substring(0,4) -Month $_.substring(4,2) -Day $_.substring(6,2) }).date 
+    $toml['info'].key | % { $headers[$_] = $toml['info'][$_].Value }
+    if ($toml['globals'].Count -gt 1) {
+        $headers['globals'] = 
     }
-    if ($preamble -match '(?mi)^\s*Updated:\s(\d{8})\s*') {
-        $header.updated = ($matches[1].split(" ")[0] | ForEach-Object { get-date -year $_.substring(0,4) -Month $_.substring(4,2) -Day $_.substring(6,2) }).date 
+    if ($toml['args'].Count -gt 1) {
+        $headers['args'] = 
     }
+
     if ($header.guid -notmatch $GUID_REGEX) { 
         Write-Error "Incorrect guid format: $($header.guid).  Should be a guid of form: $GUID_REGEX. 
             Use the following command to generate a new one: [guid]::NewGuid().Guid" 
     }
+
     $header
 }
