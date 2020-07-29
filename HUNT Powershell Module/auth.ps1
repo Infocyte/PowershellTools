@@ -20,62 +20,6 @@ function _DisableSSLVerification {
     [TrustEverything]::SetCallback()
 }
 
-#Get Login Token (required) -- NOTE: Depreciated in the SaaS version
-function New-ICToken {
-	[cmdletbinding()]
-	param(
-		[parameter(Mandatory=$true)]
-		[ValidateNotNullOrEmpty()]
-		[String]$HuntServer,
-
-		[parameter(Mandatory=$true)]
-		[System.Management.Automation.PSCredential]
-		$Credential
-	)
-
-	[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-	_DisableSSLVerification
-
-	if ($HuntServer -notlike "https://*") {
-		$Global:HuntServerAddress = "https://" + $HuntServer
-	} else {
-		$Global:HuntServerAddress = $HuntServer
-	}
-  	$url = "$Global:HuntServerAddress/api/users/login"
-
-	if (-NOT $Credential) {
-		# Default Credentials
-		Write-Verbose "No Credentials provided"
-		$Credential = Get-Credential
-	}
-
-
-
-	$data = @{
-		username = $Credential.GetNetworkCredential().username
-		password = $Credential.GetNetworkCredential().password
-	}
-	$i = $data | ConvertTo-JSON
-	Write-Verbose "Requesting new Token from $Global:HuntServerAddress using account $($Credential.username)"
-	Write-Verbose "Credentials and Hunt Server Address are stored in global variables for use in all IC cmdlets"
-
-	try {
-		$response = Invoke-RestMethod $url -Method POST -Body $i -ContentType 'application/json'
-	} catch {
-		Write-Warning "Error: $_"
-		return "ERROR: $($_.Exception.Message)"
-	}
-	if ($response -match "Error") {
-		Write-Warning "Error: Unauthorized"
-		return "ERROR: $($_.Exception.Message)"
-	} else {
-		# Set Token to global variable
-		$Global:ICToken = $response.id
-		Write-Verbose 'New token saved to global variable: $Global:ICToken'
-		$response
-	}
-}
-
 
 # Generate an API token in the web console's profile or admin section.
 # You can save tokens and proxy info to disk as well with the -Save switch.
