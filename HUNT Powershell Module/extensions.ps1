@@ -512,7 +512,9 @@ function Test-ICExtension {
 	    [parameter(mandatory=$true)]
         [String]$Path,
         
-        [Switch]$Legacy
+        [Object]$Globals,
+
+        [Object]$Arguments
     )
 
     $LoggingColor = 'DarkCyan'
@@ -528,12 +530,7 @@ function Test-ICExtension {
     }
     
     # Clear-Host
-    if ($Legacy){
-        $agentname = "s1.exe"
-    }
-    else {
-        $agentname = "agent.exe"
-    }
+    $agentname = "agent.exe"
     if ($IsWindows -OR $env:OS -match "windows") {
         $Devpath = "C:/Program Files/Infocyte/dev"
         $AgentPath = "C:/Program Files/Infocyte/Agent"
@@ -543,22 +540,13 @@ function Test-ICExtension {
     }
 
     # Check for Agent
-    if (Test-Path "$DevPath/$agentname") {
-        if ($Legacy){
-             $DevVer = (& "$DevPath/$agentname" "--version").split(" ")[2]
-        } else {
-            $DevVer = (& "$DevPath/$agentname" "--version").split(" ")[2]
-        }
+    if (Test-Path "$DevPath/$agentname") {     
+        $DevVer = (& "$DevPath/$agentname" "--version").split(" ")[2]
     } else {
 		New-Item $Devpath -ItemType Directory | Out-Null
 		if (Test-Path "$AgentPath/$agentname") {
-            if ($Legacy) {
-                $AgentVer = (& "$AgentPath/$agentname" "--version").split(" ")[2]
-            }
-            else {
-                $AgentVer = (& "$AgentPath/$agentname" "--version").split(" ")[2]
-            }
-			Write-Warning "$Devpath/$agentname not found but latest version ($Ver2) was found within your agent folder ($AgentPath). Copying this over."
+            $AgentVer = (& "$AgentPath/$agentname" "--version").split(" ")[2]
+            Write-Warning "$Devpath/$agentname not found but latest version ($AgentVer) was found within your agent folder ($AgentPath). Copying this over."
 			Copy-Item -Path "$AgentPath/$agentname" -Destination "$Devpath" | Out-Null
 		} else {
             Write-Warning "Infocyte Agent not found. Install an Agent or download it into $DevPath"
@@ -567,12 +555,7 @@ function Test-ICExtension {
 	}
     # Update Agent
     if (Test-Path "$AgentPath/$agentname") {
-        if ($Legacy) {
-            $AgentVer = (& "$AgentPath/$agentname" "--version").split(" ")[2]
-        }
-        else {
-            $AgentVer = (& "$AgentPath/$agentname" "--version").split(" ")[2]
-        }
+        $AgentVer = (& "$AgentPath/$agentname" "--version").split(" ")[2]
         if ($AgentVer -gt $DevVer) {
             Write-Warning "$agentname ($DevVer) has an update: ($AgentVer). Copy '$AgentPath/$agentname' to '$Devpath/$agentname'.`n
                 `tRun this command to do so: Copy-Item -Path '$AgentPath/$agentname' -Destination '$Devpath/$agentname'"
@@ -596,30 +579,34 @@ function Test-ICExtension {
 		} catch {
             Write-Warning "Could not download luacheck.exe from $URL."
         }
+    }
+    if (($env:OS -match "windows" -OR $isWindows) -AND (Test-Path "$DevPath/luacheck.exe")) {
         $Config = "C:\Program Files\Infocyte\dev\.luacheckrc"
         if (-NOT (Test-Path $Config)) {
             'globals = { "hunt" }' > $Config
             'allow_defined = true' >> $Config
             'ignore = { "611", "612", "613", "614" }' >> $Config
         }
-    }
-    if (($env:OS -match "windows" -OR $isWindows) -AND (Test-Path "$DevPath/luacheck.exe")) {
         Write-Host -ForegroundColor $LoggingColor "Linting $Path"
         Get-Content $Path | & "$Devpath\luacheck.exe" - --codes --config "C:\Program Files\Infocyte\dev\.luacheckrc"
     }
 
-    # & "agent.exe --no-delete --no-compress --verbose --only-extensions --extensions $Path"
     $a = @()
-    if ($Legacy) {
-        $a += "--no-compress"
-        $a += "--no-install"
-        $a += "--only-extensions"
-        $a += "--extensions $Path"
-    } else {
-        $a += "--debug"
-        $a += "--extension $Path"
-        $a += "survey --no-compress --only-extensions"
+    $a += "--debug"
+    $a += "--extension `"$Path`""
+    if ($Globals) {
+        $Globals | ConvertTo-Json | Out-File -Force "$Devpath/globals.json"
+        $a += "--extension-globals `"$Devpath/globals.json`""
     }
+    if ($Arguments) {
+        $Arguments | ConvertTo-Json | Out-File -Force "$Devpath/args.json"
+        $a += "--extension-args `"$Devpath/args.json`""
+    }
+    $a += "survey --no-compress --only-extensions"
+
+    $completedsuccessfully = $false
+    $agentOutputRegex = '^\[(?<datestamp>\d{4}-\d{1,2}-\d{1,2}\s\d{1,2}:\d{1,2}:\d{1,2}\.\d+\sUTC)\]\[(?<level>.+?)\]\[(?<logtype>.+?)\]\s(?<msg>.+)'
+    $color = 'green'
 
     Write-Host -ForegroundColor $LoggingColor "Executing $ext with $agentname (Version: $DevVer)"
     Write-Host -ForegroundColor $LoggingColor "$Devpath/$agentname $a"
@@ -627,23 +614,26 @@ function Test-ICExtension {
 	$psi.CreateNoWindow = $true
 	$psi.UseShellExecute = $false
 	$psi.RedirectStandardOutput = $true
-	$psi.RedirectStandardError = $false
+	$psi.RedirectStandardError = $true
 	$psi.FileName = "$Devpath/$agentname"
 	$psi.Arguments = $a
 	$process = New-Object System.Diagnostics.Process
 	$process.StartInfo = $psi
-	$process.Start() | Out-Null
+    $process.Start() | Out-Null
+    Write-Verbose "Args: $($psi.Arguments)"
 	#$process.WaitForExit()
-    $line = $true
     if ($process.HasExited) {
         Write-Warning "Something went wrong on survey running: $Devpath/$agentname $($a.ToString())"
     }
-    #$output = "`n$line"
-    $completedsuccessfully = $false
-    $agentOutputRegex = '^\[(?<datestamp>\d{4}-\d{1,2}-\d{1,2}\s\d{1,2}:\d{1,2}:\d{1,2}\.\d+\sUTC)\]\[(?<level>.+?)\]\[(?<logtype>.+?)\]\s(?<msg>.+)'
-    $color = 'green'
 	while ($line -OR -NOT $process.HasExited) {
         $line = $process.StandardOutput.ReadLine()
+        if (-NOT $line) {
+            $line = $process.StandardError.ReadLine()
+        }
+        if (-NOT $line -AND $process.StandardError) {
+            $l = $process.StandardError.ReadToEnd()
+            Write-Warning $l
+        }
         if ($line -Match $agentOutputRegex) {
             if ($exitError) {
                 return $false
@@ -695,6 +685,8 @@ function Test-ICExtension {
     if ($exitError) {
         Write-Warning "Survey did not complete successfully. Address any bugs in the extension and try again."
     }
+    #Remove-Item "$Devpath/args.json" | Out-Null
+    #Remove-Item "$Devpath/globals.json" | Out-Null
     -NOT $exitError
 }
 
