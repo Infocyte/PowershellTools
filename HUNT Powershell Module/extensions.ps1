@@ -58,13 +58,17 @@ function Get-ICExtension {
             $ext | Add-Member -TypeName NoteProperty -NotePropertyName body -NotePropertyValue $ext2.body
             $ext | Add-Member -TypeName NoteProperty -NotePropertyName sha256 -NotePropertyValue $ext2.sha256
             Write-Verbose "Parsing Extension Header"
-            $header = Parse-ICExtensionHeader $ext.body
-            $ext | Add-Member -TypeName NoteProperty -NotePropertyName scriptGuid -NotePropertyValue $header.guid
-            $ext | Add-Member -TypeName NoteProperty -NotePropertyName scriptName -NotePropertyValue $header.name
-            $ext | Add-Member -TypeName NoteProperty -NotePropertyName scriptDescription -NotePropertyValue $header.Description
-            $ext | Add-Member -TypeName NoteProperty -NotePropertyName scriptAuthor -NotePropertyValue $header.author
-            $ext | Add-Member -TypeName NoteProperty -NotePropertyName scriptCreated -NotePropertyValue $header.created
-            $ext | Add-Member -TypeName NoteProperty -NotePropertyName scriptUpdated -NotePropertyValue $header.updated
+            $header = Parse-ICExtensionHeader -Body $ext.body
+            $header.info.PSObject.Properties | Foreach-Object {
+                if ($_.name -match "created|updated") {
+                    $ext | Add-Member -TypeName NoteProperty -NotePropertyName "script$($_.Name)" -NotePropertyValue [datetime]$_.Value
+                } else {
+                    $ext | Add-Member -TypeName NoteProperty -NotePropertyName "script$($_.Name)" -NotePropertyValue $_.Value   
+                }
+            }
+            $ext | Add-Member -TypeName NoteProperty -NotePropertyName scriptArgs -NotePropertyValue $header.args
+            $ext | Add-Member -TypeName NoteProperty -NotePropertyName scriptGlobals -NotePropertyValue $header.globals
+            
             Write-Verbose "Looking up user: $($ext.createdBy) and $($ext.updatedBy)"
             $ext.createdBy = (Get-ICAPI -endpoint users -where @{ id = $ext.createdBy } -fields email -ea 0).email
             $ext.updatedBy = (Get-ICAPI -endpoint users -where @{ id = $ext.updatedBy } -fields email -ea 0).email
@@ -228,7 +232,7 @@ function Import-ICExtension {
         }
 
         $postbody['body'] = $Body
-        $header = Parse-ICExtensionHeader $Body
+        $header = Parse-ICExtensionHeader -Body $Body
         if (-NOT $header.name -OR -NOT $header.type) { 
             Write-Warning "Extension Header is incomplete. Recommend using a template header" 
         }
@@ -334,7 +338,7 @@ function Update-ICExtension {
             }
         }
 
-        $header = Parse-ICExtensionHeader $Body
+        $header = Parse-ICExtensionHeader -Body $Body
         Write-Verbose "Extension Header:`n$($header | ConvertTo-Json)"
         $postbody['body'] = $Body
         $postbody['name'] = $header.name
@@ -364,7 +368,7 @@ function Update-ICExtension {
             Write-Verbose "Looking up extension by Guid"
             $ext = Get-ICExtension -Guid $header.guid -IncludeBody -ea 0
             if ($ext) {
-                $header2 = Parse-ICExtensionHeader $Body
+                $header2 = Parse-ICExtensionHeader -Body $Body
                 Write-Verbose "Founding existing extension with matching guid ($header.guid). Updating id $($ext.id)"
                 $postbody['id'] = $ext.id
                 if (-NOT $postbody['name']) { $postbody['name'] = $ext.name }
@@ -483,7 +487,7 @@ function Import-ICOfficialExtensions {
             continue
         }
         try {
-            $header = Parse-ICExtensionHeader $ext
+            $header = Parse-ICExtensionHeader -Body $ext
         } catch {
             Write-Warning "Could not parse header on $($filename)"; 
             continue
@@ -690,39 +694,51 @@ function Test-ICExtension {
     -NOT $exitError
 }
 
-function Parse-ICExtensionHeader ($ExtensionBody){
+Add-Type -Path "$PSScriptRoot\lib\tommy.dll"
+function Parse-ICExtensionHeader(){
+    [cmdletbinding(DefaultParameterSetName = 'Body')]
+    Param(
+        [parameter(
+            Mandatory, 
+            ValueFromPipeline,
+            ParameterSetName = 'Body')]
+        [ValidateNotNullOrEmpty()]
+        [String]$Body,
 
-    $header = [PSCustomObject]@{
-        name = $null
-        type = $null
-        description = $null
-        author = $null
-        guid = $null
-        created = $null
-        updated = $null
+        [parameter(
+            Mandatory, 
+            ValueFromPipeline,
+            ValueFromPipelineByPropertyName,
+            ParameterSetName = 'Path')]
+        [ValidateNotNullorEmpty()]
+        [String]$Path
+    )
+
+    if ($Path) {
+        $Body = Get-Content $Path -Raw
+        #$reader = New-Object -TypeName System.IO.StreamReader -ArgumentList $Path
     }
-    if ($ExtensionBody -match '(?si)^--\[\[[\n\r]+(?<preamble>.+?)-*\]\]') {
-        $preamble = $matches.preamble
+    if ($Body -match '(?si)^--\[=\[(?<preamble>.+?)\]=\]') {
+        $preamble = $matches.preamble.trim()
     } else {
         Write-Error "Could not parse header (should be a comment section wrapped by --[[ <header> --]] )"
         return
     }
 
-    #$regex = '(?mi)\s*Name:\s(?<name>.+?)\n|\s*Type:\s(?<type>.+?)\n|\s*Description:\s(\|(?<description>.+?)\||(?<description>.+?)\n)|\s*Updated:\s(?<updated>.+?)\n|\s*Guid:\s(?<guid>.+?)\n'
-    if ($preamble -match '(?mi)^\s*Name:\s(.+?)\n') { $header.name = $Matches[1] }
-    if ($preamble -match '(?mi)^\s*Guid:\s(.+?)\n') { $header.guid = $Matches[1] }
-    if ($preamble -match '(?mi)^\s*Author:\s(.+?)\n') { $header.author = $Matches[1] }
-    if ($preamble -match '(?si)\s*Description:\s(?<a>\|\s*(?<desc>.+?)\s*\||(?<desc>.+?)\n)') { $header.description = $Matches.desc }
-    if ($preamble -match '(?mi)^\s*Type:\s(.+?)\n') { $header.type = $Matches[1] }
-    if ($preamble -match '(?mi)^\s*Created:\s(\d{8})\s*') {
-        $header.created = ($matches[1].split(" ")[0] | ForEach-Object { get-date -year $_.substring(0,4) -Month $_.substring(4,2) -Day $_.substring(6,2) }).date 
-    }
-    if ($preamble -match '(?mi)^\s*Updated:\s(\d{8})\s*') {
-        $header.updated = ($matches[1].split(" ")[0] | ForEach-Object { get-date -year $_.substring(0,4) -Month $_.substring(4,2) -Day $_.substring(6,2) }).date 
+    $reader = [System.IO.StringReader]::new($preamble)
+    [Tommy.TomlTable]$table = [Tommy.TOML]::Parse($reader)
+    $header = $table.ToString().replace("=", ":").replace("`"`"`"", "`"") | ConvertFrom-Json
+
+    if ($header.filetype -ne "Infocyte Extension") {
+        Write-Error "Incorrect filetype. Not an Infocyte Extension"
+        return
     }
     if ($header.guid -notmatch $GUID_REGEX) { 
         Write-Error "Incorrect guid format: $($header.guid).  Should be a guid of form: $GUID_REGEX. 
             Use the following command to generate a new one: [guid]::NewGuid().Guid" 
     }
+    $header.info.created = [datetime]$header.info.created
+    $header.info.updated = [datetime]$header.info.updated    
+
     $header
 }
