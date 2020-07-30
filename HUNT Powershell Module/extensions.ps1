@@ -9,19 +9,7 @@ function Get-ICExtension {
         [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('extensionId')]
         [String]$Id,
-
-        [parameter(
-            ParameterSetName='Guid')]
-        [String]$Guid,
         
-        [parameter(
-            ParameterSetName='Id')]
-        [parameter(
-            ParameterSetName='Guid')]
-        [Parameter(
-            ParameterSetName='List')]
-        [Switch]$IncludeBody,
-
         [parameter(
             ParameterSetName='List',
             HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
@@ -39,7 +27,13 @@ function Get-ICExtension {
             ParameterSetName='Id',
             HelpMessage = "Filepath and name to save extension to. Recommending ending as .lua")]
         [ValidateScript( { Test-Path -Path $_ -IsValid })]
-        [String]$SavePath
+        [String]$SavePath,
+
+        [parameter(
+            ParameterSetName = 'Id')]
+        [parameter(
+            ParameterSetName = 'List')]
+        [Switch]$NoBody
     )
 
     PROCESS {
@@ -47,82 +41,76 @@ function Get-ICExtension {
         if ($Id) {
             Write-Verbose "Looking up extension by Id."
             $Endpoint = "extensions/$Id"
-            $ext = Get-ICAPI -Endpoint $Endpoint -ea 0
-            if (-NOT $ext) {
+            $exts = Get-ICAPI -Endpoint $Endpoint -ea 0
+            if (-NOT $exts) {
                 Write-Warning "Could not find extension with Id: $($Id)"
                 return
             }
-            $ext | Add-Member -TypeName NoteProperty -NotePropertyName guid -NotePropertyValue $ext.description
-
-            $ext2= Get-ICAPI -Endpoint "$Endpoint/LatestVersion" -fields body, sha256
-            $ext | Add-Member -TypeName NoteProperty -NotePropertyName body -NotePropertyValue $ext2.body
-            $ext | Add-Member -TypeName NoteProperty -NotePropertyName sha256 -NotePropertyValue $ext2.sha256
-            Write-Verbose "Parsing Extension Header"
-            $header = Parse-ICExtensionHeader -Body $ext.body
-            $header.info.PSObject.Properties | Foreach-Object {
-                if ($_.name -match "created|updated") {
-                    $ext | Add-Member -TypeName NoteProperty -NotePropertyName "script$($_.Name)" -NotePropertyValue [datetime]$_.Value
-                } else {
-                    $ext | Add-Member -TypeName NoteProperty -NotePropertyName "script$($_.Name)" -NotePropertyValue $_.Value   
-                }
+        } else {
+            Write-Verbose "Getting extensions"
+            $Endpoint = "extensions"
+            $exts = Get-ICAPI -endpoint $Endpoint -where $where -NoLimit:$NoLimit -CountOnly:$CountOnly
+            if (-NOT $exts) {
+                Write-Warning "Could not find any extensions loaded"
+                return
             }
-            $ext | Add-Member -TypeName NoteProperty -NotePropertyName scriptArgs -NotePropertyValue $header.args
-            $ext | Add-Member -TypeName NoteProperty -NotePropertyName scriptGlobals -NotePropertyValue $header.globals
-            
+            if ($CountOnly) { return $exts }
+        }
+        if ($NoBody) {
+            return $exts
+        }
+
+        $n = 1
+        if ($null -eq $exts.count) {
+            $c = 1
+        } else { 
+            $c = $exts.count 
+        }
+        $exts | ForEach-Object {
+            $ext = $_
+            Write-Verbose "Getting Extension $($ext.name) [$($ext.id)]"
+            try { $pc = [math]::Floor(($n / $c) * 100) } catch { $pc = -1 }
+            Write-Progress -Activity "Getting Extention Body from Infocyte API" -Status "Requesting Body from Extension $n of $c" -PercentComplete $pc
+            $extBody = Get-ICAPI -endpoint "extensions/$($ext.id)/LatestVersion" -fields body, sha256
+            $Script = @{
+                body = $extBody.body 
+                sha256 = $extBody.sha256
+            }
             Write-Verbose "Looking up user: $($ext.createdBy) and $($ext.updatedBy)"
             $ext.createdBy = (Get-ICAPI -endpoint users -where @{ id = $ext.createdBy } -fields email -ea 0).email
             $ext.updatedBy = (Get-ICAPI -endpoint users -where @{ id = $ext.updatedBy } -fields email -ea 0).email
-            if ($SavePath) {
-                $ext.body | Out-File $SavePath | Out-Null
-            }
-            $ext
-        } 
-        elseif ($Guid) {
-            Write-Verbose "Looking up extension by Guid."
-            $Endpoint = "extensions"
-            $ext = Get-ICAPI -Endpoint $Endpoint -where @{ description = $Guid } -fields Id -ea 0
-            <#
-                        $ext.id | ForEach-Object {
-                $body = Get-ICAPI -Endpoint "$Endpoint/$_" -fields body -ea 0
-                if ($body.contains($Guid)) {
-                    return Get-ICExtension -Id $_ -IncludeBody
+
+            Write-Verbose "Parsing Extension Header for $($ext.name) [$($ext.id)]"
+            try {
+                $header = Parse-ICExtensionHeader -Body $Script.body
+                if ($header) {
+                    if ($header.info.created) {
+                        $header.info.created = [datetime]$header.info.created
+                    }
+                    if ($header.info.updated) {
+                        $header.info.updated = [datetime]$header.info.updated
+                    }
+                    $h = @{}
+                    $header.psobject.properties | % {
+                        $h[$_.name] = $_.value
+                    }
+                    $ext | Add-Member -MemberType NoteProperty -Name header -Value $h
                 }
-            #>
-            if ($ext) {
-                $ext
-            } else {
-                Write-Warning "Could not find extension with Guid: $($Guid)"
-                return
+            } catch {
+                Write-Error "Could not parse header on $($ext.name) [$($ext.id)]: $($_)"
             }
-            
+            $ext | Add-Member -MemberType NoteProperty -Name script -Value $Script
+            $n += 1
         }
-        else {
-            $Endpoint = "extensions"
-            $ext = Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit -CountOnly:$CountOnly
-            if ($CountOnly) { return $ext }
-            $n = 1
-            if ($ext -eq $null) { $c = 0}
-            elseif ($ext.count -eq $null) { $c = 1}
-            else { $c -eq $ext.count }
-            $ext | ForEach-Object {
-                try { $pc = [math]::Floor(($n/$c)*100) } catch { $pc = -1 }
-                $guid = $_.description
-                Write-Progress -Activity "Getting Extentions from Infocyte API" -status "Requesting Body from Extension $n of $c" -PercentComplete $pc
-                $_ | Add-Member -TypeName NoteProperty -NotePropertyName guid -NotePropertyValue $guid
-                if ($IncludeBody) {
-                    Get-ICExtension -id $_.Id
-                } else {
-                    Write-Verbose "Looking up user: $($_.createdBy) and $($_.updatedBy)"
-                    $_.createdBy = (Get-ICAPI -endpoint users -where @{ id = $_.createdBy } -fields email).email
-                    $_.updatedBy = (Get-ICAPI -endpoint users -where @{ id = $_.updatedBy } -fields email).email
-                    $_
-                }
-                $n += 1
-            }
-            Write-Progress -Activity "Getting Extentions from Infocyte API" -status "Complete" -Completed
+        Write-Progress -Activity "Getting Extentions from Infocyte API" -Status "Complete" -Completed
+        
+        if ($SavePath) {
+            $exts.body | Out-File $SavePath | Out-Null
         }
+        $exts
     }
 }
+
 function New-ICExtension {
 	[cmdletbinding()]
 	param(
@@ -156,14 +144,13 @@ function New-ICExtension {
 		$template = (new-object Net.WebClient).DownloadString($ActionTemplate)
     }
     
-    $template = $template -replace '(?si)(?<start>^--\[\[.+?Name:\s)(?<field>.+?)(?<end>\n)', "`${start}$name`${end}"
-    $template = $template -replace '(?si)(?<start>^--\[\[.+?Author:\s)(.+?)(?<end>\n)', "`${start}$Author`${end}"
-    $template = $template -replace '(?si)(?<start>^--\[\[.+?Description:\s)([^|].+?|\|.+?\|)(?<end>\n)', "`${start}| $Description |`${end}"
-    $template = $template -replace '(?si)(?<start>^--\[\[.+?Guid:\s)(.+?)(?<end>\n)', "`${start}$([guid]::NewGuid().guid)`${end}"
-    $currentdate = Get-Date
-    $dt = "$($currentdate.Year)$($currentdate.Month)$($currentdate.Day)"
-    $template = $template -replace '(?si)(?<start>^--\[\[.+?Created:\s)(.+?)(?<end>\n)',"`${start}$dt`${end}"
-    $template = $template -replace '(?si)(?<start>^--\[\[.+?Updated:\s)(.+?)(?<end>\n)',"`${start}$dt`${end}"
+    $template = $template -replace '(?si)(?<start>^--\[=\[.+?name\s*=\s*")(?<field>.+?)(?<end>"\n)', "`${start}$Name`${end}"
+    $template = $template -replace '(?si)(?<start>^--\[=\[.+?author\s*=\s*")(.+?)(?<end>"\n)', "`${start}$Author`${end}"
+    $template = $template -replace '(?si)(?<start>^--\[=\[.+?description\s*=\s*)([^|].+?|\|.+?\|)(?<end>"\n)', "`${start}| $Description |`${end}"
+    $template = $template -replace '(?si)(?<start>^--\[=\[.+?guid\s*=\s*)(.+?)(?<end>"\n)', "`${start}$([guid]::NewGuid().guid)`${end}"
+    $dt = Get-Date -UFormat "%F"
+    $template = $template -replace '(?si)(?<start>^--\[=\[.+?created\s*=\s*)(.+?)(?<end>"\n)',"`${start}$dt`${end}"
+    $template = $template -replace '(?si)(?<start>^--\[=\[.+?updated\s*=\s*)(.+?)(?<end>"\n)',"`${start}$dt`${end}"
     
     
     if ($SavePath) {
@@ -193,19 +180,6 @@ function Import-ICExtension {
         [ValidateNotNullorEmpty()]
         [String]$Body,
 
-        [parameter(
-            mandatory=$false,
-            ParameterSetName  = 'String'
-        )]
-        [String]$Name,
-
-        [parameter(
-            mandatory=$false,
-            ParameterSetName  = 'String'
-        )]
-        [ValidateSet("collection","action", $null)]
-        [String]$Type,
-
         [Switch]$Active,
 
         [Switch]$Force
@@ -226,65 +200,44 @@ function Import-ICExtension {
                 Write-Verbose "Using filename for Extension Name."
                 $Body = Get-Content $Path -Raw
             } else {
-                Write-Error "$Path does not exist!"
-                return
+                Throw "$Path does not exist!"
             }
         }
 
         $postbody['body'] = $Body
         $header = Parse-ICExtensionHeader -Body $Body
-        if (-NOT $header.name -OR -NOT $header.type) { 
-            Write-Warning "Extension Header is incomplete. Recommend using a template header" 
+        if (-NOT $header.info.name -OR -NOT $header.info.type) { 
+            Throw "Extension Header is incomplete or incorrectly formatted. Recommend using a template header" 
         }
         
-        if ($Name) {
-            $postbody['name'] = $Name 
-        } 
-        elseif ($header.name) {
-            $postbody['name'] = $header.name 
-        }
-        else {
-            Write-Warning "Name not provided or found in header. Aborting import."
-            return
-        }
+        $postbody['name'] = $header.info.name 
+        $postbody['type'] = ($header.info.type).toLower()
+        $postbody['description'] = $header.info.description
 
-        if ($Type) {  
-            $postbody['type'] = $Type
-        }
-        elseif ($header.type) {
-            $postbody['type'] = ([string]$header.type).toLower()
-        } 
-        else {
-            Write-Verbose "Type not provided or found in header. Defaulting to action extension."
-            $postbody['type'] = 'action'
-        }
-
-        if ($header.guid) {
-            $postbody['description'] = $header.guid
-        }
-
-        if ($header.guid) {
-            $ext = Get-ICExtension -Guid $header.guid -WarningAction 0
+        if ($header.info.guid) {
+            $ext = Get-ICExtension | Where-Object { $_.header.info.guid -eq $header.info.guid }
             if ($ext) {
                 if (-NOT $Force) {
-                    Write-Warning "There is already an existing extension named $($ext.name) [$($ext.Id)] with guid $($ext.guid). Try using Update-ICExtension or use -Force flag."
+                    Write-Warning "There is already an existing extension named $($ext.name) [$($ext.Id)] with guid $($ext.header.info.guid). Try using Update-ICExtension or use -Force flag."
                     return
                 }
-                Write-Warning "There is already an existing extension named $($ext.name) [$($ext.Id)] with guid $($ext.guid). Forcing update."
+                Write-Warning "There is already an existing extension named $($ext.name) [$($ext.Id)] with guid $($ext.header.info.guid). Forcing update."
                 $postbody['id'] = $ext.id
             } 
         }
         else {
             Write-Verbose "Adding new Extension named: $($postbody['name'])"
         }
-        $ext = Invoke-ICAPI -Endpoint $Endpoint -body $postbody -method POST
-        Write-Verbose "Looking up user: $($ext.createdBy) and $($ext.updatedBy)"
-        $ext.createdBy = (Get-ICAPI -endpoint users -where @{ id = $ext.createdBy } -fields email -ea 0).email
-        $ext.updatedBy = (Get-ICAPI -endpoint users -where @{ id = $ext.updatedBy } -fields email -ea 0).email
-        if ($ext.Description -match $GUID_REGEX) {
-            $ext | Add-Member -Type NoteProperty -Name guid -Value $ext.Description
-        }
-        Write-Output $ext
+        Invoke-ICAPI -Endpoint $Endpoint -body $postbody -method POST
+        $globals = Get-ICAPI -endpoint ExtensionGlobalVariables -nolimit
+        $header.globals | where-object { $_.name -notin $globals.name -AND $_.default } | ForEach-Object {
+            $body = @{
+                name = $_.name
+                type = $_.type
+                value = $_.default
+            }
+            Invoke-ICAPI -Endpoint ExtensionGlobalVariables -Method POST -body $body
+        } 
     }
 }
 
@@ -341,9 +294,9 @@ function Update-ICExtension {
         $header = Parse-ICExtensionHeader -Body $Body
         Write-Verbose "Extension Header:`n$($header | ConvertTo-Json)"
         $postbody['body'] = $Body
-        $postbody['name'] = $header.name
-        $postbody['type'] = $header.Type
-        $postbody['description'] = $header.Guid
+        $postbody['name'] = $header.info.name
+        $postbody['type'] = $header.info.type
+        $postbody['description'] = $header.info.description
 
         if ($Id) {
             Write-Verbose "Looking up extension by Id"
@@ -355,8 +308,8 @@ function Update-ICExtension {
                 if (-NOT $postbody['name']) { $postbody['name'] = $ext.name }
                 if (-NOT $postbody['type']) { $postbody['type'] = $ext.type }
                 if (-NOT $postbody['description']) { $postbody['description'] = $ext.description }
-                if ($ext.guid -AND ($header.guid -ne $ext.guid)) {
-                    Write-Warning "Extension Guids do not match. Cannot be updated, try importing the new extension!`nCurrent: $($ext.guid)`nNew: $($header.guid)"
+                if ($ext.header.info.guid -AND ($header.info.guid -ne $ext.header.info.guid)) {
+                    Write-Warning "Extension Guids do not match. Cannot be updated, try importing the new extension!`nCurrent: $($ext.header.info.guid)`nNew: $($header.info.guid)"
                     return
                 }
             } else {
@@ -366,30 +319,22 @@ function Update-ICExtension {
         } 
         else {
             Write-Verbose "Looking up extension by Guid"
-            $ext = Get-ICExtension -Guid $header.guid -IncludeBody -ea 0
+            $ext = Get-ICExtension -ea 0 | where { $_.header.info.guid -eq $header.info.guid }
             if ($ext) {
-                $header2 = Parse-ICExtensionHeader -Body $Body
-                Write-Verbose "Founding existing extension with matching guid ($header.guid). Updating id $($ext.id)"
+                Write-Verbose "Founding existing extension with matching guid $($header.info.guid). Updating id $($ext.id)"
                 $postbody['id'] = $ext.id
                 if (-NOT $postbody['name']) { $postbody['name'] = $ext.name }
                 if (-NOT $postbody['type']) { $postbody['type'] = $ext.type }
-                if (-NOT $postbody['description']) { $postbody['description'] = $header2.description }
+                if (-NOT $postbody['description']) { $postbody['description'] = $ext.description }
             } 
             else {
-                Write-Warning "Could not find existing extension with Guid: $($header.guid)"
+                Write-Warning "Could not find existing extension with Guid: $($header.info.guid)"
                 return
             }
         }
         Write-Verbose "Updating Extension: $($ext['name']) [$($ext.id)] with `n$($postbody|convertto-json)"
         if ($PSCmdlet.ShouldProcess($($ext.name), "Will update extension $($postbody['name']) [$postbody['id'])]")) {
-            $ext = Invoke-ICAPI -Endpoint $Endpoint -body $postbody -method POST
-            Write-Verbose "Looking up user: $($ext.createdBy) and $($ext.updatedBy)"
-            $ext.createdBy = (Get-ICAPI -endpoint users -where @{ id = $ext.createdBy } -fields email -ea 0).email
-            $ext.updatedBy = (Get-ICAPI -endpoint users -where @{ id = $ext.updatedBy } -fields email -ea 0).email
-            if ($ext.Description -match $GUID_REGEX) {
-                $ext | Add-Member -Type NoteProperty -Name guid -Value $ext.Description
-            }
-            Write-Output $ext
+            Invoke-ICAPI -Endpoint $Endpoint -body $postbody -method POST
         }
     }
 }
@@ -403,31 +348,15 @@ function Remove-ICExtension {
             ParameterSetName = 'Id')]
         [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('extensionId')]
-        [String]$Id,
-
-        [parameter(
-            Mandatory, 
-            ValueFromPipeline,
-            ValueFromPipelineByPropertyName,
-            ParameterSetName = 'guid')]
-        [ValidateNotNullorEmpty()]
-        [String]$Guid
+        [String]$Id
     )
+
     PROCESS {
-        if ($Id) {
-            $Endpoint = "extensions/$Id"
-            $ext = Get-ICExtension -id $Id
-            if (-NOT $ext) {
-                Write-Error "Extension with id $id not found!"
-                return
-            }
-        } else {
-            $Endpoint = "extensions"
-            $ext = Get-ICExtension -Guid $Guid
-            if (-NOT $ext) {
-                Write-Error "Extension with guid $Guid not found!"
-                return
-            }
+        $Endpoint = "extensions/$Id"
+        $ext = Get-ICExtension -id $Id
+        if (-NOT $ext) {
+            Write-Error "Extension with id $id not found!"
+            return
         }
         
         if ($PSCmdlet.ShouldProcess($($ext.Id), "Will remove $($ext.name) with extensionId '$($ext.Id)'")) {
@@ -448,7 +377,7 @@ function Import-ICOfficialExtensions {
         [Switch]$Update
     )
 
-    $InstanceExtensions = Get-ICExtension -IncludeBody -NoLimit
+    $InstanceExtensions = Get-ICExtension -NoLimit
     Write-Verbose "Pulling Official Extensions from Github: https://api.github.com/repos/Infocyte/extensions/contents/official/"
     try {
         $Extensions = Invoke-WebRequest -Uri "https://api.github.com/repos/Infocyte/extensions/contents/official/collection" | Select-Object -ExpandProperty content | ConvertFrom-Json
@@ -492,18 +421,18 @@ function Import-ICOfficialExtensions {
             Write-Warning "Could not parse header on $($filename)"; 
             continue
         }       
-        $existingExt = $InstanceExtensions | Where-Object { $_.guid -eq $header.guid }
+        $existingExt = $InstanceExtensions | Where-Object { $_.info.guid -eq $header.info.guid }
         if ($existingExt) {
             if ($Update) {
                 Write-Verbose "Updating extension $($header.name) [$($existingExt.id)] with guid $($header.guid):`n$existingExt"
-                Update-ICExtension -Id $existingExt.id -Body $ext | Select-Object id, name, type, guid, active, versionCount    
+                Update-ICExtension -Id $existingExt.id -Body $ext   
             }
             else {
                 Write-Warning "Extension $($header.name) [$($existingExt.id)] with guid $($header.guid) already exists. Try using -Update to update it."
             }
         } else {
             Write-Verbose "Importing extension $($header.name) [$($header.Type)] with guid $($header.guid)"
-            Import-ICExtension -Body $ext -Active -Type $header.Type -Force:$Force | Select-Object id, name, type, guid, active, versionCount    
+            Import-ICExtension -Body $ext -Active -Force:$Update    
         }
     }
 }
@@ -726,17 +655,24 @@ function Parse-ICExtensionHeader(){
     }
 
     $reader = [System.IO.StringReader]::new($preamble)
-    [Tommy.TomlTable]$table = [Tommy.TOML]::Parse($reader)
-    $header = $table.ToString().replace("=", ":").replace("`"`"`"", "`"") | ConvertFrom-Json
-
-    if ($header.filetype -ne "Infocyte Extension") {
-        Write-Error "Incorrect filetype. Not an Infocyte Extension"
-        return
+    try {
+        [Tommy.TomlTable]$table = [Tommy.TOML]::Parse($reader)
+    } catch {
+        Throw "Improper header format. Should be a TOML file: $($_)"
     }
-    if ($header.guid -notmatch $GUID_REGEX) { 
-        Write-Error "Incorrect guid format: $($header.guid).  Should be a guid of form: $GUID_REGEX. 
+    try {
+        $header = $table.ToString().replace(" =", ":").replace("`"`"`"", "`"").replace("'''", "'") | ConvertFrom-Json
+    } catch {
+        Throw "TOML header could not be converted to/from JSON: $($_)"
+    }
+    if ($header.filetype -ne "Infocyte Extension") {
+        Throw "Incorrect filetype. Not an Infocyte Extension"
+    }    
+    if ($header.info.guid -notmatch $GUID_REGEX) { 
+        Throw "Incorrect guid format: $($header.guid).  Should be a guid of form: $GUID_REGEX. 
             Use the following command to generate a new one: [guid]::NewGuid().Guid" 
     }
+
     $header.info.created = [datetime]$header.info.created
     $header.info.updated = [datetime]$header.info.updated    
 
