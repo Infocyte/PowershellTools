@@ -101,5 +101,6 @@ function Get-ICHelp {
 . "$PSScriptRoot\targetgroupmgmt.ps1"
 . "$PSScriptRoot\status.ps1"
 . "$PSScriptRoot\scan.ps1"
+. "$PSScriptRoot\scan_schedule.ps1"
 . "$PSScriptRoot\admin.ps1"
 . "$PSScriptRoot\extensions.ps1"
