@@ -50,10 +50,12 @@ function Get-ICAPI {
     }
     if ($where) { $filter['where'] = $where }
 
-    Write-Verbose "Requesting data from $url"
+    $str = "Requesting data from $url"
     if ($where -AND $where.count -gt 0) {
-        Write-Verbose "where-filter:`n$($where | ConvertTo-JSON -Depth 10)"
+        $str +=  "with where-filter:`n$($where | ConvertTo-Json -Depth 10)"
     }
+    Write-Verbose $str
+
 
     if ($Endpoint -match "/count$") {
         # if it matches /count or an id guid, there is no count
@@ -75,14 +77,14 @@ function Get-ICAPI {
          $body['where'] = $where | ConvertTo-JSON -Depth 10 -Compress
     }
     else {
-        Write-Debug "Counting results first"
-        try {
-            $tcnt = Get-ICAPI -endpoint "$endpoint/count" -where $where
+        Write-Debug "Counting results first"       
+        $tcnt = Get-ICAPI -endpoint "$endpoint/count" -where $where -ErrorAction 0 -WarningAction 0 -verbose:$false
+        if ($tcnt) {
             $total = [int]$tcnt.'count'
-        } catch {
-            Write-Verbose "Couldn't get a count from $url/count"
-            $total = "N/A"
-        }       
+        } else {
+            Write-Debug "Couldn't get a count from $url/count"
+            $total = "N/A"       
+        }
 
         if ($total.Gettype() -ne [int]) {
             $NoCount = $true
@@ -98,7 +100,7 @@ function Get-ICAPI {
                 Use a tighter 'where' filter or the -NoLimit switch to get more."
         } 
         else {
-            Write-Verbose "Found $total objects with this filter."
+            Write-Debug "Found $total objects with this filter."
         }
 
         $body['filter'] = $filter | ConvertTo-JSON -Depth 10 -Compress
@@ -114,25 +116,29 @@ function Get-ICAPI {
             $pc = -1
         }
         if (-NOT $NoCount -AND $total -ge 100) {
-            Write-Progress -Activity "Getting Data from Infocyte API" -status "Requesting data from $url [$skip of $total]" -PercentComplete $pc
+            Write-Progress -Activity "Getting Data from Infocyte API" -status "Requesting data from $url [$skip of $total] ($pc)" -PercentComplete $pc
         }
         Write-Debug "Sending $url this Body as 'application/json':`n$($body|convertto-json)"
         $at = $timer.Elapsed
-        $Objects = Invoke-RestMethod $url -body $body -Method GET -ContentType 'application/json' -Proxy $Global:Proxy -ProxyCredential $Global:ProxyCredential
+        #try {
+        $Objects = Invoke-RestMethod $url -Body $body -Method GET -ContentType 'application/json' -Proxy $Global:Proxy -ProxyCredential $Global:ProxyCredential -Verbose:$DebugPreference
+        #} catch {
+        #    $StatusCode = "$($_.Exception.Response.StatusCode)($($_.Exception.Response.StatusCode.value__))"
+        #    Write-Warning "ERROR[$StatusCode]: $url`n$($body|convertto-json -compress)`n$($_.Exception.Message)"
+        #}
         $bt = $timer.Elapsed
         $e = ($bt - $at).TotalMilliseconds
         $times += $e
         Write-Debug "Last Request: $($e.ToString("#.#"))ms"
 
         if ($CountOnly) {
-            if ($Objects) {
-                Write-Debug $Objects
+            if ($Objects.count -AND $Objects.count.GetType() -in @([int],[int64])) {
                 return [int]$Objects.count
             } else {
-                Write-Error "Could not get count!"
-                return
+                return $Objects
             }
         }
+
         if ($Objects) {
             if ($Objects.count) {
                 $count += $Objects.count
@@ -180,7 +186,7 @@ function Get-ICAPI {
         Write-Progress -Activity "Getting Data from Infocyte API" -Completed
     }
     if (-NOT $NoCount) {
-        Write-Verbose "Received $count objects from $url in $($TotalTime.TotalSeconds.ToString("#.####")) Seconds (Page Request times: Ave= $($AveTime.ToString("#"))ms, Max= $($MaxTime.ToString("#"))ms)"
+        Write-Verbose "Received $count of $total objects from $url in $($TotalTime.TotalSeconds.ToString("#.####")) Seconds (Page Request times: Ave= $($AveTime.ToString("#"))ms, Max= $($MaxTime.ToString("#"))ms)"
     }
 }
 
@@ -216,28 +222,11 @@ function Invoke-ICAPI {
     }
 
     $url = "$($Global:HuntServerAddress)/api/$Endpoint"
-    Write-verbose "Sending $method command to $url"
-    Write-verbose "Body: `n$($body | ConvertTo-JSON -Depth 10)"
+    Write-verbose "Sending $method command to $url with Body: `n$($body | ConvertTo-JSON -Depth 10)"
     if ($body) {
         $json = $body | ConvertTo-JSON -Depth 10 -Compress
     }
-    $Result = Invoke-RestMethod -Uri $url -headers $headers -body $json -Method $method -ContentType 'application/json' -Proxy $Global:Proxy -ProxyCredential $Global:ProxyCredential
-
-    if ($Method -like "DELETE") {
-        if ($Result.'count') {
-            return $true
-        } else {
-            Write-Warning "DELETE action returned unexpected result: $Result"
-            return
-        }
-    }
-
-	if ($Result) {
-		Write-Output $Result
-	} else {
-        Write-Verbose "Nothing returned from call."
-		return
-	}
+    Invoke-RestMethod -Uri $url -headers $headers -body $json -Method $method -ContentType 'application/json' -Proxy $Global:Proxy -ProxyCredential $Global:ProxyCredential
 }
 
 
