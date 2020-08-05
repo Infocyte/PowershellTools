@@ -16,50 +16,52 @@ function Get-ICHelp {
     Write-Host "Pass your Infocyte API Token into Set-ICToken to connect to an instance of Infocyte."
     Write-Host "`tThis will store your login token and server into a global variable for use by the other commands"
     Write-Host "`n"
-    Write-Host "Help:"
+    Write-Host "## Help ##"
     Write-Host -ForegroundColor Cyan "`tGet-ICHelp`n"
 
-    Write-Host "Authentication Functions:"
-    Write-Host -ForegroundColor Cyan "`tNew-ICToken (On-Prem ONLY), Set-ICToken (alias: Set-ICInstance)`n"
+    Write-Host "## Authentication Functions ##"
+    Write-Host -ForegroundColor Cyan "`tSet-ICToken (alias: Set-ICInstance)`n"
 
-    Write-Host "Generic API Functions"
+    Write-Host "## Generic API Functions ##"
     Write-Host -ForegroundColor Cyan "`tGet-ICAPI, Invoke-ICAPI`n"
 
-    Write-Host "Extension Development Functions:"
-    Write-Host -ForegroundColor Cyan "`tNew-ICExtension, Test-ICExtension,"
-    Write-Host -ForegroundColor Cyan "`tGet-ICExtension, Update-ICExtension, Remove-ICExtension,"
-    Write-Host -ForegroundColor Cyan "`tImport-ICExtension, Import-ICOfficialExtensions`n"
+    Write-Host "## Extension Development Functions ##"
+    Write-Host -ForegroundColor Cyan "`tNew-ICExtension, Get-ICExtension, Update-ICExtension, Remove-ICExtension,"
+    Write-Host -ForegroundColor Cyan "`tTest-ICExtension (Runs the extension locally for testing"
+    Write-Host -ForegroundColor Cyan "`tImport-ICExtension -> Loads an extension into your instance "
+    Write-Host -ForegroundColor Cyan "`tImport-ICOfficialExtensions -> Imports all official extensions from Infocyte`n" 
 
-    Write-Host "Admin/Misc Functions:"
-    Write-Host -ForegroundColor Cyan "`tNew-ICFlag, Update-ICFlag, Remove-ICFlag, Get-ICFlagColors"
+    Write-Host "## Admin/Misc Functions ##"
     Write-Host -ForegroundColor Cyan "`tGet-ICUser, Get-ICUserAuditLog,"
     Write-Host -ForegroundColor Cyan "`tAdd-ICComment", "Get-ICDwellTime`n"
 
-    Write-Host "Target Group Management Functions:"
+    Write-Host "## Target Group Management Functions ##"
     Write-Host -ForegroundColor Cyan "`tNew-ICTargetGroup, Get-ICTargetGroup, Remove-ICTargetGroup,"
     Write-Host -ForegroundColor Cyan "`tNew-ICCredential, Get-ICCredential, Remove-ICCredential,"
     Write-Host -ForegroundColor Cyan "`tNew-ICQuery, Get-ICQuery, Remove-ICQuery,"
     Write-Host -ForegroundColor Cyan "`tGet-ICAddress, Remove-ICAddress,"
     Write-Host -ForegroundColor Cyan "`tGet-ICAgent, Remove-ICAgent`n"
 
-    Write-Host "Analysis Data Retrieval Functions:"
-    Write-Host -ForegroundColor Cyan "`tGet-ICBox, Set-ICBox,"
-    Write-Host -ForegroundColor Cyan "`tGet-ICObject (alias: Get-ICData), Get-ICVulnerability, Get-ICNote,"
+    Write-Host "## Analysis Data Retrieval Functions ##"
+    Write-Host -ForegroundColor Cyan "`tGet-ICScan`n"
+    Write-Host -ForegroundColor Cyan "`tGet-ICBox, Set-ICBox -> Boxes are 7 (default), 30, or 90 day aggregations"
+    Write-Host -ForegroundColor Cyan "`tGet-ICObject (alias: Get-ICData) -> The primary data retrieval function"
+    Write-Host -ForegroundColor Cyan "`tGet-ICVulnerability, Get-ICNote"
     Write-Host -ForegroundColor Cyan "`tGet-ICAlert, Get-ICFileDetail, Get-ICActivityTrace`n"
 
-    Write-Host "Scanning Functions:"
-    Write-Host -ForegroundColor Cyan "`tInvoke-ICFindHosts, New-ICScanOptions,"
-    Write-Host -ForegroundColor Cyan "`tGet-ICScan, Invoke-ICScan,"
-    Write-Host -ForegroundColor Cyan "`tAdd-ICScanSchedule, Get-ICScanSchedule, Remove-ICScanSchedule`n"
+    Write-Host "## Scanning Functions ##"
+    Write-Host -ForegroundColor Cyan "`tNew-ICScanOptions"
+    Write-Host -ForegroundColor Cyan "`tInvoke-ICFindHosts, Invoke-ICScan"
 
-    Write-Host "Response Functions:"
-    Write-Host -ForegroundColor Cyan "`tInvoke-ICScanTarget, Invoke-ICResponse,"
-    Write-Host -ForegroundColor Cyan "`tGet-ICResponseResult", "Get-ICHostScanResult`n"
+    Write-Host "## Response Functions ##"
+    Write-Host -ForegroundColor Cyan "`tInvoke-ICScanTarget -> Scans the specified host"
+    Write-Host -ForegroundColor Cyan "`tInvoke-ICResponse -> Runs an extension on a specified host"
+    Write-Host -ForegroundColor Cyan "`tGet-ICHostScanResult, Get-ICResponseResult`n"
 
-    Write-Host "Task Status Functions:"
-    Write-Host -ForegroundColor Cyan "`tGet-ICTask, Get-ICTaskItems, Get-ICLastScanTask`n"
+    Write-Host "## Task Status Functions ##"
+    Write-Host -ForegroundColor Cyan "`tGet-ICTask, Get-ICTaskItems`n"
 
-    Write-Host "Offline Scan Import Functions:"
+    Write-Host "## Offline Scan Import Functions ##"
     Write-Host -ForegroundColor Cyan "`tImport-ICSurvey`n"
 
     Write-Host "`n"
@@ -72,8 +74,8 @@ function Get-ICHelp {
     Write-Host -ForegroundColor Cyan "targetGroupId" -NoNewLine
     Write-Host ")"
     Write-Host "- Time Boxes are Last 7, 30, and 90 Day filters for all data within range"
-    Write-Host "- GET Results are capped at $resultlimit results unless you use -NoLimit`n"
-    Write-Host "Example:"
+    Write-Host "- GET Results are capped at $resultlimit results unless you use -NoLimit`n----------------`n"
+    Write-Host "Examples:"
     Write-Host -ForegroundColor Cyan 'PS> Set-ICInstance -Instance "clouddemo" -Token ASDFASDASFASDASF -Save'
     Write-Host -ForegroundColor Cyan 'PS> $Box = Get-ICBox -Last30 | where { $_.TargetGroup -eq "Brooklyn Office"}'
     Write-Host -ForegroundColor Cyan 'PS> Get-ICObject -Type Process -BoxId $Box.Id -NoLimit'
