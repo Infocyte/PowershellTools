@@ -130,7 +130,7 @@ function New-ICExtension {
 	)
 	
 	$CollectionTemplate = "https://raw.githubusercontent.com/Infocyte/extensions/master/examples/collection_template.lua"
-	$ActionTemplate = "https://raw.githubusercontent.com/Infocyte/extensions/master/examples/action_template.lua"
+    $ActionTemplate = "https://raw.githubusercontent.com/Infocyte/extensions/master/examples/response_template.lua"
 
 	if ($Type -eq "Collection"){
 		$template = (new-object Net.WebClient).DownloadString($CollectionTemplate)
@@ -389,10 +389,10 @@ function Import-ICOfficialExtensions {
         Write-Warning "Could not download extensions from https://api.github.com/repos/Infocyte/extensions/contents/official/collection"
     }
     try {
-        $Extensions += Invoke-WebRequest -Uri "https://api.github.com/repos/Infocyte/extensions/contents/official/action" | Select-Object -ExpandProperty content | ConvertFrom-Json
+        $Extensions += Invoke-WebRequest -Uri "https://api.github.com/repos/Infocyte/extensions/contents/official/response" | Select-Object -ExpandProperty content | ConvertFrom-Json
     }
     catch {
-        Write-Warning "Could not download extensions from https://api.github.com/repos/Infocyte/extensions/contents/official/action"
+        Write-Warning "Could not download extensions from https://api.github.com/repos/Infocyte/extensions/contents/official/response"
     }
     If ($IncludeContributed) {
         Write-Verbose "Pulling Official Extensions from Github: https://api.github.com/repos/Infocyte/extensions/contents/contrib/"
@@ -403,10 +403,10 @@ function Import-ICOfficialExtensions {
             Write-Warning "Could not download extensions from https://api.github.com/repos/Infocyte/extensions/contents/contrib/collection"
         }
         try {
-            $Extensions += Invoke-WebRequest -Uri "https://api.github.com/repos/Infocyte/extensions/contents/contrib/action" | Select-Object -ExpandProperty content | ConvertFrom-Json
+            $Extensions += Invoke-WebRequest -Uri "https://api.github.com/repos/Infocyte/extensions/contents/contrib/response" | Select-Object -ExpandProperty content | ConvertFrom-Json
         }
         catch {
-            Write-Warning "Could not download extensions from https://api.github.com/repos/Infocyte/extensions/contents/contrib/action"
+            Write-Warning "Could not download extensions from https://api.github.com/repos/Infocyte/extensions/contents/contrib/response"
         }
     }
     $Results = @()
@@ -655,11 +655,6 @@ function Parse-ICExtensionHeader(){
     } else {
         Write-Error "Could not parse header (should be a comment section wrapped by --[=[ <header> ]=] )"
         return
-    }
-    Add-Type -Path "$PSScriptRoot\lib\nett.dll"
-    $toml = [Toml]::ReadString($preamble.trim())
-    if ($toml['filetype'].value -ne "Infocyte Extension") {
-        Throw "Invalid filetype. File is not an Infocyte Extension."
     }
 
     $reader = [System.IO.StringReader]::new($preamble)
