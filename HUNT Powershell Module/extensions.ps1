@@ -206,9 +206,9 @@ function Import-ICExtension {
         
         $postbody['name'] = $header.info.name 
         if (($header.info.type).toLower() -eq "collection") {
-            $postbody['type'] = "Collection"
+            $postbody['type'] = "collection"
         } else {
-            $postbody['type'] = "Response"
+            $postbody['type'] = "response"
         }
         $postbody['description'] = $header.info.guid
 
@@ -294,9 +294,9 @@ function Update-ICExtension {
         $postbody['body'] = $Body
         $postbody['name'] = $header.info.name
         if ($header.info.type -match "collection") {
-            $postbody['type'] = "Collection"
+            $postbody['type'] = "collection"
         } else {
-            $postbody['type'] = "Response"
+            $postbody['type'] = "response"
         }
         $postbody['description'] = $header.info.guid
 
