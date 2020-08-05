@@ -653,8 +653,13 @@ function Parse-ICExtensionHeader(){
     if ($Body -match '(?si)^--\[=\[(?<preamble>.+?)\]=\]') {
         $preamble = $matches.preamble.trim()
     } else {
-        Write-Error "Could not parse header (should be a comment section wrapped by --[[ <header> --]] )"
+        Write-Error "Could not parse header (should be a comment section wrapped by --[=[ <header> ]=] )"
         return
+    }
+    Add-Type -Path "$PSScriptRoot\lib\nett.dll"
+    $toml = [Toml]::ReadString($preamble.trim())
+    if ($toml['filetype'].value -ne "Infocyte Extension") {
+        Throw "Invalid filetype. File is not an Infocyte Extension."
     }
 
     $reader = [System.IO.StringReader]::new($preamble)

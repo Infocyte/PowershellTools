@@ -1,0 +1,2 @@
+$script = try {(get-childitem "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"| where pschildname -eq "Infocyte HUNT Agent").GetValue('uninstallstring')} catch{(get-childitem "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\"| where pschildname -eq "Infocyte HUNT Agent").GetValue('uninstallstring')} finally{}
+"& $script"|iex
