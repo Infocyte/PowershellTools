@@ -5,7 +5,7 @@ function Get-ICObject {
     [alias("Get-ICData","Get-ICObjects")]
     param(
         [parameter(ValueFromPipeline)]
-        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
+        [ValidateScript( { if ($_ -match $GUID_REGEX -OR $_ -match "\b[0-9a-f]{40}\b") { $true } else { throw "Incorrect input: $_.  Should be a guid." } })]
         [String]$Id,
 
         [parameter(
@@ -31,12 +31,12 @@ function Get-ICObject {
         [parameter(
             ParameterSetName="Box",
             HelpMessage={"Boxes are the 7, 30, and 90 day views of target group or global data. Use Set-ICBox to set your default. CurrentDefault: $Global:ICCurrentBox"})]
-        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
+        [ValidateScript( { if ($_ -match $GUID_REGEX -OR $_ -match "\b[0-9a-f]{40}\b") { $true } else { throw "Incorrect input: $_.  Should be a guid." } })]
         [String]$BoxId=$Global:ICCurrentBox,
 
         [parameter(
             ParameterSetName = "Scan")]
-        [ValidateScript( { if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid." } })]
+        [ValidateScript( { if ($_ -match $GUID_REGEX -OR $_ -match "\b[0-9a-f]{40}\b") { $true } else { throw "Incorrect input: $_.  Should be a guid." } })]
         [string]$ScanId,
 
         [parameter(HelpMessage="Defaults to hash+path aggregation (normalized). Use this switch to get all raw instances of the object found.")]
@@ -79,7 +79,7 @@ function Get-ICObject {
                     @{ scanId = $scanId }
                 )
             }
-            $where += @{ scanId = $scanId }
+            #$where += @{ scanId = $scanId }
             Write-Warning "where-filter:$($where|ConvertTo-Json -depth 10)"
         }
         elseif ($where) {
@@ -93,7 +93,7 @@ function Get-ICObject {
     else {
         #BoxId
         if ($where -AND $where['and']) {
-            if (-NOT $where['and'].boxId -AND -NOT $where['and'].boxId) {
+            if (-NOT $where['and'].boxId -AND -NOT $where['boxId']) {
                 $where['and'] += @{ 'boxId' = $BoxId }
             }
         }
@@ -108,7 +108,7 @@ function Get-ICObject {
                     @{ boxId = $BoxId }
                 )
             }
-            $where += @{ boxId = $BoxId }
+            #$where += @{ boxId = $BoxId }
             Write-Warning "where-filter:$($where|ConvertTo-Json -depth 10)"
         }
         elseif ($where) {
@@ -347,7 +347,6 @@ function Get-ICVulnerability {
     [cmdletbinding()]
     param(
         [parameter(ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
-        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('applicationId')]
         [String]$Id,
 
@@ -586,27 +585,23 @@ function Get-ICActivityTrace {
         [parameter(
             ParameterSetName="Id",
             ValueFromPipeline=$true)]
-        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [String]$Id,
 
         [parameter(
             ParameterSetName="accountId",
             ValueFromPipelineByPropertyName=$true)]
-        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [String]$accountId,
 
         [parameter(
             ParameterSetName="fileRepId",
             ValueFromPipeline=$True,
             ValueFromPipelineByPropertyName=$true)]
-        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [alias('fileRepId')]
         [String]$sha1,
 
         [parameter(
             ParameterSetName="hostId",
             ValueFromPipelineByPropertyName=$true)]
-        [ValidateScript({ if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid."} })]
         [String]$hostId,
 
         [parameter(ParameterSetName="accountId")]
