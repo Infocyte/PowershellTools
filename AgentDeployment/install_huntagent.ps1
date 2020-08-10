@@ -50,7 +50,12 @@ New-Module -name install_InfocyteAgent -scriptblock {
 
 		$agentDestination = "$($env:TEMP)\agent.windows.exe"
 		$LogPath = "$env:SystemDrive\windows\Temp\infocyteagentinstaller.log"
-		$agentURL = "https://s3.us-east-2.amazonaws.com/infocyte-support/executables/agent.windows.exe"
+		if ([System.IntPtr]::Size -eq 4) {
+			$agentURL = "https://s3.us-east-2.amazonaws.com/infocyte-support/executables/agent.windows32.exe"
+		} else {
+			$agentURL = "https://s3.us-east-2.amazonaws.com/infocyte-support/executables/agent.windows.exe"
+		}
+		
 		$hunturl = "https://$InstanceName.infocyte.com"
 
 		If (-NOT $InstanceName) {
@@ -68,7 +73,7 @@ New-Module -name install_InfocyteAgent -scriptblock {
 		# Make script silent unless run interactive
 		if (-NOT $Interactive) { $ErrorActionPreference = "silentlycontinue" }
 
-		$InstallPath = 'C:\Program Files\Infocyte\Agent\agent.windows.exe'
+		$InstallPath = 'C:\Program Files\Infocyte\Agent\agent.exe'
 		If (Get-Service -name huntAgent -ErrorAction SilentlyContinue) {
 			if ($Force) {
 				$Uninstall = $True
@@ -112,8 +117,8 @@ New-Module -name install_InfocyteAgent -scriptblock {
 		try {
 			$wc.DownloadFile($agentURL, $agentDestination)
 		} catch {
-			if ($Interactive) { Write-Warning "Could not download HUNT agent from $agentURL" }
-			"$(Get-Date) [Error] Installation Error: Install started but could not download agent.windows.exe from $agentURL." >> $LogPath
+			if ($Interactive) { Write-Warning "Could not download Infocyte agent from $agentURL" }
+			"$(Get-Date) [Error] Installation Error: Install started but could not download agent from $agentURL." >> $LogPath
 		}
 
 		# Verify Sha1 of file
@@ -139,24 +144,21 @@ New-Module -name install_InfocyteAgent -scriptblock {
 				Start-Process -NoNewWindow -FilePath $agentDestination -ArgumentList $arguments -Wait -ErrorAction Stop
 				#& $agentDestination $arguments
 			} catch {
-				if ($Interactive) { Write-Error "$(Get-Date) [Error] Uninstall Error: Could not start agent.windows.exe. [$_]" }
-				"$(Get-Date) [Error] Uninstall Error: Could not start agent.windows.exe. [$_]" >> $LogPath
+				if ($Interactive) { Write-Error "$(Get-Date) [Error] Uninstall Error: Could not start $agentDestination. [$_]" }
+				"$(Get-Date) [Error] Uninstall Error: Could not start $agentDestination. [$_]" >> $LogPath
 				return
 			}
 		}
 
 		# Setup exe arguments
-		#$arguments = "--url $hunturl --install"
-		#if ($Silent) { $arguments += " --quiet" }
-		#if ($RegKey) { $arguments += " --key $RegKey" }
-		$arguments = @("--install", "--url $hunturl")
+		$arguments = @("--url $hunturl")
 		if ($RegKey) { $arguments += "--key $RegKey" }
 		if ($FriendlyName) { $arguments += "--friendly $FriendlyName" }
 		if ($Proxy) { $arguments += "--proxy $Proxy" }
 		if (-NOT $Interactive) { $arguments += "--quiet" }
 
 		$version = & "$agentDestination" --version
-		if ($version -notmatch "HUNT Agent") {
+		if ($version -notmatch "RTS Agent") {
 			if ($Interactive) { Write-Warning "$(Get-Date) [Error] $agentDestination (version: $version, sha1: $sha1) is not valid or appears to be corrupt." }
 			"$(Get-Date) [Error] $agentDestination (version: $version, sha1: $sha1) is not valid or appears to be corrupt." >> $LogPath
 		}
