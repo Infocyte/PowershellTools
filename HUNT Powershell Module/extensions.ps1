@@ -424,7 +424,7 @@ function Import-ICOfficialExtensions {
             Write-Warning "Could not parse header on $($filename)"; 
             continue
         }       
-        $existingExt = $InstanceExtensions | Where-Object { $_.info.guid -eq $header.info.guid }
+        $existingExt = $InstanceExtensions | Where-Object { $_.description -eq $header.info.guid }
         if ($existingExt) {
             if ($Update) {
                 Write-Verbose "Updating extension $($header.name) [$($existingExt.id)] with guid $($header.guid):`n$existingExt"
@@ -435,7 +435,7 @@ function Import-ICOfficialExtensions {
             }
         } else {
             Write-Verbose "Importing extension $($header.name) [$($header.Type)] with guid $($header.guid)"
-            Import-ICExtension -Body $ext -Active -Force:$Update    
+            Import-ICExtension -Body $ext -Active -Force:$Update
         }
     }
 }
