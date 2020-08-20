@@ -52,7 +52,7 @@ function Get-ICAPI {
 
     $str = "Requesting data from $url"
     if ($where -AND $where.count -gt 0) {
-        $str +=  "with where-filter:`n$($where | ConvertTo-Json -Depth 10)"
+        $str +=  " with where-filter:`n$($where | ConvertTo-Json -Depth 10)"
     }
     Write-Verbose $str
 
@@ -62,6 +62,7 @@ function Get-ICAPI {
         $CountOnly = $true
         # JSON Stringify the where on body
         $body['where'] = $where | ConvertTo-JSON -Depth 10 -Compress
+        Write-Debug "Getting count..."
     }
     elseif ($Endpoint -match "[A-Z0-9]{8}-([A-Z0-9]{4}-){3}[A-Z0-9]{12}$" -OR
             $Endpoint -match "[0-9a-f]{40}$" -OR
@@ -79,10 +80,11 @@ function Get-ICAPI {
     else {
         Write-Debug "Counting results first"       
         $tcnt = Get-ICAPI -endpoint "$endpoint/count" -where $where -ErrorAction 0 -WarningAction 0 -verbose:$false
-        if ($tcnt) {
-            $total = [int]$tcnt.'count'
+        Write-Debug "Count came back as: $tcnt [$($tcnt.GetType())])"
+        if ($tcnt.GetType() -in @([int], [int64]) ) {
+            $total = [int]$tcnt
         } else {
-            Write-Debug "Couldn't get a count from $url/count"
+            Write-Warning "Couldn't get a count from $url/count. Returned: $tcnt"
             $total = "N/A"       
         }
 
@@ -135,6 +137,7 @@ function Get-ICAPI {
             if ($Objects.count -AND $Objects.count.GetType() -in @([int],[int64])) {
                 return [int]$Objects.count
             } else {
+                Write-Debug "Object does not have a count, returning raw result"
                 return $Objects
             }
         }

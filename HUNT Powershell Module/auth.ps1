@@ -55,7 +55,7 @@ function Set-ICToken {
 
 	if ($Instance -match "https://*") {
 		$Global:HuntServerAddress = $Instance
-	elseif ($Instance -match ".*infocyte.com")
+	} elseif ($Instance -match ".*infocyte.com") {
 		$Global:HuntServerAddress = "https://$Instance"
 	} else {
 		$Global:HuntServerAddress = "https://$Instance.infocyte.com"
