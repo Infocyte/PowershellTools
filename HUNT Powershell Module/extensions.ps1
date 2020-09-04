@@ -70,7 +70,7 @@ function Get-ICExtension {
             $ext = $_
             Write-Verbose "Getting Extension $($ext.name) [$($ext.id)]"
             try { $pc = [math]::Floor(($n / $c) * 100) } catch { $pc = -1 }
-            Write-Progress -Activity "Getting Extention Body from Infocyte API" -Status "Requesting Body from Extension $n of $c" -PercentComplete $pc
+            Write-Progress -Id 1 -Activity "Getting Extention Body from Infocyte API" -Status "Requesting Body from Extension $n of $c" -PercentComplete $pc
             $extBody = Get-ICAPI -endpoint "extensions/$($ext.id)/LatestVersion" -fields body, sha256
             $Script = @{
                 body = $extBody.body 
@@ -88,15 +88,17 @@ function Get-ICExtension {
                     $header.psobject.properties | % {
                         $h[$_.name] = $_.value
                     }
-                    $ext | Add-Member -MemberType NoteProperty -Name header -Value $h
                 }
+                $ext | Add-Member -MemberType NoteProperty -Name args -Value $h.args
+                $ext | Add-Member -MemberType NoteProperty -Name globals -Value $h.globals
+                $ext | Add-Member -MemberType NoteProperty -Name header -Value $h.info
             } catch {
                 Write-Warning "Could not parse header on $($ext.name) [$($ext.id)]: $($_)"
             }
             $ext | Add-Member -MemberType NoteProperty -Name script -Value $Script
             $n += 1
         }
-        Write-Progress -Activity "Getting Extentions from Infocyte API" -Status "Complete" -Completed
+        Write-Progress -Id 1 -Activity "Getting Extentions from Infocyte API" -Status "Complete" -Completed
         
         if ($SavePath) {
             $exts.body | Out-File $SavePath | Out-Null
@@ -511,7 +513,7 @@ function Test-ICExtension {
 		$wc.Encoding = [System.Text.Encoding]::UTF8
 		$wc.UseDefaultCredentials = $true
 		try {
-			$wc.DownloadFile($URL, "$Devpath/luacheck.exe")
+			$wc.DownloadFile($URL, "$Devpath/luacheck.exe") | Out-Null
 		} catch {
             Write-Warning "Could not download luacheck.exe from $URL."
         }
@@ -524,18 +526,21 @@ function Test-ICExtension {
             'ignore = { "611", "612", "613", "614" }' >> $Config
         }
         Write-Host -ForegroundColor $LoggingColor "Linting $Path"
-        Get-Content $Path | & "$Devpath\luacheck.exe" - --codes --config "C:\Program Files\Infocyte\dev\.luacheckrc"
+        $luacheck = Get-Content $Path | & "$Devpath\luacheck.exe" - --codes --config "C:\Program Files\Infocyte\dev\.luacheckrc"
+        $luacheck | ForEach-Object {
+            Write-Host $_
+        }
     }
 
     $a = @()
     $a += "--debug"
     $a += "--extension `"$Path`""
     if ($Globals) {
-        $Globals | ConvertTo-Json | Out-File -Force "$Devpath/globals.json"
+        $Globals | ConvertTo-Json | Out-File -Force "$Devpath/globals.json" | Out-Null
         $a += "--extension-globals `"$Devpath/globals.json`""
     }
     if ($Arguments) {
-        $Arguments | ConvertTo-Json | Out-File -Force "$Devpath/args.json"
+        $Arguments | ConvertTo-Json | Out-File -Force "$Devpath/args.json" | Out-Null
         $a += "--extension-args `"$Devpath/args.json`""
     }
     $a += "survey --no-compress --only-extensions"
@@ -550,7 +555,7 @@ function Test-ICExtension {
 	$psi.CreateNoWindow = $true
 	$psi.UseShellExecute = $false
 	$psi.RedirectStandardOutput = $true
-	$psi.RedirectStandardError = $true
+	$psi.RedirectStandardError = $false
 	$psi.FileName = "$Devpath/$agentname"
 	$psi.Arguments = $a
 	$process = New-Object System.Diagnostics.Process
@@ -563,23 +568,13 @@ function Test-ICExtension {
     }
 	while ($line -OR -NOT $process.HasExited) {
         $line = $process.StandardOutput.ReadLine()
-        if (-NOT $line) {
-            $line = $process.StandardError.ReadLine()
-        }
-        if (-NOT $line -AND $process.StandardError) {
-            $l = $process.StandardError.ReadToEnd()
-            Write-Warning $l
-        }
         if ($line -Match $agentOutputRegex) {
-            if ($exitError) {
-                return $false
-            }
             $AgentOutput = $Matches
             
-            # End
             if ($AgentOutput.msg -match "System inspections complete") {
-                Write-Verbose "Completed!"
-                return $true
+                # End
+                Write-Verbose "System inspections complete!"
+                break
             }
             elseif ($AgentOutput.logtype -eq "agent::survey") {
                 Write-Verbose "$line"
@@ -612,7 +607,7 @@ function Test-ICExtension {
         } else {
             # print and error output
             if ($color -eq 'Red') {
-                Write-Host -ForegroundColor Red "$line"
+                Write-Host -ForegroundColor Red "[ERROR] $line"
             } else {
                 Write-Host -ForegroundColor DarkGray "[PRINT] $line"
             }
@@ -627,7 +622,7 @@ function Test-ICExtension {
 }
 
 Add-Type -Path "$PSScriptRoot\lib\tommy.dll"
-function Parse-ICExtensionHeader(){
+function Parse-ICExtensionHeader {
     [cmdletbinding(DefaultParameterSetName = 'Body')]
     Param(
         [parameter(
