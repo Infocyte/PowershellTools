@@ -473,9 +473,10 @@ function Test-ICExtension {
         $Devpath = "C:/Program Files/Infocyte/dev"
         $AgentPath = "C:/Program Files/Infocyte/Agent"
     } else {
-        $Devpath = "opt/infocyte/dev"
-        $AgentPath = "opt/infocyte/agent"
+        $Devpath = "/opt/infocyte/dev"
+        $AgentPath = "/opt/infocyte/agent"
     }
+
 
     # Check for Agent
     if (Test-Path "$DevPath/$agentname") {     
@@ -486,6 +487,7 @@ function Test-ICExtension {
             $AgentVer = (& "$AgentPath/$agentname" "--version").split(" ")[2]
             Write-Warning "$Devpath/$agentname not found but latest version ($AgentVer) was found within your agent folder ($AgentPath). Copying this over."
 			Copy-Item -Path "$AgentPath/$agentname" -Destination "$Devpath" | Out-Null
+            $DevVer = (& "$DevPath/$agentname" "--version").split(" ")[2]
 		} else {
             Write-Warning "Infocyte Agent not found. Install an Agent or download it into $DevPath"
             return
@@ -503,34 +505,57 @@ function Test-ICExtension {
     $Path = Get-item $Path | Select-Object -ExpandProperty FullName
     $ext = Get-item $Path | Select-Object -ExpandProperty name
     
+    # Check for luacheck
+    if ($env:OS -match "windows" -OR $isWindows) {
 
-    if (($env:OS -match "windows" -OR $isWindows) -AND (-NOT (Test-Path "$DevPath/luacheck.exe"))) {
-		$url = "https://github.com/mpeterv/luacheck/releases/download/0.23.0/luacheck.exe"
-        Write-Host -ForegroundColor $LoggingColor "$Devpath/luacheck.exe not found (used for linting). Attempting to download from Github."
-		# Download luacheck from Github
-		#[Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls13
-		$wc = New-Object Net.WebClient
-		$wc.Encoding = [System.Text.Encoding]::UTF8
-		$wc.UseDefaultCredentials = $true
-		try {
-			$wc.DownloadFile($URL, "$Devpath/luacheck.exe") | Out-Null
-		} catch {
-            Write-Warning "Could not download luacheck.exe from $URL."
+        if (-NOT (Test-Path "$DevPath/luacheck.exe")) {
+            $url = "https://github.com/mpeterv/luacheck/releases/download/0.23.0/luacheck.exe"
+            Write-Host -ForegroundColor $LoggingColor "$Devpath/luacheck.exe not found (used for linting). Attempting to download from Github."
+            # Download luacheck from Github
+            #[Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls13
+            $wc = New-Object Net.WebClient
+            $wc.Encoding = [System.Text.Encoding]::UTF8
+            $wc.UseDefaultCredentials = $true
+            try {
+                $wc.DownloadFile($URL, "$Devpath/luacheck.exe") | Out-Null
+            } catch {
+                Write-Warning "Could not download luacheck.exe from $URL."
+            }
         }
     }
-    if (($env:OS -match "windows" -OR $isWindows) -AND (Test-Path "$DevPath/luacheck.exe")) {
-        $Config = "C:\Program Files\Infocyte\dev\.luacheckrc"
-        if (-NOT (Test-Path $Config)) {
-            'globals = { "hunt" }' > $Config
-            'allow_defined = true' >> $Config
-            'ignore = { "611", "612", "613", "614" }' >> $Config
+    else {
+        $luacheck = (which luacheck)
+        if ($luacheck -match "not found") {
+            Write-Warning "luacheck not found (used for linting). Try installing it first"
         }
+    }
+
+    # luacheck config setup
+    $Config = "$Devpath/.luacheckrc"
+    if (-NOT (Test-Path $Config)) {
+        'globals = { "hunt" }' | Out-File -Encoding utf8 $Config
+        'allow_defined = true' | Out-File -Encoding utf8 -Append $Config
+        'ignore = { "611", "612", "613", "614" }' | Out-File -Encoding utf8 -Append $Config
+    }
+
+    # Run luacheck
+    if (($env:OS -match "windows" -OR $isWindows) -AND (Test-Path "$DevPath/luacheck.exe")) {        
         Write-Host -ForegroundColor $LoggingColor "Linting $Path"
-        $luacheck = Get-Content $Path | & "$Devpath\luacheck.exe" - --codes --config "C:\Program Files\Infocyte\dev\.luacheckrc"
+        $luacheck = Get-Content $Path | & "$Devpath/luacheck.exe" - --codes --config $Config
+        $luacheck | ForEach-Object {
+            Write-Host $_
+        }
+    } 
+    elseif ($IsLinux -AND $luacheck -notmatch "not found") {
+        Write-Host -ForegroundColor $LoggingColor "Linting $Path"
+        $luacheck = Get-Content $Path | luacheck - --codes --config $Config
         $luacheck | ForEach-Object {
             Write-Host $_
         }
     }
+
+    Remove-Item "$Devpath/args.json" | Out-Null
+    Remove-Item "$Devpath/globals.json" | Out-Null
 
     $a = @()
     $a += "--debug"
@@ -609,19 +634,18 @@ function Test-ICExtension {
             if ($color -eq 'Red') {
                 Write-Host -ForegroundColor Red "[ERROR] $line"
             } else {
-                Write-Host -ForegroundColor DarkGray "[PRINT] $line"
+                Write-Host -ForegroundColor DarkGray "$line"
             }
         }
     }
     if ($exitError) {
         Write-Warning "Survey did not complete successfully. Address any bugs in the extension and try again."
     }
-    #Remove-Item "$Devpath/args.json" | Out-Null
-    #Remove-Item "$Devpath/globals.json" | Out-Null
     -NOT $exitError
 }
 
-Add-Type -Path "$PSScriptRoot\lib\tommy.dll"
+Add-Type -Path "$PSScriptRoot/lib/Tommy.dll"
+
 function Parse-ICExtensionHeader {
     [cmdletbinding(DefaultParameterSetName = 'Body')]
     Param(
@@ -663,6 +687,8 @@ function Parse-ICExtensionHeader {
     } catch {
         Throw "TOML header could not be converted to/from JSON: $($_)"
     }
+    
+    
     if ($header.filetype -ne "Infocyte Extension") {
         Throw "Incorrect filetype. Not an Infocyte Extension"
     }    
