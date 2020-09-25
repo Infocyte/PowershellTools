@@ -195,7 +195,7 @@ function Invoke-ICScanTarget {
 		# Select Target targetgroup
 		if ($TargetGroupId) {
 			$tg = Get-ICTargetGroup -Id $TargetGroupId
-			if (-NOT $TargetGroup) {
+			if (-NOT $tg) {
 				Throw "TargetGroup with id $TargetGroupid does not exist!"
 			} 
 		} else {
