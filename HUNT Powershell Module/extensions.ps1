@@ -535,7 +535,7 @@ function Test-ICExtension {
     if (-NOT (Test-Path $Config)) {
         'globals = { "hunt" }' | Out-File -Encoding utf8 $Config
         'allow_defined = true' | Out-File -Encoding utf8 -Append $Config
-        'ignore = { "611", "612", "613", "614" }' | Out-File -Encoding utf8 -Append $Config
+        'ignore = { "113", "611", "612", "613", "614", "631" }' | Out-File -Encoding utf8 -Append $Config
     }
 
     # Run luacheck
@@ -554,8 +554,8 @@ function Test-ICExtension {
         }
     }
 
-    Remove-Item "$Devpath/args.json" | Out-Null
-    Remove-Item "$Devpath/globals.json" | Out-Null
+    Remove-Item "$Devpath/args.json" -ea 0 | Out-Null
+    Remove-Item "$Devpath/globals.json" -ea 0 | Out-Null
 
     $a = @()
     $a += "--debug"
