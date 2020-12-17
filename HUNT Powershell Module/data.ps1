@@ -631,10 +631,12 @@ function Get-ICActivityTrace {
     )
 
     BEGIN {
-        $Where['between'] = @(
-            (Get-Date $StartTime -Format "o"),
-            (Get-Date $EndTime -Format "o")
-        )
+        $Where['eventTime'] = @{ 
+            between = @(
+                (Get-Date $StartTime -Format "o"),
+                (Get-Date $EndTime -Format "o")
+            )
+        }
     }
     PROCESS {
         $Endpoint = "activity"
