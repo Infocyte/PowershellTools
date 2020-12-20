@@ -561,11 +561,11 @@ function Test-ICExtension {
     $a += "--debug"
     $a += "--extension `"$Path`""
     if ($Globals) {
-        $Globals | ConvertTo-Json | Out-File -Force "$Devpath/globals.json" | Out-Null
+        $Globals | ConvertTo-Json | Out-File -Force "$Devpath/globals.json" -encoding utf8 | Out-Null
         $a += "--extension-globals `"$Devpath/globals.json`""
     }
     if ($Arguments) {
-        $Arguments | ConvertTo-Json | Out-File -Force "$Devpath/args.json" | Out-Null
+        $Arguments | ConvertTo-Json | Out-File -Force "$Devpath/args.json" -encoding utf8 | Out-Null
         $a += "--extension-args `"$Devpath/args.json`""
     }
     $a += "survey --no-compress --only-extensions"
@@ -644,7 +644,7 @@ function Test-ICExtension {
     -NOT $exitError
 }
 
-Add-Type -Path "$PSScriptRoot/lib/Tommy.dll"
+Install-Module powershell-yaml
 
 function Parse-ICExtensionHeader {
     [cmdletbinding(DefaultParameterSetName = 'Body')]
@@ -676,19 +676,8 @@ function Parse-ICExtensionHeader {
         return
     }
 
-    $reader = [System.IO.StringReader]::new($preamble)
-    try {
-        [Tommy.TomlTable]$table = [Tommy.TOML]::Parse($reader)
-    } catch {
-        Throw "Improper header format. Should be a TOML file: $($_)"
-    }
-    try {
-        $header = $table.ToString().replace(" =", ":").replace("`"`"`"", "`"").replace("'''", "'") | ConvertFrom-Json
-    } catch {
-        Throw "TOML header could not be converted to/from JSON: $($_)"
-    }
-    
-    
+    $header = ConvertFrom-Yaml $preamble
+
     if ($header.filetype -ne "Infocyte Extension") {
         Throw "Incorrect filetype. Not an Infocyte Extension"
     }    
