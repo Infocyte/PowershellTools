@@ -91,7 +91,7 @@ function Get-ICExtension {
                 }
                 $ext | Add-Member -MemberType NoteProperty -Name args -Value $h.args
                 $ext | Add-Member -MemberType NoteProperty -Name globals -Value $h.globals
-                $ext | Add-Member -MemberType NoteProperty -Name header -Value $h.info
+                $ext | Add-Member -MemberType NoteProperty -Name header -Value $h
             } catch {
                 Write-Warning "Could not parse header on $($ext.name) [$($ext.id)]: $($_)"
             }
@@ -101,7 +101,9 @@ function Get-ICExtension {
         Write-Progress -Id 1 -Activity "Getting Extentions from Infocyte API" -Status "Complete" -Completed
         
         if ($SavePath) {
-            $exts.body | Out-File $SavePath | Out-Null
+            Remove-Item $SavePath -Force | Out-Null
+            [System.IO.File]::WriteAllLines($SavePath, $exts.body)
+            # $exts.body | Out-File $SavePath | Out-Null
         }
         $exts
     }
@@ -151,7 +153,9 @@ function New-ICExtension {
     
     if ($SavePath) {
         Write-Host "`nCreated $Type extension from template and saved to $SavePath"
-        $template | Out-File -FilePath $SavePath
+        Remove-Item $SavePath -Force | Out-Null
+        [System.IO.File]::WriteAllLines($SavePath, $template)
+        # $template | Out-File -FilePath $SavePath
         return $true
     }
     else {
@@ -202,20 +206,20 @@ function Import-ICExtension {
 
         $postbody['body'] = $Body
         $header = Parse-ICExtensionHeader -Body $Body
-        if (-NOT $header.info.name -OR -NOT $header.info.type) { 
+        if (-NOT $header.name -OR -NOT $header.type) { 
             Throw "Extension Header is incomplete or incorrectly formatted. Recommend using a template header" 
         }
         
-        $postbody['name'] = $header.info.name 
-        if (($header.info.type).toLower() -eq "collection") {
+        $postbody['name'] = $header.name 
+        if (($header.type).toLower() -eq "collection") {
             $postbody['type'] = "collection"
         } else {
             $postbody['type'] = "response"
         }
-        $postbody['description'] = $header.info.guid
+        $postbody['description'] = $header.guid
 
-        if ($header.info.guid) {
-            $ext = Get-ICExtension -where @{ description = $header.info.guid }
+        if ($header.guid) {
+            $ext = Get-ICExtension -where @{ description = $header.guid }
             if ($ext) {
                 if (-NOT $Force) {
                     Write-Warning "There is already an existing extension named $($ext.name) [$($ext.Id)] with guid $($ext.description). Try using Update-ICExtension or use -Force flag."
@@ -294,13 +298,13 @@ function Update-ICExtension {
         $header = Parse-ICExtensionHeader -Body $Body
         Write-Verbose "Extension Header:`n$($header | ConvertTo-Json)"
         $postbody['body'] = $Body
-        $postbody['name'] = $header.info.name
-        if ($header.info.type -match "collection") {
+        $postbody['name'] = $header.name
+        if ($header.type -match "collection") {
             $postbody['type'] = "collection"
         } else {
             $postbody['type'] = "response"
         }
-        $postbody['description'] = $header.info.guid
+        $postbody['description'] = $header.guid
 
         if ($Id) {
             Write-Verbose "Looking up extension by Id"
@@ -312,8 +316,8 @@ function Update-ICExtension {
                 if (-NOT $postbody['name']) { $postbody['name'] = $ext.name }
                 if (-NOT $postbody['type']) { $postbody['type'] = $ext.type }
                 if (-NOT $postbody['description']) { $postbody['description'] = $ext.description }
-                if ($ext.description -AND ($header.info.guid -ne $ext.description)) {
-                    Write-Warning "Extension Guids do not match. Cannot be updated, try importing the new extension!`nCurrent: $($ext.description)`nNew: $($header.info.guid)"
+                if ($ext.description -AND ($header.guid -ne $ext.description)) {
+                    Write-Warning "Extension Guids do not match. Cannot be updated, try importing the new extension!`nCurrent: $($ext.description)`nNew: $($header.guid)"
                     return
                 }
             } else {
@@ -323,16 +327,16 @@ function Update-ICExtension {
         } 
         else {
             Write-Verbose "Looking up extension by Guid"
-            $ext = Get-ICExtension -ea 0 -where @{ description = $header.info.guid }
+            $ext = Get-ICExtension -ea 0 -where @{ description = $header.guid }
             if ($ext) {
-                Write-Verbose "Founding existing extension with matching guid $($header.info.guid). Updating id $($ext.id)"
+                Write-Verbose "Founding existing extension with matching guid $($header.guid). Updating id $($ext.id)"
                 $postbody['id'] = $ext.id
                 if (-NOT $postbody['name']) { $postbody['name'] = $ext.name }
                 if (-NOT $postbody['type']) { $postbody['type'] = $ext.type }
                 if (-NOT $postbody['description']) { $postbody['description'] = $ext.description }
             } 
             else {
-                Write-Warning "Could not find existing extension with Guid: $($header.info.guid)"
+                Write-Warning "Could not find existing extension with Guid: $($header.guid)"
                 return
             }
         }
@@ -426,7 +430,7 @@ function Import-ICOfficialExtensions {
             Write-Warning "Could not parse header on $($filename)"; 
             continue
         }       
-        $existingExt = $InstanceExtensions | Where-Object { $_.description -eq $header.info.guid }
+        $existingExt = $InstanceExtensions | Where-Object { $_.description -eq $header.guid }
         if ($existingExt) {
             if ($Update) {
                 Write-Verbose "Updating extension $($header.name) [$($existingExt.id)] with guid $($header.guid):`n$existingExt"
@@ -533,9 +537,10 @@ function Test-ICExtension {
     # luacheck config setup
     $Config = "$Devpath/.luacheckrc"
     if (-NOT (Test-Path $Config)) {
-        'globals = { "hunt" }' | Out-File -Encoding utf8 $Config
-        'allow_defined = true' | Out-File -Encoding utf8 -Append $Config
-        'ignore = { "113", "611", "612", "613", "614", "631" }' | Out-File -Encoding utf8 -Append $Config
+        $configString = 'globals = { "hunt" }'
+        $configString += 'allow_defined = true'
+        $configString += 'ignore = { "113", "611", "612", "613", "614", "631" }'
+        [System.IO.File]::WriteAllLines($Config, $configString)
     }
 
     # Run luacheck
@@ -561,11 +566,11 @@ function Test-ICExtension {
     $a += "--debug"
     $a += "--extension `"$Path`""
     if ($Globals) {
-        $Globals | ConvertTo-Json | Out-File -Force "$Devpath/globals.json" -encoding utf8 | Out-Null
+        [System.IO.File]::WriteAllLines("$Devpath/globals.json", ($Globals | ConvertTo-Json))
         $a += "--extension-globals `"$Devpath/globals.json`""
     }
     if ($Arguments) {
-        $Arguments | ConvertTo-Json | Out-File -Force "$Devpath/args.json" -encoding utf8 | Out-Null
+        [System.IO.File]::WriteAllLines("$Devpath/args.json", ($Arguments | ConvertTo-Json))
         $a += "--extension-args `"$Devpath/args.json`""
     }
     $a += "survey --no-compress --only-extensions"
@@ -644,7 +649,7 @@ function Test-ICExtension {
     -NOT $exitError
 }
 
-Install-Module powershell-yaml
+Install-Module powershell-yaml -AcceptLicense -SkipPublisherCheck
 
 function Parse-ICExtensionHeader {
     [cmdletbinding(DefaultParameterSetName = 'Body')]
@@ -681,13 +686,13 @@ function Parse-ICExtensionHeader {
     if ($header.filetype -ne "Infocyte Extension") {
         Throw "Incorrect filetype. Not an Infocyte Extension"
     }    
-    if ($header.info.guid -notmatch $GUID_REGEX) { 
+    if ($header.guid -notmatch $GUID_REGEX) { 
         Throw "Incorrect guid format: $($header.guid).  Should be a guid of form: $GUID_REGEX. 
             Use the following command to generate a new one: [guid]::NewGuid().Guid" 
     }
 
-    $header.info.created = [datetime]$header.info.created
-    $header.info.updated = [datetime]$header.info.updated    
+    $header.created = [datetime]$header.created
+    $header.updated = [datetime]$header.updated    
 
     $header
 }
