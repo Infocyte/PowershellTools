@@ -54,6 +54,10 @@ function Get-ICAuditLog {
 		[Switch]$NoLimit,
 		[Switch]$CountOnly
 	)
+	BEGIN {
+		$users = Get-ICAPI -endpoint users -nolimit
+	}
+
 	PROCESS {
 		$endpoint = 'useractivities'
 		if ($Id) {
@@ -61,7 +65,17 @@ function Get-ICAuditLog {
 			$endpoint += "/$Id"
 		}
 		Write-Verbose "Getting User Activity Logs"
-		Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit -CountOnly:$CountOnly
+		if ($CountOnly) {
+			Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit -CountOnly:$CountOnly
+		} else {
+			Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit -CountOnly:$CountOnly | foreach-object {
+				$userid = $_.userId
+				$user = $users | where { $_.id -eq $userid }
+				$_ | Add-Member -Type NoteProperty -Name username -Value $user.username
+				$_.query = $_.query | ConvertTo-Json -Depth 10 -Compress
+				$_
+			}
+		}
 	}
 }
 
