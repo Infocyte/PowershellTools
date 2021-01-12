@@ -128,6 +128,13 @@ function Get-ICObject {
                 $Endpoint = "$($Box)Processes"
             }
         }
+        "Script" {
+            if ($AllInstances) {
+                $Endpoint = "$($Box)ScriptInstances"
+            } else {
+                $Endpoint = "$($Box)ScriptDetails"
+            }
+        }
         "Host" {
             if ($AllInstances) {
                 $Endpoint = "$($Box)HostScans"
@@ -218,7 +225,8 @@ function Get-ICObject {
                     $cnt += $c
                 } else {
                     Write-Verbose "Querying $_"
-                    if ($ScanId){
+                    if ($ScanId) {
+                        if ()
                         Get-ICObject -Type $_ -ScanId $ScanId -where $where -fields $fields -NoLimit:$NoLimit -AllInstances:$AllInstances
                     } else {
                         Get-ICObject -Type $_ -BoxId $BoxId -where $where -fields $fields -NoLimit:$NoLimit -AllInstances:$AllInstances
