@@ -226,7 +226,6 @@ function Get-ICObject {
                 } else {
                     Write-Verbose "Querying $_"
                     if ($ScanId) {
-                        if ()
                         Get-ICObject -Type $_ -ScanId $ScanId -where $where -fields $fields -NoLimit:$NoLimit -AllInstances:$AllInstances
                     } else {
                         Get-ICObject -Type $_ -BoxId $BoxId -where $where -fields $fields -NoLimit:$NoLimit -AllInstances:$AllInstances
