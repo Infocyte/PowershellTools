@@ -209,9 +209,18 @@ function Get-ICObject {
         }
         "File" {
             If ($where.count -lt 2) {
-                Write-Warning "No where filter provided. You should provide a filter for this query to reduce strain on the database."
-                Write-Warning "Defaulting to bad and suspicious objects only."
-                $where += @{ threatName = @{ or = @("Bad", "Suspicious")} }
+                if ($where.'and'  -AND $where.'and'.count -lt 2 -OR $where.'or'  -AND $where.'or'.count -lt 2) {
+                    Write-Warning "No where filter provided. You should provide a filter for this query to reduce strain on the database."
+                    Write-Warning "Defaulting to bad objects only."
+                    $where += @{   
+                        or = @(
+                            @{ threatName = "Bad" },
+                            @{ threatName = "Blacklist" },
+                            @{ flagName = "Verified Bad" }
+                        )
+                    }
+                    #$where += @{ threatName = @{ or = @("Bad", "Suspicious")} }
+                }
             }
             $cnt = 0
             $Files | ForEach-Object {
