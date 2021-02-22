@@ -382,7 +382,7 @@ function Remove-ICAgent {
 
         $body = @{
             where = @{ id = $Id }
-	}
+        }
 
         if ($PSCmdlet.ShouldProcess($obj.hostname, "Will uninstall agent: $($obj.hostname) [$Id]")) {
             Write-Verbose "Uninstalling Agent $($obj.hostname) [$Id]."
