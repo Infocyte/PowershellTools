@@ -41,6 +41,21 @@ function Get-ICHelp {
     Write-Host -ForegroundColor Cyan "`tNew-ICQuery, Get-ICQuery, Remove-ICQuery,"
     Write-Host -ForegroundColor Cyan "`tGet-ICAddress, Remove-ICAddress,"
     Write-Host -ForegroundColor Cyan "`tGet-ICAgent, Remove-ICAgent`n"
+    
+    Write-Host "## Task Status Functions ##"
+    Write-Host -ForegroundColor Cyan "`tGet-ICTask, Get-ICTaskItems`n"
+
+    Write-Host "## Scanning Functions ##"
+    Write-Host -ForegroundColor Cyan "`tNew-ICScanOptions"
+    Write-Host -ForegroundColor Cyan "`tInvoke-ICFindHosts, Invoke-ICScan"
+
+    Write-Host "## Offline Scan Import Functions ##"
+    Write-Host -ForegroundColor Cyan "`tImport-ICSurvey`n"
+
+    Write-Host "## Response Functions ##"
+    Write-Host -ForegroundColor Cyan "`tInvoke-ICScanTarget -> Scans the specified host"
+    Write-Host -ForegroundColor Cyan "`tInvoke-ICResponse -> Runs an extension on a specified host"
+    Write-Host -ForegroundColor Cyan "`tGet-ICHostScanResult, Get-ICResponseResult`n"
 
     Write-Host "## Analysis Data Retrieval Functions ##"
     Write-Host -ForegroundColor Cyan "`tGet-ICScan`n"
@@ -49,20 +64,8 @@ function Get-ICHelp {
     Write-Host -ForegroundColor Cyan "`tGet-ICVulnerability, Get-ICNote"
     Write-Host -ForegroundColor Cyan "`tGet-ICAlert, Get-ICFileDetail, Get-ICActivityTrace`n"
 
-    Write-Host "## Scanning Functions ##"
-    Write-Host -ForegroundColor Cyan "`tNew-ICScanOptions"
-    Write-Host -ForegroundColor Cyan "`tInvoke-ICFindHosts, Invoke-ICScan"
-
-    Write-Host "## Response Functions ##"
-    Write-Host -ForegroundColor Cyan "`tInvoke-ICScanTarget -> Scans the specified host"
-    Write-Host -ForegroundColor Cyan "`tInvoke-ICResponse -> Runs an extension on a specified host"
-    Write-Host -ForegroundColor Cyan "`tGet-ICHostScanResult, Get-ICResponseResult`n"
-
-    Write-Host "## Task Status Functions ##"
-    Write-Host -ForegroundColor Cyan "`tGet-ICTask, Get-ICTaskItems`n"
-
-    Write-Host "## Offline Scan Import Functions ##"
-    Write-Host -ForegroundColor Cyan "`tImport-ICSurvey`n"
+    Write-Host "## Cloud App Compliance Functions ##"
+    Write-Host -ForegroundColor Cyan "`tGet-ICComplianceResults"
 
     Write-Host "`n"
     Write-Host "FAQ:"

@@ -64,7 +64,7 @@ function Get-ICObject {
 
     if ($ScanId) {
         if ($where -AND $where['and']) {
-            if (-NOT $where['and'].scanId -AND -NOT $where['and'].scanId) {
+            if (-NOT $where.scanId -AND -NOT $where['and'].scanId) {
                 $where['and'] += @{ 'scanId' = $scanId }
             }
         }
@@ -93,7 +93,7 @@ function Get-ICObject {
     else {
         #BoxId
         if ($where -AND $where['and']) {
-            if (-NOT $where['and'].boxId -AND -NOT $where['boxId']) {
+            if (-NOT $where['boxId'] -AND -NOT $where['and'].boxId) {
                 $where['and'] += @{ 'boxId' = $BoxId }
             }
         }
@@ -118,6 +118,8 @@ function Get-ICObject {
             $where += @{ boxId = $BoxId }
         }
         $Box = "Box"
+        $B = Get-ICBox -id $BoxId
+        $BoxName = "$($B.targetGroup) - $($B.name)"
     }
     
     switch ( $Type ) {
@@ -161,15 +163,45 @@ function Get-ICObject {
                 $Endpoint += "\$Id"
             }
             elseif ($AllInstances) {
-                $result = Get-ICAPI -Endpoint $Endpoint -where $where -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly
-                $result | foreach-object {
+                $results = Get-ICAPI -Endpoint $Endpoint -where $where -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly
+                $results | foreach-object {
                     $_.output = $_.output.output.entry
-                    $_ | Add-Member -Type NoteProperty -Name runTime -Value $null
+                    $_ | Add-Member -MemberType NoteProperty -Name runTime -Value $null
                     if ($_.endedOn) {
                         $_.runTime = [math]::round(([datetime]$_.endedOn - [DateTime]$_.startedOn).TotalSeconds)
                     }
                 }
-                return $result
+                #Enrich BoxName
+                if ($Box -eq "Box") {
+                    $Results | ForEach-Object {
+                        $_ | Add-Member -MemberType NoteProperty -Name boxName -Value $BoxName
+                    }
+                }
+                if ($EnrichTargetGroupName) {
+                    #Enrich targetGroupName
+                    if ($results) {
+                        $Scans = @()
+                        $TargetGroups = Get-ICTargetGroup
+                        $results | ForEach-Object {
+                            if ($scan_id -ne $_.scanId) {
+                                $scan_id = $_.scanId
+                                $scan = $Scans | Where-Object { $_.id -eq $scan_id }
+                                if (-NOT $scan) {
+                                    $scan = Get-ICScan -id $scan_id
+                                    $scans += $scan
+                                }
+                                $tg = $TargetGroups | Where-Object { $_.id -eq $scan.targetId }
+                                if ($tg) {
+                                    $tgname = $tg.name
+                                } else {
+                                    $tgname = "(deleted)"
+                                }
+                            }
+                            $_ | Add-Member -MemberType NoteProperty -Name targetGroup -Value $tgname
+                        }
+                    }
+                }
+                return $results
             } 
             elseif (-Not $Id) {
                 $fields = @("id","extensionId","extensionVersionId","boxId","hostScanId","success","threatStatus","name","hostId","scanId")
@@ -185,6 +217,7 @@ function Get-ICObject {
                         Id = $_.name # extensionVersionId
                         name = $_.group[0].name
                         boxId = $_.group[0].boxId
+                        boxName = $BoxName
                         count = $_.count
                         hosts = ($_.group | Select-Object hostId -unique).hostId.count
                         success = 0
@@ -258,8 +291,78 @@ function Get-ICObject {
             $CountOnly = $false
             $Endpoint += "/$id"
         }
-        Get-ICAPI -Endpoint $Endpoint -where $where -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly
+        if ($CountOnly) { 
+            Get-ICAPI -Endpoint $Endpoint -where $where -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly
+        } else {
+            $Results = Get-ICAPI -Endpoint $Endpoint -where $where -fields $fields -NoLimit:$NoLimit
+
+            #Enrich BoxName
+            if ($Box -eq "Box") {
+                $Results | ForEach-Object {
+                    $_ | Add-Member -MemberType NoteProperty -Name boxName -Value $BoxName
+                }
+            }
+
+            if ($EnrichTargetGroupName) {
+                #Enrich targetGroupName
+                if ($Results -AND $Results[0].scanId) {
+                    $Scans = @()
+                    $TargetGroups = Get-ICTargetGroup
+                    $Results | ForEach-Object {
+                        if ($scan_id -ne $_.scanId) { 
+                            $scan_id = $_.scanId
+                            $scan = $Scans | Where-Object { $_.id -eq $scan_id }
+                            if (-NOT $scan) {
+                                $scan = Get-ICScan -id $scan_id
+                                $scans += $scan
+                            }
+                            $tg = $TargetGroups | Where-Object { $_.id -eq $scan.targetId }
+                            if ($tg) {
+                                $tgname = $tg.name
+                            } else {
+                                $tgname = "(deleted)"
+                            }
+                        }
+                        $_ | Add-Member -MemberType NoteProperty -Name targetGroup -Value $tgname
+                    }
+                }
+            }            
+            $Results
+        }
     }
+}
+
+function Get-ICComplianceResults {
+    [cmdletbinding()]
+    param(
+        [parameter(
+            Mandatory=$false
+        )]
+        [ValidateScript( { if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid." } })]
+        [alias('id')]
+        [String]$complianceResultId,
+
+        [Switch]$RemediationSteps
+    )
+
+    $compliancescans = @()
+    if ($complianceResultId) {
+        $compliancescans += Get-ICAPI -endpoint complianceresultinstances -where @{ id = $complianceResultId }
+        if (-NOT $compliancescan) {
+            Write-Error "complianceResultId does not exist"
+            return
+        }
+    } else {
+        $compliancescans += Get-ICAPI -endpoint complianceresultinstances
+    }
+
+    $compliancescans | ForEach-Object {
+        Write-Verbose "Getting failed items for compliance result id $($_.id)"
+        $items = Get-ICAPI -endpoint complianceresultitems -where @{ complianceResultId = $_.id; passed = $false } -fields id, checklistId, result, score, maxscore, remarks, passed
+        $_ | Add-Member -MemberType NoteProperty -Name items -Value $items
+    }
+
+    $compliancescans
 }
 
 function Get-ICHostScanResult {
