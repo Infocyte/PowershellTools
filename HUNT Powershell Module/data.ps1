@@ -235,7 +235,7 @@ function Get-ICObject {
                         $props[$_.Name] = $_.count
                     }
                     $props['completion'] = ($($props.hosts)/$($_.count)).tostring("P")
-                    $results += New-Object PSObject -property $props
+                    $results += New-Object PSCustomObject -property $props
                 }
                 return $results
             }

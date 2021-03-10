@@ -115,3 +115,6 @@ function Get-ICHelp {
 . "$PSScriptRoot\scan_schedule.ps1"
 . "$PSScriptRoot\admin.ps1"
 . "$PSScriptRoot\extensions.ps1"
+. "$PSScriptRoot\rules.ps1"
+
+Install-Module powershell-yaml -AcceptLicense -SkipPublisherCheck

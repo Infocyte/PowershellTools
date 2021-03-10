@@ -1,13 +1,13 @@
 
-function Import-ICRules {
-    [cmdletbinding(DefaultParameterSetName = 'Body')]
+function Import-ICRule {
+    [cmdletbinding(DefaultParameterSetName = 'Rule')]
     Param(
         [parameter(
             Mandatory, 
             ValueFromPipeline,
-            ParameterSetName = 'Body')]
+            ParameterSetName = 'Rule')]
         [ValidateNotNullOrEmpty()]
-        [String]$Body,
+        [PSCustomObject]$Rule,
 
         [parameter(
             Mandatory, 
@@ -17,73 +17,82 @@ function Import-ICRules {
         [ValidateNotNullorEmpty()]
         [String]$Path,
 
-        [parameter(ParameterSetName = 'Body')]
+        [parameter(ParameterSetName = 'Rule')]
         [parameter(ParameterSetName = 'Path')]
         [Switch]$Active,
 
-        [parameter(ParameterSetName = 'Body')]
+        [parameter(ParameterSetName = 'Rule')]
         [parameter(ParameterSetName = 'Path')]
         [Switch]$Force
     )
 
-    if ($Path) {
-        $Body = Get-Content $Path -Raw
-        #$reader = New-Object -TypeName System.IO.StreamReader -ArgumentList $Path
-    }
-
-    $rules = ConvertFrom-Yaml $Body | convertto-json | convertfrom-json | ForEach-Object {
-        if ($null -eq $_.rule) {
-            Write-Error "Incorrect filetype. Not an Infocyte Rule"
-            continue
-        }
-        $_
-    }
-
-    $rules | Foreach-Object {
-        $rule = $_
-        if ($rule.guid) {
-
-            if ($rule.guid -notmatch $GUID_REGEX) {
-                Write-Error "Incorrect guid format: $($rule.guid).  Should be a guid of form: $GUID_REGEX. 
-                Use the following command to generate a new one: [guid]::NewGuid().Guid"
-                $guid = [guid]::NewGuid().Guid
-                Write-Warning "Missing guid: Generating a new one prior to import: $guid" 
-                $rule.guid = $guid
-            } 
-            else {
-                $existingRule = Get-ICRule -where @{ guid = $rule.guid }
-                if ($existingRule) {
-                    if (-NOT $Force) {
-                        Write-Warning "There is already an existing rule named $($existingRule.name) [$($existingRule.Id)] with guid $($rule.guid). Try using Update-ICRule or use -Force flag."
-                        continue
-                    }
-                    Write-Warning "There is already an existing rule named $($existingRule.name) [$($existingRule.Id)] with guid $($rule.guid). Forcing update."
-                    $id = $existingRule.id
-                    Invoke-ICAPI -Endpoint rule -method PATCH -body @{
-                        id          = $id
-                        name        = $rule.name
-                        short       = $rule.short
-                        description = $rule.description
-                        body        = $rule.rule
-                    }
+    PROCESS { 
+        if ($Path) {
+            $Body = Get-Content $Path -Raw
+            #$reader = New-Object -TypeName System.IO.StreamReader -ArgumentList $Path
+            $rules = ConvertFrom-Yaml $Body | convertto-json | convertfrom-json | ForEach-Object {
+                if ($null -eq $_.rule) {
+                    Write-Error "Incorrect filetype. Not an Infocyte Rule"
                     continue
                 }
-            }            
+                $_
+            }
+        } else {
+            if ($null -eq $rule.rule) {
+                Write-Error "Incorrect filetype. Not an Infocyte Rule"
+                continue
+            }
+            $rules = $rule
         }
-        else {
-            $rule | Add-Member -TypeName NoteProperty -Name guid -Value ([guid]::NewGuid().Guid)
-        }
+        
 
-        Write-Verbose "Adding new Rule named: $($rule.name)"
-        Invoke-ICAPI -Endpoint rule -method POST -body @{ 
-            name        = $rule.name
-            short       = $rule.short
-            description = $rule.description
-            body        = $rule.rule
-            guid        = $rule.guid
+        $rules | Foreach-Object {
+            $rule = $_
+            if ($rule.guid) {
+
+                if ($rule.guid -notmatch $GUID_REGEX) {
+                    Write-Error "Incorrect guid format: $($rule.guid).  Should be a guid of form: $GUID_REGEX. 
+                    Use the following command to generate a new one: [guid]::NewGuid().Guid"
+                    $guid = [guid]::NewGuid().Guid
+                    Write-Warning "Missing guid: Generating a new one prior to import: $guid" 
+                    $rule.guid = $guid
+                } 
+                else {
+                    $existingRule = Get-ICRule -where @{ guid = $rule.guid } -NoBody | Select-Object -First 1
+                    if ($existingRule) {
+                        if (-NOT $Force) {
+                            Write-Warning "There is already an existing rule named $($existingRule.name) [$($existingRule.Id)] with guid $($rule.guid). Try using Update-ICRule or use -Force flag."
+                            continue
+                        }
+                        Write-Warning "There is already an existing rule named $($existingRule.name) [$($existingRule.Id)] with guid $($rule.guid). Forcing update."
+                        $id = $existingRule.id
+                        Invoke-ICAPI -Endpoint rules -method POST -body @{
+                            id          = $id
+                            name        = $rule.name
+                            short       = $rule.short
+                            description = $rule.description
+                            body        = $rule.rule
+                        }
+                        continue
+                    }
+                }            
+            }
+            else {
+                $rule | Add-Member -TypeName NoteProperty -Name guid -Value ([guid]::NewGuid().Guid)
+            }
+
+            Write-Verbose "Adding new Rule named: $($rule.name)"
+            Invoke-ICAPI -Endpoint rule -method POST -body @{ 
+                name        = $rule.name
+                short       = $rule.short
+                description = $rule.description
+                body        = $rule.rule
+                guid        = $rule.guid
+            }
         }
     }
 }
+
 function Get-ICRule {
     [cmdletbinding(DefaultParameterSetName = "List")]
     Param(
@@ -106,7 +115,11 @@ function Get-ICRule {
 
         [parameter(
             ParameterSetName = 'List')]
-        [Switch]$CountOnly
+        [Switch]$CountOnly,
+
+        [Switch]$NoBody,
+
+        [Switch]$Export
     )
 
     PROCESS {
@@ -140,21 +153,42 @@ function Get-ICRule {
         else { 
             $c = $rules.count 
         }
-        $rules | ForEach-Object {
-            $rule = $_
-            Write-Verbose "Getting Rule $($rule.name) [$($rule.id)]"
-            try { $pc = [math]::Floor(($n / $c) * 100) } catch { $pc = -1 }
-            Write-Progress -Id 1 -Activity "Getting Rule Body from Infocyte API" -Status "Requesting Body from Rule $n of $c" -PercentComplete $pc
-            $ruleBody = Get-ICAPI -endpoint "rules/$($rule.id)/LatestVersion" -fields body, sha256
-            $rule | Add-Member -MemberType NoteProperty -Name rule -Value $ruleBody.body 
-            $rule | Add-Member -MemberType NoteProperty -Name sha256 -Value $ruleBody.sha256
-            Write-Verbose "Looking up user: $($rule.createdBy) and $($rule.updatedBy)"
-            $rule.createdBy = (Get-ICAPI -endpoint users -where @{ id = $rule.createdBy } -fields email -ea 0).email
-            $rule.updatedBy = (Get-ICAPI -endpoint users -where @{ id = $rule.updatedBy } -fields email -ea 0).email
-            $n += 1
-        }        
-    
-        Write-Progress -Id 1 -Activity "Getting Rules from Infocyte API" -Status "Complete" -Completed
+        if (-NOT $NoBody -or $Export) {
+            $rules | ForEach-Object {
+                $rule = $_
+                Write-Verbose "Getting Rule $($rule.name) [$($rule.id)]"
+                try { $pc = [math]::Floor(($n / $c) * 100) } catch { $pc = -1 }
+                Write-Progress -Id 1 -Activity "Getting Rule Body from Infocyte API" -Status "Requesting Body from Rule $n of $c" -PercentComplete $pc
+                $ruleBody = Get-ICAPI -endpoint "rules/$($rule.id)/LatestVersion" -fields body, sha256
+                $rule | Add-Member -MemberType NoteProperty -Name rule -Value $ruleBody.body 
+                $rule | Add-Member -MemberType NoteProperty -Name sha256 -Value $ruleBody.sha256
+                Write-Verbose "Looking up user: $($rule.createdBy) and $($rule.updatedBy)"
+                $rule.createdBy = (Get-ICAPI -endpoint users -where @{ id = $rule.createdBy } -fields email -ea 0).email
+                $rule.updatedBy = (Get-ICAPI -endpoint users -where @{ id = $rule.updatedBy } -fields email -ea 0).email
+                $n += 1
+            }  
+            Write-Progress -Id 1 -Activity "Getting Rules from Infocyte API" -Status "Complete" -Completed
+        }
+        
+        if ($Export) {
+            $rules | ForEach-Object {
+                $FilePath = "$($(Resolve-Path .\).Path)\$($($_.name).ToLower().Replace(' ','_')).yaml"
+                $new_rule = [PSCustomObject][Ordered]@{
+                    name = $_.name
+                    guid = if ($_.guid) { $_.guid } else { $null }
+                    rule = $_.body
+                    author = $_.createdBy
+                    description = $_.description
+                    short = $_.short
+                    severity = if ($_.severity) { $_.severity } else { "Medium" }
+                    created = $_.created
+                    updated = $_.updated
+                    action = @{ alert = $true }
+                }
+                Write-Verbose "Exported Rule [$($_.name)] to $FilePath"
+                $_ | Convertto-YAML -Force -OutFile $FilePath
+            }
+        }
         $rules
     }
 }
@@ -183,27 +217,30 @@ function New-ICRule {
             "Medium",
             "Low"
         )]
-        [String]$Severity = "Medium"
+        [String]$Severity = "Medium",
+        
+        [Switch]$Force
     )
 	
     $today = Get-Date -UFormat "%F"
     
-    $Rule = New-PSObject -Type Noteproperty -Property @{
-        Name = $Name
-        $Guid = [Guid]::NewGuid().guid
-        Rule = $Rule
-        Author = $Author
-        Description = $Description
-        Short = $Short
-        Severity = $Severity
-        Created = $today
-        Updated = $today
+    $new_rule = [PSCustomObject][Ordered]@{
+        name = $Name
+        guid = [Guid]::NewGuid().guid
+        rule = $Rule
+        author = $Author
+        description = $Description
+        short = $Short
+        severity = $Severity
+        created = $today
+        updated = $today
+        action = @{ alert = $true }
     }
 
     $SavePath = (Resolve-Path .\).Path + "\new_rule.yaml"
-    Write-Host "`nCreated rule from template and saved to $SavePath"
-    $Rule | convertto-YAML | Out-File $SavePath -Encoding utf8
-    $Rule    
+    Write-Verbose "Created rule from template and saved to $SavePath"
+    $new_rule | ConvertTo-YAML -OutFile $SavePath -Force
+    Write-Output $new_rule
 }
 function Update-ICRule {
     <#
@@ -266,10 +303,11 @@ function Update-ICRule {
         }
         else {
             Write-Verbose "Looking up rule by Guid"
-            $existing_rule = Get-ICRule -ea 0 -where @{ guid = $rule.guid }
+            $existing_rule = Get-ICRule -ea 0 -where @{ guid = $rule.guid } -NoBody
             if ($existing_rule) {
                 Write-Verbose "Found existing rule with matching guid $($existing_rule.guid). Updating id $($existing_rule.id)"
                 $Endpoint = "rules/$($existing_rule.id)"
+                $existing_rule = Get-ICRule -id $existing_rule.id
                 if (-NOT $postbody['active']) { $postbody['active'] = $existing_rule.active }
                 if (-NOT $postbody['name']) { $postbody['name'] = $existing_rule.name }
                 if (-NOT $postbody['short']) { $postbody['short'] = $existing_rule.short }

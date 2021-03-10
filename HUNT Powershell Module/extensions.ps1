@@ -23,11 +23,8 @@ function Get-ICExtension {
             ParameterSetName='List')]
         [Switch]$CountOnly,
 
-        [Parameter(
-            ParameterSetName='Id',
-            HelpMessage = "Filepath and name to save extension to. Recommending ending as .lua")]
-        [ValidateScript( { Test-Path -Path $_ -IsValid })]
-        [String]$SavePath,
+        [Parameter()]
+        [Switch]$Save,
 
         [parameter(
             ParameterSetName = 'Id')]
@@ -100,12 +97,17 @@ function Get-ICExtension {
         }
         Write-Progress -Id 1 -Activity "Getting Extentions from Infocyte API" -Status "Complete" -Completed
         
-        if ($SavePath) {
-            Remove-Item $SavePath -Force | Out-Null
-            [System.IO.File]::WriteAllLines($SavePath, $exts.body)
-            # $exts.body | Out-File $SavePath | Out-Null
+        $SavePath = (Resolve-Path .\).Path
+        if ($Save) {
+            $exts | Foreach-Object {
+                $FilePath = "$SavePath\$($($_.name).replace(" ","_")).lua" 
+                Remove-Item $FilePath -Force | Out-Null
+                [System.IO.File]::WriteAllLines($FilePath, $exts.script.body)
+                Write-Verbose "Saved extension to $FilePath"
+                # $exts.body | Out-File $SavePath | Out-Null
+            }
         }
-        $exts
+        Write-Output $exts
     }
 }
 
@@ -642,7 +644,7 @@ function Test-ICExtension {
     -NOT $exitError
 }
 
-function ConvertTo-ICExtensionHeader {
+function Parse-ICExtensionHeader {
     [cmdletbinding(DefaultParameterSetName = 'Body')]
     Param(
         [parameter(
