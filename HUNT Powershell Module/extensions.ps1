@@ -123,14 +123,10 @@ function New-ICExtension {
 
 		[Parameter()]
 		[ValidateSet(
-          "Collection",
-          "Response"
+            "Collection",
+            "Response"
         )]
-        [String]$Type = "Collection",
-
-        [Parameter(HelpMessage="Filepath and name to save new extension to. Recommending ending as .lua")]
-        [ValidateScript({ Test-Path -Path $_ -IsValid })]
-        [String]$SavePath
+        [String]$Type = "Collection"
 	)
 	
 	$CollectionTemplate = "https://raw.githubusercontent.com/Infocyte/extensions/master/examples/collection_template.lua"
@@ -151,17 +147,14 @@ function New-ICExtension {
     $template = $template -replace '(?si)(?<start>^--\[=\[.+?updated\s*=\s*)(.+?)(?<end>"\n)',"`${start}$dt`${end}"
     
     
-    if ($SavePath) {
-        Write-Host "`nCreated $Type extension from template and saved to $SavePath"
-        Remove-Item $SavePath -Force | Out-Null
-        [System.IO.File]::WriteAllLines($SavePath, $template)
-        # $template | Out-File -FilePath $SavePath
-        return $true
-    }
-    else {
-        return $template
-    }    
+    $SavePath = (Resolve-Path ".\").path + "\$($Type)_extension.lua"
+    Write-Host "`nCreated $Type extension from template and saved to $SavePath"
+    Remove-Item $SavePath -Force | Out-Null
+    [System.IO.File]::WriteAllLines($SavePath, $template)
+    # $template | Out-File -FilePath $SavePath
+    return $template    
 }
+
 function Import-ICExtension {
     [cmdletbinding()]
     Param(
@@ -415,7 +408,7 @@ function Import-ICOfficialExtensions {
             Write-Warning "Could not download extensions from https://api.github.com/repos/Infocyte/extensions/contents/contrib/response"
         }
     }
-    $Results = @()
+
     $Extensions | ForEach-Object {
         $filename = ($_.name -split "\.")[0]
         try {
@@ -649,9 +642,7 @@ function Test-ICExtension {
     -NOT $exitError
 }
 
-Install-Module powershell-yaml -AcceptLicense -SkipPublisherCheck
-
-function Parse-ICExtensionHeader {
+function ConvertTo-ICExtensionHeader {
     [cmdletbinding(DefaultParameterSetName = 'Body')]
     Param(
         [parameter(

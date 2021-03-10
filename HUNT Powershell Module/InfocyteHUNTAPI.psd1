@@ -8,7 +8,7 @@
 RootModule = 'InfocyteHUNTAPI.psm1'
 
 # Version number of this module.
-ModuleVersion = '1.7.0'
+ModuleVersion = '1.8.0'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -129,7 +129,12 @@ FunctionsToExport = @(
     "Get-ICAgent",
     "Remove-ICAgent",
     "Get-ICDwellTime",
-    "Get-ICComplianceResults"
+    "Get-ICComplianceResults",
+    "Get-ICRule",
+    "New-ICRule",
+    "Import-ICRule",
+    "Update-ICRule",
+    "Remove-ICRule"
 )
 
 # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
@@ -168,7 +173,7 @@ PrivateData = @{
         # IconUri = ''
 
         # ReleaseNotes of this module
-        ReleaseNotes = 'Update Extension Tester (Test-ICExtension)'
+        ReleaseNotes = 'Add ICRule functions for managing and creating rules'
 
     } # End of PSData hashtable
 

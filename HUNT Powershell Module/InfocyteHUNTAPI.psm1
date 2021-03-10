@@ -31,6 +31,12 @@ function Get-ICHelp {
     Write-Host -ForegroundColor Cyan "`tImport-ICExtension -> Loads an extension into your instance "
     Write-Host -ForegroundColor Cyan "`tImport-ICOfficialExtensions -> Imports all official extensions from Infocyte`n" 
 
+    Write-Host "## Rule Development Functions ##"
+    Write-Host -ForegroundColor Cyan "`tNew-ICRule, Get-ICRule, Update-ICRule, Remove-ICRule,"
+    Write-Host -ForegroundColor Cyan "`tTest-ICRule (Runs the extension locally for testing"
+    Write-Host -ForegroundColor Cyan "`tImport-ICRule -> Loads an extension into your instance "
+    Write-Host -ForegroundColor Cyan "`tImport-ICOfficialRules -> Imports all official extensions from Infocyte`n" 
+
     Write-Host "## Admin/Misc Functions ##"
     Write-Host -ForegroundColor Cyan "`tGet-ICUser, Get-ICUserAuditLog,"
     Write-Host -ForegroundColor Cyan "`tAdd-ICComment", "Get-ICDwellTime`n"
