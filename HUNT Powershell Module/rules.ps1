@@ -117,7 +117,7 @@ function Get-ICRule {
             ParameterSetName = 'List')]
         [Switch]$CountOnly,
 
-        [Switch]$NoBody,
+        [Switch]$IncludeBody,
 
         [Switch]$Export
     )
@@ -153,7 +153,7 @@ function Get-ICRule {
         else { 
             $c = $rules.count 
         }
-        if (-NOT $NoBody -or $Export) {
+        if ($IncludeBody -or $Export) {
             $rules | ForEach-Object {
                 $rule = $_
                 Write-Verbose "Getting Rule $($rule.name) [$($rule.id)]"
