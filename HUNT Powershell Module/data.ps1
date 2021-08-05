@@ -1,5 +1,80 @@
 
 # General function for getting various objects (files, processes, memory injects, autostarts, etc.) from Infoyte
+function New-ICFilter {
+    param(
+        [HashTable]$Where=@{},
+
+        [DateTime]$StartDate=(Get-Date).AddDays(-1),
+
+        [DateTime]$EndDate=(Get-Date),
+
+        [string]$ScanId
+    )
+
+    if ($where.Count -eq 0 -OR (-NOT $where.scanId -AND ($where['and'].keys -notcontains 'scanId') -AND -NOT $where['scannedOn'] -AND ($where['and'].Keys -notcontains 'scannedOn'))) {
+        if ($ScanId) {
+            Write-Verbose "Adding scanId to filter"
+            if ($where -AND $where['and']) {
+                if (-NOT $where.scanId -AND ($where['and'].keys -notcontains 'scanId')) {
+                    $where['and'] += @{ scanId = $scanId }
+                }
+            }
+            elseif ($where -AND $where['or']) {
+                # handle this wierd loopback thing where 'or' filters screw things up
+                # wrap everything in an explicit 'and'
+                Write-Warning "There is a known issue with Loopback where filters that cause problems with first level 'or' filters."
+                Write-Warning "You should wrap everything in an And filter to make sure this works. Doing this now."
+                $where = @{
+                    and = @(
+                        @{ or = $where['or'] },
+                        @{ scanId = $scanId }
+                    )
+                }
+            }
+            elseif ($where) {
+                $where['scanId'] = $scanId
+            }
+            else {
+                $where = @{ scanId = $scanId }
+            }
+        }
+        else {
+            Write-Verbose "Adding time bounds to filter"
+            #Time Window
+            if ($StartDate -AND $EndDate) {
+                if ($where -AND $where['and']) {
+                    if (-NOT $where['scannedOn'] -AND ($where['and'].Keys -notcontains 'scannedOn')) {
+                        $where['and'] += @{ 'scannedOn' = @{ gt = $StartDate.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ") }}
+                        $where['and'] += @{ 'scannedOn' = @{ lte = $EndDate.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ") }}
+                    }
+                }
+                elseif ($where -AND $where['or']) {
+                    # handle this wierd loopback thing where 'or' filters screw things up
+                    # wrap everything in an explicit 'and'
+                    Write-Warning "There is a known issue with Loopback where filters that cause problems with first level 'or' filters."
+                    Write-Warning "You should wrap everything in an And filter to make sure this works. Doing this now."
+                    $where = @{
+                        and = @(
+                            @{ or = $where['or'] },
+                            @{ 'scannedOn' = @{ gt = $StartDate.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ") }},
+                            @{ 'scannedOn' = @{ lte = $EndDate.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ") }}
+                        )
+                    }
+                    Write-Warning "where-filter:$($where|ConvertTo-Json -depth 10)"
+                }
+                else {
+                    $where += @{ 
+                        and = @(
+                            @{ 'scannedOn' = @{ gt = $StartDate.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ") }},
+                            @{ 'scannedOn' = @{ lte = $EndDate.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ") }}
+                        )
+                    }
+                }
+            } 
+        }
+    }
+    return $where
+}
 function Get-ICEvent {
     [cmdletbinding(DefaultParameterSetName="Time")]
     [alias("Get-ICData", "Get-ICObject")]
@@ -65,68 +140,7 @@ function Get-ICEvent {
         "Script"
     )
 
-    if ($where.Count -eq 0 -OR (-NOT $where.scanId -AND ($where['and'].keys -notcontains 'scanId') -AND -NOT $where['scannedOn'] -AND ($where['and'].Keys -notcontains 'scannedOn'))) {
-        if ($ScanId) {
-            Write-Verbose "Adding scanId to filter"
-            if ($where -AND $where['and']) {
-                if (-NOT $where.scanId -AND ($where['and'].keys -notcontains 'scanId')) {
-                    $where['and'] += @{ scanId = $scanId }
-                }
-            }
-            elseif ($where -AND $where['or']) {
-                # handle this wierd loopback thing where 'or' filters screw things up
-                # wrap everything in an explicit 'and'
-                Write-Warning "There is a known issue with Loopback where filters that cause problems with first level 'or' filters."
-                Write-Warning "You should wrap everything in an And filter to make sure this works. Doing this now."
-                $where = @{
-                    and = @(
-                        @{ or = $where['or'] },
-                        @{ scanId = $scanId }
-                    )
-                }
-            }
-            elseif ($where) {
-                $where['scanId'] = $scanId
-            }
-            else {
-                $where = @{ scanId = $scanId }
-            }
-        }
-        else {
-            Write-Verbose "Adding time bounds to filter"
-            #Time Window
-            if ($StartDate -AND $EndDate) {
-                if ($where -AND $where['and']) {
-                    if (-NOT $where['scannedOn'] -AND ($where['and'].Keys -notcontains 'scannedOn')) {
-                        $where['and'] += @{ 'scannedOn' = @{ gt = $StartDate.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ") }}
-                        $where['and'] += @{ 'scannedOn' = @{ lte = $EndDate.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ") }}
-                    }
-                }
-                elseif ($where -AND $where['or']) {
-                    # handle this wierd loopback thing where 'or' filters screw things up
-                    # wrap everything in an explicit 'and'
-                    Write-Warning "There is a known issue with Loopback where filters that cause problems with first level 'or' filters."
-                    Write-Warning "You should wrap everything in an And filter to make sure this works. Doing this now."
-                    $where = @{
-                        and = @(
-                            @{ or = $where['or'] },
-                            @{ 'scannedOn' = @{ gt = $StartDate.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ") }},
-                            @{ 'scannedOn' = @{ lte = $EndDate.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ") }}
-                        )
-                    }
-                    Write-Warning "where-filter:$($where|ConvertTo-Json -depth 10)"
-                }
-                else {
-                    $where += @{ 
-                        and = @(
-                            @{ 'scannedOn' = @{ gt = $StartDate.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ") }},
-                            @{ 'scannedOn' = @{ lte = $EndDate.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ") }}
-                        )
-                    }
-                }
-            } 
-        }
-    }
+    $where = New-ICFilter -Where $where -ScanId $scanId -StartDate $StartDate -EndDate $EndDate
     
     switch ( $Type ) {
         "Script" {
@@ -348,7 +362,6 @@ function Get-ICObject_old {
         }
     }
 }
-
 function Get-ICComplianceResults {
     [cmdletbinding()]
     param(
@@ -483,74 +496,38 @@ function Get-ICResponseResult {
 function Get-ICVulnerability {
     [cmdletbinding()]
     param(
-        [parameter(ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
-        [alias('applicationId')]
-        [String]$Id,
+        [parameter(
+            ValueFromPipeline, 
+            Mandatory,
+            HelpMessage="Pipe in applications from Get-ICEvent or Get-ICObject")]
+        [PSCustomObject[]]$Applications,
 
-        [Switch]$AllInstances,
-        [parameter(HelpMessage={"Boxes are the 7, 30, and 90 day views of target group or global data. Use Set-ICBox to set your default. CurrentDefault: $Global:ICCurrentBox"})]
-        [String]$BoxId=$Global:ICCurrentBox,
         [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
-        [HashTable]$where=@{},
-        [Switch]$NoLimit
+        [HashTable]$where=@{}
     )
 
     BEGIN {
-        if ($where -AND $where['boxId']) {
-            $where['boxId'] = $BoxId
-        } else {
-            $where += @{ boxId = $BoxId }
-        }
-
-        Write-Verbose "Building Application table..."
-        $Apps = @()
+        
     }
 
-    PROCESS{
-        if ($Id) {
-            if ($AllInstances) {
-                Write-verbose "Querying for application instances with applicationId: $Id"
-                $a = Get-ICObjects -Type Application -where @{ applicationId = $id } -BoxId $BoxId 
-            } else {
-                Write-verbose "Querying for applications with applicationId: $Id"
-                $a = Get-ICObjects -Id $id -Type Application -BoxId $BoxId
-                if ($a) {
-                    $a | ForEach-Object {
-                        $appid = $_.id
-                        $_ | Add-Member -MemberType "NoteProperty" -name "applicationId" -value $appid
-                    }
-                    Write-Debug $a
-                }
-            }
-            if ($a) {
-                $apps += $a
-            } else {
-                Write-Warning "No application found with applicationId: $Id in BoxId: $BoxId"
-                return
-            }
+    PROCESS {
+        if (-NOT $applications.applicationId) {
+            Write-Error "Input is not an application instance or list of application instances"
+            continue
         } else {
-            if ($AllInstances) {
-                $apps = Get-ICObjects -Type Application -BoxId $BoxId -where $where -NoLimit:$NoLimit 
-            } else {
-                $apps = Get-ICObjects -Type Application -BoxId $BoxId -where $where -NoLimit:$NoLimit
-                $apps | ForEach-Object {
-                    $appid = $_.id
-                    $_ | Add-Member -MemberType "NoteProperty" -name "applicationId" -value $appid
-               }
-            }
+            $apps += $applications
         }
     }
 
     END {
-        $where.remove('boxId') | Out-Null
-        $Endpoint = "ApplicationAdvisories"
-        Write-Verbose "Building Application Advisory bridge table with filter: $($where|convertto-json -compress)"
-        $appvulns = Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$true | sort-object applicationId, cveId -unique
+        #$where.remove('boxId') | Out-Null
+        Write-Verbose "Building Application Advisory bridge table"
+        $appvulns = Get-ICAPI -Endpoint "ApplicationAdvisories" -where $where -NoLimit:$true | sort-object applicationId, cveId -unique
 
         if ($apps -AND $appvulns) {
             $appids = $apps.applicationid | sort-object -unique
-            $appvulns = $appvulns | Where-Object  { $appids -contains $_.applicationId }
-            $apps = $apps | Where-Object  { $appvulns.applicationId -contains $_.applicationId }
+            $appvulns = $appvulns | Where-Object { $appids -contains $_.applicationId }
+            $apps = $apps | Where-Object { $appvulns.applicationId -contains $_.applicationId }
         } else {
             Write-Warning "No Results found."
             return
@@ -675,14 +652,13 @@ function Get-ICAlert {
     )
 
     PROCESS {
-        $Endpoint = "AlertDetails"
+        $Endpoint = "Alerts"
         if ($Id) {
             $CountOnly = $false
-            $where = @{ id = $Id }
-            #$Endpoint += "/$Id" (currently broken)
+            $Endpoint += "/$Id"
         }
         elseif (-NOT ($IncludeArchived -OR $Where['archived'])) {
-            $Where += @{ archived = $FALSE }
+            $Where['archived'] = $FALSE
         }
         Get-ICAPI -Endpoint $Endpoint -where $where -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly
     }
