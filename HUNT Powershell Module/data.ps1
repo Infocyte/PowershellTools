@@ -10,7 +10,7 @@ function Get-ICEvent {
 
         [parameter(
             Mandatory=$true,
-            HelpMessage="Data is currently seperated into object-type tables. 'File' will perform a recursive call of all files.")]
+            HelpMessage="Data is currently seperated into object-type tables. 'File' will perform a recursive call of all file types (process, module, driver, artifact, and autostart.")]
         [ValidateSet(
           "Process",
           "Module",
@@ -64,41 +64,13 @@ function Get-ICEvent {
         "Autostart",
         "Script"
     )
-    
-    if ($ScanId) {
-        if ($where -AND $where['and']) {
-            if (-NOT $where.scanId -AND -NOT $where['and'].scanId) {
-                $where['and'] += @{ 'scanId' = $scanId }
-            }
-        }
-        if ($where -AND $where['or']) {
-            # handle this wierd loopback thing where 'or' filters screw things up
-            # wrap everything in an explicit 'and'
-            Write-Warning "There is a known issue with Loopback where filters that cause problems with first level 'or' filters."
-            Write-Warning "You should wrap everything in an And filter to make sure this works. Doing this now."
-            $where = @{
-                and = @(
-                    @{ or = $where['or'] },
-                    @{ scanId = $scanId }
-                )
-            }
-            #$where += @{ scanId = $scanId }
-            Write-Warning "where-filter:$($where|ConvertTo-Json -depth 10)"
-        }
-        elseif ($where) {
-            $where['scanId'] = $scanId
-        }
-        else {
-            $where += @{ scanId = $scanId }
-        }
-    }
-    else {
-        #Time Window
-        if ($StartDate -AND $EndDate) {
+
+    if ($where.Count -eq 0 -OR (-NOT $where.scanId -AND ($where['and'].keys -notcontains 'scanId') -AND -NOT $where['scannedOn'] -AND ($where['and'].Keys -notcontains 'scannedOn'))) {
+        if ($ScanId) {
+            Write-Verbose "Adding scanId to filter"
             if ($where -AND $where['and']) {
-                if (-NOT $where['boxId'] -AND -NOT $where['and'].boxId) {
-                    $where['and'] += @{ 'scannedOn' = @{ gt = $StartDate }}
-                    $where['and'] += @{ 'scannedOn' = @{ lte = $EndDate }}
+                if (-NOT $where.scanId -AND ($where['and'].keys -notcontains 'scanId')) {
+                    $where['and'] += @{ scanId = $scanId }
                 }
             }
             elseif ($where -AND $where['or']) {
@@ -109,21 +81,51 @@ function Get-ICEvent {
                 $where = @{
                     and = @(
                         @{ or = $where['or'] },
-                        @{ 'scannedOn' = @{ gt = $StartDate }},
-                        @{ 'scannedOn' = @{ lte = $EndDate }}
+                        @{ scanId = $scanId }
                     )
                 }
-                Write-Warning "where-filter:$($where|ConvertTo-Json -depth 10)"
+            }
+            elseif ($where) {
+                $where['scanId'] = $scanId
             }
             else {
-                $where += @{ 
-                    and = @(
-                        @{ 'scannedOn' = @{ gt = $StartDate }},
-                        @{ 'scannedOn' = @{ lte = $EndDate }}
-                    )
-                }
+                $where = @{ scanId = $scanId }
             }
-        } 
+        }
+        else {
+            Write-Verbose "Adding time bounds to filter"
+            #Time Window
+            if ($StartDate -AND $EndDate) {
+                if ($where -AND $where['and']) {
+                    if (-NOT $where['scannedOn'] -AND ($where['and'].Keys -notcontains 'scannedOn')) {
+                        $where['and'] += @{ 'scannedOn' = @{ gt = $StartDate.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ") }}
+                        $where['and'] += @{ 'scannedOn' = @{ lte = $EndDate.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ") }}
+                    }
+                }
+                elseif ($where -AND $where['or']) {
+                    # handle this wierd loopback thing where 'or' filters screw things up
+                    # wrap everything in an explicit 'and'
+                    Write-Warning "There is a known issue with Loopback where filters that cause problems with first level 'or' filters."
+                    Write-Warning "You should wrap everything in an And filter to make sure this works. Doing this now."
+                    $where = @{
+                        and = @(
+                            @{ or = $where['or'] },
+                            @{ 'scannedOn' = @{ gt = $StartDate.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ") }},
+                            @{ 'scannedOn' = @{ lte = $EndDate.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ") }}
+                        )
+                    }
+                    Write-Warning "where-filter:$($where|ConvertTo-Json -depth 10)"
+                }
+                else {
+                    $where += @{ 
+                        and = @(
+                            @{ 'scannedOn' = @{ gt = $StartDate.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ") }},
+                            @{ 'scannedOn' = @{ lte = $EndDate.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ") }}
+                        )
+                    }
+                }
+            } 
+        }
     }
     
     switch ( $Type ) {
@@ -138,20 +140,12 @@ function Get-ICEvent {
             $cnt = 0
             $Files | ForEach-Object {
                 if ($CountOnly) {
-                    if ($ScanId) {
-                        $c = Get-ICObject -Type $_ -ScanId $ScanId -where $where -CountOnly
-                    } else {
-                        $c = Get-ICObject -Type $_ -StartDate $StartDate -EndDate $EndDate -where $where -CountOnly
-                    }
+                    $c = Get-ICObject -Type $_ -where $where -CountOnly
                     Write-Verbose "Found $c $_ Objects"
                     $cnt += $c
                 } else {
                     Write-Verbose "Querying $_"
-                    if ($ScanId) {
-                        Get-ICObject -Type $_ -ScanId $ScanId -where $where -fields $fields -NoLimit:$NoLimit 
-                    } else {
-                        Get-ICObject -Type $_ -StartDate $StartDate -EndDate $EndDate -where $where -fields $fields -NoLimit:$NoLimit 
-                    }
+                    Get-ICObject -Type $_ -where $where -fields $fields -NoLimit:$NoLimit 
                 }    
             }
             if ($CountOnly) {
@@ -174,7 +168,6 @@ function Get-ICEvent {
         Get-ICAPI -Endpoint $Endpoint -where $where -fields $fields -NoLimit:$NoLimit     
     }
 }
-
 
 
 function Get-ICObject_old {
@@ -239,6 +232,7 @@ function Get-ICObject_old {
         "Script"
     )
 
+    Write-Verbose "Got $where"
     if ($ScanId) {
         if ($where -AND $where['and']) {
             if (-NOT $where.scanId -AND -NOT $where['and'].scanId) {
