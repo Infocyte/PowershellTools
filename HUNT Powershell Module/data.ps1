@@ -1,6 +1,190 @@
 
 # General function for getting various objects (files, processes, memory injects, autostarts, etc.) from Infoyte
-function Get-ICObject {
+function New-ICFilter {
+    param(
+        [HashTable]$Where=@{},
+
+        [DateTime]$StartDate=(Get-Date).AddDays(-1),
+
+        [DateTime]$EndDate=(Get-Date),
+
+        [string]$ScanId
+    )
+
+    if ($where.Count -eq 0 -OR (-NOT $where.scanId -AND ($where['and'].keys -notcontains 'scanId') -AND -NOT $where['scannedOn'] -AND ($where['and'].Keys -notcontains 'scannedOn'))) {
+        if ($ScanId) {
+            Write-Verbose "Adding scanId to filter"
+            if ($where -AND $where['and']) {
+                if (-NOT $where.scanId -AND ($where['and'].keys -notcontains 'scanId')) {
+                    $where['and'] += @{ scanId = $scanId }
+                }
+            }
+            elseif ($where -AND $where['or']) {
+                # handle this wierd loopback thing where 'or' filters screw things up
+                # wrap everything in an explicit 'and'
+                Write-Warning "There is a known issue with Loopback where filters that cause problems with first level 'or' filters."
+                Write-Warning "You should wrap everything in an And filter to make sure this works. Doing this now."
+                $where = @{
+                    and = @(
+                        @{ or = $where['or'] },
+                        @{ scanId = $scanId }
+                    )
+                }
+            }
+            elseif ($where) {
+                $where['scanId'] = $scanId
+            }
+            else {
+                $where = @{ scanId = $scanId }
+            }
+        }
+        else {
+            Write-Verbose "Adding time bounds to filter"
+            #Time Window
+            if ($StartDate -AND $EndDate) {
+                if ($where -AND $where['and']) {
+                    if (-NOT $where['scannedOn'] -AND ($where['and'].Keys -notcontains 'scannedOn')) {
+                        $where['and'] += @{ 'scannedOn' = @{ gt = $StartDate.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ") }}
+                        $where['and'] += @{ 'scannedOn' = @{ lte = $EndDate.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ") }}
+                    }
+                }
+                elseif ($where -AND $where['or']) {
+                    # handle this wierd loopback thing where 'or' filters screw things up
+                    # wrap everything in an explicit 'and'
+                    Write-Warning "There is a known issue with Loopback where filters that cause problems with first level 'or' filters."
+                    Write-Warning "You should wrap everything in an And filter to make sure this works. Doing this now."
+                    $where = @{
+                        and = @(
+                            @{ or = $where['or'] },
+                            @{ 'scannedOn' = @{ gt = $StartDate.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ") }},
+                            @{ 'scannedOn' = @{ lte = $EndDate.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ") }}
+                        )
+                    }
+                    Write-Warning "where-filter:$($where|ConvertTo-Json -depth 10)"
+                }
+                else {
+                    $where += @{ 
+                        and = @(
+                            @{ 'scannedOn' = @{ gt = $StartDate.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ") }},
+                            @{ 'scannedOn' = @{ lte = $EndDate.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ") }}
+                        )
+                    }
+                }
+            } 
+        }
+    }
+    return $where
+}
+function Get-ICEvent {
+    [cmdletbinding(DefaultParameterSetName="Time")]
+    [alias("Get-ICData", "Get-ICObject")]
+    param(
+        [parameter(ValueFromPipeline)]
+        [ValidateScript( { if ($_ -match $GUID_REGEX -OR $_ -match "\b[0-9a-f]{40}\b") { $true } else { throw "Incorrect input: $_.  Should be a guid." } })]
+        [String]$Id,
+
+        [parameter(
+            Mandatory=$true,
+            HelpMessage="Data is currently seperated into object-type tables. 'File' will perform a recursive call of all file types (process, module, driver, artifact, and autostart.")]
+        [ValidateSet(
+          "Process",
+          "Module",
+          "Driver",
+          "MemScan",
+          "Artifact",
+          "Autostart",
+          "Connection",
+          "Application",
+          "Account",
+          "Script",
+          "File",
+          "Extension",
+          "Host"
+        )]
+        [String]$Type,
+
+        [parameter(
+            ParameterSetName="Time",
+            HelpMessage={"Starting timestamp of items. Default = -1 days"})]
+        [DateTime]$StartDate=(Get-Date).AddDays(-1),
+
+        [parameter(
+            ParameterSetName="Time",
+            HelpMessage={"Last timestamp of items. Default = Now"})]
+        [DateTime]$EndDate=(Get-Date),
+
+        [parameter(
+            ParameterSetName = "Scan")]
+        [ValidateScript( { if ($_ -match $GUID_REGEX -OR $_ -match "\b[0-9a-f]{40}\b") { $true } else { throw "Incorrect input: $_.  Should be a guid." } })]
+        [string]$ScanId,
+
+        [Switch]$CountOnly,
+        [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter")]
+        [HashTable]$where=@{},
+
+        [parameter(HelpMessage="The field or fields to return.")]
+        [String[]]$fields,
+
+        [Switch]$AllInstances,
+
+        [Switch]$NoLimit
+    )
+
+    $Files = @(
+        "Process",
+        "Module",
+        "Driver",
+        "MemScan",
+        "Artifact",
+        "Autostart",
+        "Script"
+    )
+
+    $where = New-ICFilter -Where $where -ScanId $scanId -StartDate $StartDate -EndDate $EndDate
+    
+    switch ( $Type ) {
+        "Script" {
+            $Endpoint = "ScanScriptInstances"
+            # $Endpoint = "ScanScriptDetails"
+        }
+        "Host" {
+            $Endpoint = "ScanHosts"
+        }
+        "File" {
+            $cnt = 0
+            $Files | ForEach-Object {
+                if ($CountOnly) {
+                    $c = Get-ICObject -Type $_ -where $where -CountOnly
+                    Write-Verbose "Found $c $_ Objects"
+                    $cnt += $c
+                } else {
+                    Write-Verbose "Querying $_"
+                    Get-ICObject -Type $_ -where $where -fields $fields -NoLimit:$NoLimit 
+                }    
+            }
+            if ($CountOnly) {
+                return $cnt
+            }
+            return
+        }
+        Default {
+            $Endpoint = "Scan$($Type)Instances"
+        }
+    }
+
+    if ($Id) {
+        $CountOnly = $false
+        $Endpoint += "/$id"
+    }
+    if ($CountOnly) { 
+        Get-ICAPI -Endpoint $Endpoint -where $where -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly
+    } else {
+        Get-ICAPI -Endpoint $Endpoint -where $where -fields $fields -NoLimit:$NoLimit     
+    }
+}
+
+
+function Get-ICObject_old {
     [cmdletbinding(DefaultParameterSetName="Box")]
     [alias("Get-ICData","Get-ICObjects")]
     param(
@@ -62,6 +246,7 @@ function Get-ICObject {
         "Script"
     )
 
+    Write-Verbose "Got $where"
     if ($ScanId) {
         if ($where -AND $where['and']) {
             if (-NOT $where.scanId -AND -NOT $where['and'].scanId) {
@@ -124,153 +309,36 @@ function Get-ICObject {
     
     switch ( $Type ) {
         "Process" {
-            if ($AllInstances) {
-                $Endpoint = "$($Box)ProcessInstances"
-            } else {
-                $Endpoint = "$($Box)Processes"
-            }
+                $Endpoint = "ScanProcessInstances"
         }
         "Script" {
-            if ($AllInstances) {
-                $Endpoint = "$($Box)ScriptInstances"
-            } else {
-                $Endpoint = "$($Box)ScriptDetails"
-            }
-        }
-        "Host" {
-            if ($AllInstances) {
-                $Endpoint = "$($Box)HostScans"
-            } else {
-                $Endpoint = "$($Box)Hosts"
-            }
+                $Endpoint = "ScanScriptInstances"
         }
         "Account" {
-            if ($AllInstances) {
-                $Endpoint = "$($Box)AccountInstancesByHost"
-            } else {
-                $Endpoint = "$($Box)Accounts"
-            }
+            $Endpoint = "ScanAccountInstancesByHost"
         }
         "Extension" {
-            $Endpoint = "$($Box)ExtensionInstances"
+            $Endpoint = "ScanExtensionInstances"
             $fields = @("id", "extensionId", "extensionVersionId", "hostname", "ip", "sha256",
                 "hostScanId", "success", "threatStatus", "name", "hostId", "scanId", "scannedOn", "startedOn", "endedOn", "output")
-            if (-NOT $ScanId) {
-                $fields += "boxId"
-            }
-
-            if ($Id) {            
-                $Endpoint += "\$Id"
-            }
-            elseif ($AllInstances) {
-                $results = Get-ICAPI -Endpoint $Endpoint -where $where -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly
-                $results | foreach-object {
-                    $_.output = $_.output.output.entry
-                    $_ | Add-Member -MemberType NoteProperty -Name runTime -Value $null
-                    if ($_.endedOn) {
-                        $_.runTime = [math]::round(([datetime]$_.endedOn - [DateTime]$_.startedOn).TotalSeconds)
-                    }
-                }
-                #Enrich BoxName
-                if ($Box -eq "Box") {
-                    $Results | ForEach-Object {
-                        $_ | Add-Member -MemberType NoteProperty -Name boxName -Value $BoxName
-                    }
-                }
-                if ($EnrichTargetGroupName) {
-                    #Enrich targetGroupName
-                    if ($results) {
-                        $Scans = @()
-                        $TargetGroups = Get-ICTargetGroup
-                        $results | ForEach-Object {
-                            if ($scan_id -ne $_.scanId) {
-                                $scan_id = $_.scanId
-                                $scan = $Scans | Where-Object { $_.id -eq $scan_id }
-                                if (-NOT $scan) {
-                                    $scan = Get-ICScan -id $scan_id
-                                    $scans += $scan
-                                }
-                                $tg = $TargetGroups | Where-Object { $_.id -eq $scan.targetId }
-                                if ($tg) {
-                                    $tgname = $tg.name
-                                } else {
-                                    $tgname = "(deleted)"
-                                }
-                            }
-                            $_ | Add-Member -MemberType NoteProperty -Name targetGroup -Value $tgname
-                        }
-                    }
-                }
-                return $results
-            } 
-            elseif (-Not $Id) {
-                $fields = @("id","extensionId","extensionVersionId","boxId","hostScanId","success","threatStatus","name","hostId","scanId")
-                Write-Verbose "Aggregating Extensions."
-                if ($ScanId) {
-                    $extensioninstances = Get-ICObject -Type "Extension" -ScanId $ScanId -where $where -fields $fields -AllInstances -NoLimit:$NoLimit
-                } else {
-                    $extensioninstances = Get-ICObject -Type "Extension" -BoxId $BoxId -where $where -fields $fields -AllInstances -NoLimit:$NoLimit
-                }
-                $results = @()
-                $extensioninstances | Group-Object extensionVersionId | ForEach-Object {
-                    $props = @{
-                        Id = $_.name # extensionVersionId
-                        name = $_.group[0].name
-                        boxId = $_.group[0].boxId
-                        boxName = $BoxName
-                        count = $_.count
-                        hosts = ($_.group | Select-Object hostId -unique).hostId.count
-                        success = 0
-                        Good = 0
-                        'Low Risk' = 0
-                        Unknown = 0
-                        Suspicious = 0
-                        Bad = 0
-                    }
-                    $_.Group | ForEach-Object {
-                        if ($_.success) { $props['success'] += 1}
-                    }
-
-                    $_.group | Group-Object threatStatus | ForEach-Object {
-                        $props[$_.Name] = $_.count
-                    }
-                    $props['completion'] = ($($props.hosts)/$($_.count)).tostring("P")
-                    $results += New-Object PSCustomObject -property $props
-                }
-                return $results
-            }
         }
         "File" {
-            If ($where.count -lt 2) {
-                if ($where.'and'  -AND $where.'and'.count -lt 2 -OR $where.'or'  -AND $where.'or'.count -lt 2) {
-                    Write-Warning "No where filter provided. You should provide a filter for this query to reduce strain on the database."
-                    Write-Warning "Defaulting to bad objects only."
-                    $where += @{   
-                        or = @(
-                            @{ threatName = "Bad" },
-                            @{ threatName = "Blacklist" },
-                            @{ flagName = "Verified Bad" }
-                        )
-                    }
-                    #$where += @{ threatName = @{ or = @("Bad", "Suspicious")} }
-                }
-            }
             $cnt = 0
             $Files | ForEach-Object {
                 if ($CountOnly) {
                     if ($ScanId) {
-                        $c = Get-ICObject -Type $_ -ScanId $ScanId -where $where -AllInstances:$AllInstances -CountOnly
+                        $c = Get-ICObject -Type $_ -ScanId $ScanId -where $where  -CountOnly
                     } else {
-                        $c = Get-ICObject -Type $_ -BoxId $BoxId -where $where -AllInstances:$AllInstances -CountOnly
+                        $c = Get-ICObject -Type $_ -BoxId $BoxId -where $where  -CountOnly
                     }
                     Write-Verbose "Found $c $_ Objects"
                     $cnt += $c
                 } else {
                     Write-Verbose "Querying $_"
                     if ($ScanId) {
-                        Get-ICObject -Type $_ -ScanId $ScanId -where $where -fields $fields -NoLimit:$NoLimit -AllInstances:$AllInstances
+                        Get-ICObject -Type $_ -ScanId $ScanId -where $where -fields $fields -NoLimit:$NoLimit 
                     } else {
-                        Get-ICObject -Type $_ -BoxId $BoxId -where $where -fields $fields -NoLimit:$NoLimit -AllInstances:$AllInstances
+                        Get-ICObject -Type $_ -BoxId $BoxId -where $where -fields $fields -NoLimit:$NoLimit 
                     }
                 }    
             }
@@ -279,11 +347,7 @@ function Get-ICObject {
             }
         }
         Default {
-            if ($AllInstances) {
-                $Endpoint = "$($Box)$($Type)Instances"
-            } else {
-                $Endpoint = "$($Box)$($Type)s"
-            }
+            $Endpoint = "Scan$($Type)Instances"
         }
     }
     if ($Type -ne 'File') {
@@ -295,43 +359,9 @@ function Get-ICObject {
             Get-ICAPI -Endpoint $Endpoint -where $where -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly
         } else {
             $Results = Get-ICAPI -Endpoint $Endpoint -where $where -fields $fields -NoLimit:$NoLimit
-
-            #Enrich BoxName
-            if ($Box -eq "Box") {
-                $Results | ForEach-Object {
-                    $_ | Add-Member -MemberType NoteProperty -Name boxName -Value $BoxName
-                }
-            }
-
-            if ($EnrichTargetGroupName) {
-                #Enrich targetGroupName
-                if ($Results -AND $Results[0].scanId) {
-                    $Scans = @()
-                    $TargetGroups = Get-ICTargetGroup
-                    $Results | ForEach-Object {
-                        if ($scan_id -ne $_.scanId) { 
-                            $scan_id = $_.scanId
-                            $scan = $Scans | Where-Object { $_.id -eq $scan_id }
-                            if (-NOT $scan) {
-                                $scan = Get-ICScan -id $scan_id
-                                $scans += $scan
-                            }
-                            $tg = $TargetGroups | Where-Object { $_.id -eq $scan.targetId }
-                            if ($tg) {
-                                $tgname = $tg.name
-                            } else {
-                                $tgname = "(deleted)"
-                            }
-                        }
-                        $_ | Add-Member -MemberType NoteProperty -Name targetGroup -Value $tgname
-                    }
-                }
-            }            
-            $Results
         }
     }
 }
-
 function Get-ICComplianceResults {
     [cmdletbinding()]
     param(
@@ -462,77 +492,42 @@ function Get-ICResponseResult {
     }
 }
 
+# Fix for time window
 function Get-ICVulnerability {
     [cmdletbinding()]
     param(
-        [parameter(ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
-        [alias('applicationId')]
-        [String]$Id,
+        [parameter(
+            ValueFromPipeline, 
+            Mandatory,
+            HelpMessage="Pipe in applications from Get-ICEvent or Get-ICObject")]
+        [PSCustomObject[]]$Applications,
 
-        [Switch]$AllInstances,
-        [parameter(HelpMessage={"Boxes are the 7, 30, and 90 day views of target group or global data. Use Set-ICBox to set your default. CurrentDefault: $Global:ICCurrentBox"})]
-        [String]$BoxId=$Global:ICCurrentBox,
         [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
-        [HashTable]$where=@{},
-        [Switch]$NoLimit
+        [HashTable]$where=@{}
     )
 
     BEGIN {
-        if ($where -AND $where['boxId']) {
-            $where['boxId'] = $BoxId
-        } else {
-            $where += @{ boxId = $BoxId }
-        }
-
-        Write-Verbose "Building Application table..."
-        $Apps = @()
+        
     }
 
-    PROCESS{
-        if ($Id) {
-            if ($AllInstances) {
-                Write-verbose "Querying for application instances with applicationId: $Id"
-                $a = Get-ICObjects -Type Application -where @{ applicationId = $id } -BoxId $BoxId -AllInstances:$AllInstances
-            } else {
-                Write-verbose "Querying for applications with applicationId: $Id"
-                $a = Get-ICObjects -Id $id -Type Application -BoxId $BoxId
-                if ($a) {
-                    $a | ForEach-Object {
-                        $appid = $_.id
-                        $_ | Add-Member -MemberType "NoteProperty" -name "applicationId" -value $appid
-                    }
-                    Write-Debug $a
-                }
-            }
-            if ($a) {
-                $apps += $a
-            } else {
-                Write-Warning "No application found with applicationId: $Id in BoxId: $BoxId"
-                return
-            }
+    PROCESS {
+        if (-NOT $applications.applicationId) {
+            Write-Error "Input is not an application instance or list of application instances"
+            continue
         } else {
-            if ($AllInstances) {
-                $apps = Get-ICObjects -Type Application -BoxId $BoxId -where $where -NoLimit:$NoLimit -AllInstances:$AllInstances
-            } else {
-                $apps = Get-ICObjects -Type Application -BoxId $BoxId -where $where -NoLimit:$NoLimit
-                $apps | ForEach-Object {
-                    $appid = $_.id
-                    $_ | Add-Member -MemberType "NoteProperty" -name "applicationId" -value $appid
-               }
-            }
+            $apps += $applications
         }
     }
 
     END {
-        $where.remove('boxId') | Out-Null
-        $Endpoint = "ApplicationAdvisories"
-        Write-Verbose "Building Application Advisory bridge table with filter: $($where|convertto-json -compress)"
-        $appvulns = Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$true | sort-object applicationId, cveId -unique
+        #$where.remove('boxId') | Out-Null
+        Write-Verbose "Building Application Advisory bridge table"
+        $appvulns = Get-ICAPI -Endpoint "ApplicationAdvisories" -where $where -NoLimit:$true | sort-object applicationId, cveId -unique
 
         if ($apps -AND $appvulns) {
             $appids = $apps.applicationid | sort-object -unique
-            $appvulns = $appvulns | Where-Object  { $appids -contains $_.applicationId }
-            $apps = $apps | Where-Object  { $appvulns.applicationId -contains $_.applicationId }
+            $appvulns = $appvulns | Where-Object { $appids -contains $_.applicationId }
+            $apps = $apps | Where-Object { $appvulns.applicationId -contains $_.applicationId }
         } else {
             Write-Warning "No Results found."
             return
@@ -637,7 +632,7 @@ function Get-ICNote {
     }
 }
 
-# Get Account objects
+# Add time window
 function Get-ICAlert {
     [cmdletbinding()]
     param(
@@ -657,14 +652,13 @@ function Get-ICAlert {
     )
 
     PROCESS {
-        $Endpoint = "AlertDetails"
+        $Endpoint = "Alerts"
         if ($Id) {
             $CountOnly = $false
-            $where = @{ id = $Id }
-            #$Endpoint += "/$Id" (currently broken)
+            $Endpoint += "/$Id"
         }
         elseif (-NOT ($IncludeArchived -OR $Where['archived'])) {
-            $Where += @{ archived = $FALSE }
+            $Where['archived'] = $FALSE
         }
         Get-ICAPI -Endpoint $Endpoint -where $where -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly
     }
@@ -695,85 +689,6 @@ function Get-ICReport {
         }
 
         Get-ICAPI -Endpoint $Endpoint -where $where -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly
-    }
-}
-
-function Get-ICActivityTrace {
-    [cmdletbinding(DefaultParameterSetName="fileRepId")]
-    param(
-        [parameter(
-            ParameterSetName="Id",
-            ValueFromPipeline=$true)]
-        [String]$Id,
-
-        [parameter(
-            ParameterSetName="accountId",
-            ValueFromPipelineByPropertyName=$true)]
-        [String]$accountId,
-
-        [parameter(
-            ParameterSetName="fileRepId",
-            ValueFromPipeline=$True,
-            ValueFromPipelineByPropertyName=$true)]
-        [alias('fileRepId')]
-        [String]$sha1,
-
-        [parameter(
-            ParameterSetName="hostId",
-            ValueFromPipelineByPropertyName=$true)]
-        [String]$hostId,
-
-        [parameter(ParameterSetName="accountId")]
-        [parameter(ParameterSetName="fileRepId")]
-        [parameter(ParameterSetName="hostId")]     
-        [DateTime]$StartTime=(Get-Date).AddDays(-7).ToUniversalTime(),
-
-        [parameter(ParameterSetName="accountId")]
-        [parameter(ParameterSetName="fileRepId")]
-        [parameter(ParameterSetName="hostId")] 
-        [DateTime]$EndTime = (Get-Date).ToUniversalTime(),
-
-        [parameter(ParameterSetName="accountId")]
-        [parameter(ParameterSetName="fileRepId")]
-        [parameter(ParameterSetName="hostId")] 
-        [HashTable]$where=@{},
-
-        [parameter(ParameterSetName="accountId")]
-        [parameter(ParameterSetName="fileRepId")]
-        [parameter(ParameterSetName="hostId")] 
-        [Switch]$NoLimit,
-
-        [parameter(ParameterSetName="accountId")]
-        [parameter(ParameterSetName="fileRepId")]
-        [parameter(ParameterSetName="hostId")] 
-        [Switch]$CountOnly
-    )
-
-    BEGIN {
-        $Where['eventTime'] = @{ 
-            between = @(
-                (Get-Date $StartTime -Format "o"),
-                (Get-Date $EndTime -Format "o")
-            )
-        }
-    }
-    PROCESS {
-        $Endpoint = "activity"
-        if ($Id) {
-            $CountOnly = $false
-            $Endpoint += "/$Id"
-        } else {
-            if ($SHA1) {
-                $where['fileRepId'] = $SHA1
-            }
-            if ($AccountId) {
-                $where['accountId'] = $AccountId
-            }
-            if ($HostId) {
-                $where['hostId'] = $HostId
-            }
-        }
-        Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit -CountOnly:$CountOnly
     }
 }
 
@@ -896,7 +811,6 @@ function Get-ICBox {
             $tg = $TargetGroups | Where-Object { $_.id -eq $tgid }
             if ($tg) {
                 $_ | Add-Member -MemberType "NoteProperty" -name "targetGroup" -value $tg.name
-                $_ | Add-Member -MemberType "NoteProperty" -name "lastScannedOn" -value $tg.lastScannedOn
                 $_ | Add-Member -MemberType "NoteProperty" -name "deleted" -value $tg.deleted
             } else {
                 $_ | Add-Member -MemberType "NoteProperty" -name "targetGroup" -value "Deleted"

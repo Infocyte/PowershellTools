@@ -8,7 +8,7 @@
 RootModule = 'InfocyteHUNTAPI.psm1'
 
 # Version number of this module.
-ModuleVersion = '1.8.0'
+ModuleVersion = '2.0.0'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -23,7 +23,7 @@ Author = 'Chris Gerritz'
 CompanyName = 'Infocyte, Inc.'
 
 # Copyright statement for this module
-Copyright = '(c) 2019 Infocyte, Inc. All rights reserved.'
+Copyright = '(c) 2021 Infocyte, Inc. All rights reserved.'
 
 # Description of the functionality provided by this module
 Description = 'Functions and Cmdlets to interface with the Infocyte HUNT API'
@@ -75,7 +75,7 @@ FunctionsToExport = @(
     "Invoke-ICScanTarget",
     "Invoke-ICResponse",
     "Import-ICSurvey",
-    "Get-ICObject",
+    "Get-ICEvent",
     "Get-ICResponseResult",
     "Get-ICHostScanResult",
     "Get-ICAlert",
@@ -173,7 +173,7 @@ PrivateData = @{
         # IconUri = ''
 
         # ReleaseNotes of this module
-        ReleaseNotes = 'Add ICRule functions for managing and creating rules'
+        ReleaseNotes = 'Conforms to new API version'
 
     } # End of PSData hashtable
 
