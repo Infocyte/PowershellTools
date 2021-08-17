@@ -1,82 +1,63 @@
 
 # General function for getting various objects (files, processes, memory injects, autostarts, etc.) from Infoyte
 function New-ICFilter {
+    [cmdletbinding(DefaultParameterSetName="Box")]
     param(
         [HashTable]$Where=@{},
-
-        [DateTime]$StartDate=(Get-Date).AddDays(-1),
-
-        [DateTime]$EndDate=(Get-Date),
-
-        [string]$ScanId
+        $Trailing,
+        $StartDate,
+        $EndDate,
+        $ScanId
     )
+
+    if ($where -AND $where.ContainsKey('or')) {
+        # handle this wierd loopback thing where 'or' filters screw things up
+        # wrap everything in an explicit 'and'
+        Write-Warning "There is a known issue with Loopback where filters that cause problems with first level 'or' filters."
+        Write-Warning "You should wrap everything in an 'And' filter to make sure this works."
+        throw "Unnested OR filter in base."
+    }
+
+    if ($where -AND -NOT $where.ContainsKey('and')) {
+        $where['and'] = @()
+    }
 
     if ($where.Count -eq 0 -OR (-NOT $where.scanId -AND ($where['and'].keys -notcontains 'scanId') -AND -NOT $where['scannedOn'] -AND ($where['and'].Keys -notcontains 'scannedOn'))) {
         if ($ScanId) {
             Write-Verbose "Adding scanId to filter"
-            if ($where -AND $where['and']) {
+            if (-NOT $where) {
+                $where = @{ scanId = $scanId }
+            }
+            else {
                 if (-NOT $where.scanId -AND ($where['and'].keys -notcontains 'scanId')) {
                     $where['and'] += @{ scanId = $scanId }
                 }
-            }
-            elseif ($where -AND $where['or']) {
-                # handle this wierd loopback thing where 'or' filters screw things up
-                # wrap everything in an explicit 'and'
-                Write-Warning "There is a known issue with Loopback where filters that cause problems with first level 'or' filters."
-                Write-Warning "You should wrap everything in an And filter to make sure this works. Doing this now."
-                $where = @{
-                    and = @(
-                        @{ or = $where['or'] },
-                        @{ scanId = $scanId }
-                    )
-                }
-            }
-            elseif ($where) {
-                $where['scanId'] = $scanId
-            }
-            else {
-                $where = @{ scanId = $scanId }
             }
         }
         else {
             Write-Verbose "Adding time bounds to filter"
             #Time Window
-            if ($StartDate -AND $EndDate) {
-                if ($where -AND $where['and']) {
-                    if (-NOT $where['scannedOn'] -AND ($where['and'].Keys -notcontains 'scannedOn')) {
-                        $where['and'] += @{ 'scannedOn' = @{ gt = $StartDate.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ") }}
-                        $where['and'] += @{ 'scannedOn' = @{ lte = $EndDate.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ") }}
-                    }
+            if ($Trailing) {
+                $StartDate = (Get-Date).AddDays(-$Trailing)
+                $EndDate = $null
+            }
+
+            if (-NOT $where['scannedOn'] -AND ($where['and'].Keys -notcontains 'scannedOn')) {
+                if ($StartDate) { 
+                    $where['and'] += @{ 'scannedOn' = @{ gte = $StartDate.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ") }}
                 }
-                elseif ($where -AND $where['or']) {
-                    # handle this wierd loopback thing where 'or' filters screw things up
-                    # wrap everything in an explicit 'and'
-                    Write-Warning "There is a known issue with Loopback where filters that cause problems with first level 'or' filters."
-                    Write-Warning "You should wrap everything in an And filter to make sure this works. Doing this now."
-                    $where = @{
-                        and = @(
-                            @{ or = $where['or'] },
-                            @{ 'scannedOn' = @{ gt = $StartDate.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ") }},
-                            @{ 'scannedOn' = @{ lte = $EndDate.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ") }}
-                        )
-                    }
-                    Write-Warning "where-filter:$($where|ConvertTo-Json -depth 10)"
+                if ($EndDate) {
+                    $where['and'] += @{ 'scannedOn' = @{ lte = $EndDate.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ") }}
                 }
-                else {
-                    $where += @{ 
-                        and = @(
-                            @{ 'scannedOn' = @{ gt = $StartDate.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ") }},
-                            @{ 'scannedOn' = @{ lte = $EndDate.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ") }}
-                        )
-                    }
-                }
-            } 
+            }
         }
     }
+    Write-Verbose "where-filter:$($where|ConvertTo-Json -depth 10)"
     return $where
 }
+
 function Get-ICEvent {
-    [cmdletbinding(DefaultParameterSetName="Time")]
+    [cmdletbinding(DefaultParameterSetName="Box")]
     [alias("Get-ICData", "Get-ICObject")]
     param(
         [parameter(ValueFromPipeline)]
@@ -104,14 +85,19 @@ function Get-ICEvent {
         [String]$Type,
 
         [parameter(
+            ParameterSetName="Box",
+            HelpMessage={"Trailing Days"})]
+        [Int]$Trailing=7,
+
+        [parameter(
             ParameterSetName="Time",
-            HelpMessage={"Starting timestamp of items. Default = -1 days"})]
-        [DateTime]$StartDate=(Get-Date).AddDays(-1),
+            HelpMessage={"Starting timestamp of items."})]
+        [DateTime]$StartDate,
 
         [parameter(
             ParameterSetName="Time",
             HelpMessage={"Last timestamp of items. Default = Now"})]
-        [DateTime]$EndDate=(Get-Date),
+        [DateTime]$EndDate,
 
         [parameter(
             ParameterSetName = "Scan")]
@@ -140,7 +126,7 @@ function Get-ICEvent {
         "Script"
     )
 
-    $where = New-ICFilter -Where $where -ScanId $scanId -StartDate $StartDate -EndDate $EndDate
+    $where = New-ICFilter -Where $where -ScanId $scanId -StartDate $StartDate -EndDate $EndDate -Trailing $Trailing
     
     switch ( $Type ) {
         "Script" {
