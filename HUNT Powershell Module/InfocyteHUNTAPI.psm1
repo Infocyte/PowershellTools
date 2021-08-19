@@ -77,16 +77,12 @@ function Get-ICHelp {
     Write-Host "FAQ:"
     Write-Host "- Most data within HUNT are tagged and filterable by Scan (" -NoNewLine
     Write-Host -ForegroundColor Cyan "scanId" -NoNewLine
-    Write-Host "), Time Boxes (" -NoNewLine
-    Write-Host -ForegroundColor Cyan "boxId" -NoNewLine
-    Write-Host "), and Target Groups (" -NoNewLine
+    Write-Host ") and Target Groups (" -NoNewLine
     Write-Host -ForegroundColor Cyan "targetGroupId" -NoNewLine
     Write-Host ")"
-    Write-Host "- Time Boxes are Last 7, 30, and 90 Day filters for all data within range"
     Write-Host "- GET Results are capped at $resultlimit results unless you use -NoLimit`n----------------`n"
     Write-Host "Examples:"
     Write-Host -ForegroundColor Cyan 'PS> Set-ICInstance -Instance "clouddemo" -Token ASDFASDASFASDASF -Save'
-    Write-Host -ForegroundColor Cyan 'PS> $Box = Get-ICBox -Last30 | where { $_.TargetGroup -eq "Brooklyn Office"}'
     Write-Host -ForegroundColor Cyan 'PS> Get-ICObject -Type Process -BoxId $Box.Id -NoLimit'
 
 
