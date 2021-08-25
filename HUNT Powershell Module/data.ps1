@@ -1,17 +1,17 @@
 
 # General function for getting various objects (files, processes, memory injects, autostarts, etc.) from Infoyte
 function New-ICFilter {
-    [cmdletbinding(DefaultParameterSetName="Box")]
+    [cmdletbinding()]
     param(
         [HashTable]$Where=@{},
         $Trailing,
-        $StartDate,
-        $EndDate,
+        $StartTime,
+        $EndTime,
         $ScanId,
         $Timefield="scannedOn"
     )
 
-    Write-Debug "ScanId: $ScanId, Trailing: $Trailing, StartTime: $StartTime, EndTime: $EndTime, Timefield: $Timefield, Where: $where"
+    Write-Debug "ScanId: $ScanId, Trailing: $Trailing, StartTime: $StartTime, EndTime: $EndTime, Timefield: $Timefield, Where:`n$($where|ConvertTo-Json -depth 10)"
     if ($where.ContainsKey('or')) {
         # handle this wierd loopback thing where 'or' filters screw things up
         # wrap everything in an explicit 'and'
@@ -20,7 +20,7 @@ function New-ICFilter {
         throw "Unnested OR filter in base."
     }
 
-    if (-NOT ($Trailing -OR $StartDate -OR $Enddate -OR $ScanId)) {
+    if (-NOT ($Trailing -OR $StartTime -OR $EndTime -OR $ScanId)) {
         Write-Debug "No additional filters selected:`n$($where|ConvertTo-Json -depth 10)"
         return $where
     }
@@ -41,18 +41,18 @@ function New-ICFilter {
         Write-Debug "Adding time bounds to filter"
         #Time Window
         if ($Trailing) {
-            Write-Debug "Converting StartDate to trailing filter"
-            $StartDate = (Get-Date).AddDays(-$Trailing)
-            $EndDate = $null
+            Write-Debug "Converting StartTime to trailing filter"
+            $StartTime = (Get-Date).AddDays(-$Trailing)
+            $EndTime = $null
         }
 
-        if ($StartDate) { 
-            Write-Debug "Adding StartDate to filter"
-            $where['and'] += @{ "$Timefield" = @{ gte = $StartDate.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ") }}
+        if ($StartTime) { 
+            Write-Debug "Adding StartTime to filter"
+            $where['and'] += @{ "$Timefield" = @{ gte = $StartTime.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ") }}
         }
-        if ($EndDate) {
-            Write-Debug "Adding StartDate to filter"
-            $where['and'] += @{ "$Timefield" = @{ lte = $EndDate.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ") }}
+        if ($EndTime) {
+            Write-Debug "Adding StartTime to filter"
+            $where['and'] += @{ "$Timefield" = @{ lte = $EndTime.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ") }}
         }
     }
     Write-Debug "where-filter:`n$($where|ConvertTo-Json -depth 10)"
@@ -95,12 +95,12 @@ function Get-ICEvent {
         [parameter(
             ParameterSetName="Time",
             HelpMessage={"Starting timestamp of items."})]
-        [DateTime]$StartDate,
+        [DateTime]$StartTime,
 
         [parameter(
             ParameterSetName="Time",
             HelpMessage={"Last timestamp of items. Default = Now"})]
-        [DateTime]$EndDate,
+        [DateTime]$EndTime,
 
         [parameter(
             ParameterSetName = "Scan")]
@@ -149,7 +149,7 @@ function Get-ICEvent {
             $where = New-ICFilter -Where $where -Trailing $Trailing -timefield $Timefield
         }
         "Time" { 
-            $where = New-ICFilter -Where $where -StartDate $StartDate -EndDate $EndDate -timefield $Timefield
+            $where = New-ICFilter -Where $where -StartTime $StartTime -EndTime $EndTime -timefield $Timefield
         }
         "Scan" { 
             $where = New-ICFilter -Where $where -ScanId $scanId -timefield $Timefield
@@ -657,12 +657,12 @@ function Get-ICAlert {
         [parameter(
             ParameterSetName="Time",
             HelpMessage={"Starting timestamp of items."})]
-        [DateTime]$StartDate,
+        [DateTime]$StartTime,
 
         [parameter(
             ParameterSetName="Time",
             HelpMessage={"Last timestamp of items. Default = Now"})]
-        [DateTime]$EndDate,
+        [DateTime]$EndTime,
 
         [Switch]$IncludeArchived,
 
@@ -677,10 +677,12 @@ function Get-ICAlert {
     )
 
     PROCESS {
-            
+        
         $Timefield = "createdOn"
 
         Write-Debug "ParameterSetName: $($PSCmdlet.ParameterSetName)"
+        Write-Debug "Trailing: $Trailing, StartTime: $StartTime, EndTime: $EndTime, Timefield: $Timefield, Where:`n$($where|ConvertTo-Json -depth 10)"
+    
         switch ( $PSCmdlet.ParameterSetName )
         {
             "Trailing" {
@@ -689,7 +691,8 @@ function Get-ICAlert {
                 }
             }
             "Time" { 
-                $where = New-ICFilter -Where $where -StartDate $StartDate -EndDate $EndDate -timefield $Timefield
+                $where = New-ICFilter -Where $where -StartTime $StartTime -EndTime $EndTime -timefield $Timefield
+                Write-Verbose "$($where|ConvertTo-Json -depth 10)"
             }
         }
         
@@ -698,7 +701,7 @@ function Get-ICAlert {
             $CountOnly = $false
             $Endpoint += "/$Id"
         } else {
-            if ($Trailing -gt 30 -OR ($StartDate -AND $StartDate -lt (Get-Date).AddDays(-30))) {
+            if ($Trailing -gt 30 -OR ($StartTime -AND $StartTime -lt (Get-Date).AddDays(-30))) {
                 Write-Verbose "Querying Alert Archive Table for alerts older than 30 days..."
                 Get-ICAPI -Endpoint "$($Endpoint)archive" -where $where -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly
             }
