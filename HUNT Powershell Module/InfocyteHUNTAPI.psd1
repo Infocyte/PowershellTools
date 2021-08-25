@@ -8,7 +8,7 @@
 RootModule = 'InfocyteHUNTAPI.psm1'
 
 # Version number of this module.
-ModuleVersion = '2.0.0'
+ModuleVersion = '2.0.6'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -66,7 +66,7 @@ PowerShellVersion = '5.1'
 
 # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
 FunctionsToExport = @(
-    "Parse-ICExtensionHeader",
+    "Convert-ICExtensionHeader",
     "Set-ICToken",
     "Get-ICAPI",
     "Invoke-ICAPI",
@@ -173,7 +173,7 @@ PrivateData = @{
         # IconUri = ''
 
         # ReleaseNotes of this module
-        ReleaseNotes = 'Conforms to new API version'
+        ReleaseNotes = 'Add archived alerts endpoint to Get-ICAlert'
 
     } # End of PSData hashtable
 

@@ -79,7 +79,7 @@ function Get-ICExtension {
 
             Write-Verbose "Parsing Extension Header for $($ext.name) [$($ext.id)]"
             try {
-                $header = Parse-ICExtensionHeader -Body $Script.body
+                $header = Convert-ICExtensionHeader -Body $Script.body
                 if ($header) {
                     $h = @{}
                     $header.psobject.properties | % {
@@ -200,7 +200,7 @@ function Import-ICExtension {
         }
 
         $postbody['body'] = $Body
-        $header = Parse-ICExtensionHeader -Body $Body
+        $header = Convert-ICExtensionHeader -Body $Body
         if (-NOT $header.name -OR -NOT $header.type) { 
             Throw "Extension Header is incomplete or incorrectly formatted. Recommend using a template header" 
         }
@@ -290,7 +290,7 @@ function Update-ICExtension {
             }
         }
 
-        $header = Parse-ICExtensionHeader -Body $Body
+        $header = Convert-ICExtensionHeader -Body $Body
         Write-Verbose "Extension Header:`n$($header | ConvertTo-Json)"
         $postbody['body'] = $Body
         $postbody['name'] = $header.name
@@ -420,7 +420,7 @@ function Import-ICOfficialExtensions {
             continue
         }
         try {
-            $header = Parse-ICExtensionHeader -Body $ext
+            $header = Convert-ICExtensionHeader -Body $ext
         } catch {
             Write-Warning "Could not parse header on $($filename)"; 
             continue
@@ -644,7 +644,7 @@ function Test-ICExtension {
     -NOT $exitError
 }
 
-function Parse-ICExtensionHeader {
+function Convert-ICExtensionHeader {
     [cmdletbinding(DefaultParameterSetName = 'Body')]
     Param(
         [parameter(
