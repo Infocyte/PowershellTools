@@ -115,6 +115,7 @@ function Get-ICEvent {
         [String[]]$fields,
 
         [Switch]$AllInstances,
+        [Switch]$Simple,
 
         [Switch]$NoLimit
     )
@@ -159,6 +160,45 @@ function Get-ICEvent {
     switch ( $Type ) {
         "Host" {
             $Endpoint = "ScanHosts"
+            if ($Simple) {
+                $fields = $(
+                    "id", 
+                    "completedOn",
+                    "hostname",
+                    "ip",
+                    "name",
+                    "domain",
+                    "osVersion",
+                    "architecture"
+                )
+            }
+        }
+        "Extension" {
+            $Endpoint = "ScanExtensionDetails"
+            if (-NOT $fields) {
+                $fields = $(
+                    "id", 
+                    "extensionId",
+                    "extensionVersionId",
+                    "output",
+                    "hostScanId",
+                    "success",
+                    "threatStatus",
+                    "startedOn",
+                    "endedOn",
+                    "name",
+                    "hostId",
+                    "scanId",
+                    "scannedOn",
+                    "hostname",
+                    "ip"
+                )
+            } else {
+                $fields | Where-Object { $_ -notmatch "(outputString|body|createdOn)"}
+            }
+            if ($Simple) {
+                $fields | Where-Object { $_ -notmatch ".+Id$"}
+            }
         }
         "File" {
             $cnt = 0
@@ -168,8 +208,30 @@ function Get-ICEvent {
                     Write-Verbose "Found $c $_ Objects"
                     $cnt += $c
                 } else {
-                    Write-Verbose "Querying $_"
-                    Get-ICObject -Type $_ -where $where -fields $fields -NoLimit:$NoLimit 
+                    $fields = $(
+                        "id", 
+                        "scannedOn",
+                        "hostname",
+                        "filerepId",
+                        "name",
+                        "path",
+                        "commandLine",
+                        "artifactType",
+                        "modifiedOn",
+                        "autostartType"
+                        "regPath",
+                        "value",
+                        "signed",
+                        "avPositives",
+                        "avTotal",
+                        "threatName",
+                        "flagName"
+                    )
+                    $filetype = $_
+                    Write-Verbose "Querying $filetype"
+                    Get-ICObject -Type $_ -where $where -fields $fields -NoLimit:$NoLimit | ForEach-Object {
+                        $_ | Add-Member -MemberType NoteProperty -Name fileType -Value $filetype
+                    }
                 }    
             }
             if ($CountOnly) {
@@ -192,7 +254,6 @@ function Get-ICEvent {
         Get-ICAPI -Endpoint $Endpoint -where $where -fields $fields -NoLimit:$NoLimit     
     }
 }
-
 
 function Get-ICObject_old {
     [cmdletbinding(DefaultParameterSetName="Box")]
