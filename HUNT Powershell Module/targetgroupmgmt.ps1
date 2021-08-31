@@ -51,6 +51,8 @@ function Get-ICTargetGroup {
         [alias('TargetGroupId','targetId')]
         [String]$Id,
 
+        [String]$Name,
+
         [Switch]$IncludeArchive,
 
         [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
@@ -60,14 +62,12 @@ function Get-ICTargetGroup {
     )
 
     PROCESS {
-        if ($IncludeArchive) {
-            $Endpoint = "TargetsArchive"
-        } else {
-            $Endpoint = "targets"
-        }
+        $Endpoint = "targets"
 
         if ($Id) {
             $Endpoint += "/$Id"
+        } elseif ($Name) {
+            $where = @{ name = $Name }
         }
 
         Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit -CountOnly:$CountOnly
@@ -264,6 +264,8 @@ function Get-ICAddress {
         [alias('targetId')]
         [String]$TargetGroupId,
 
+        [String]$TargetGroupName,
+        
         [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
         
@@ -281,6 +283,17 @@ function Get-ICAddress {
         elseif ($TargetGroupId) {
             Write-Verbose "Getting all Addresses from TargetGroup: $TargetGroupId"
             $where += @{ targetId = $TargetGroupId }
+        }
+        elseif ($TargetGroupName) {
+            $tg = Get-ICTargetGroup -Name $TargetGroupName
+            if ($tg) {
+                Write-Verbose "Getting all Addresses from TargetGroup: $TargetGroupName"
+                $where += @{ targetId = $TargetGroupId }
+            } else {
+                Write-Error "TargetGroup with name $TargetGroupName does not exist."
+                return
+            }
+            
         }
 
         Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit -CountOnly:$CountOnly
@@ -344,6 +357,12 @@ function Get-ICAgent {
         [alias('agentId')]
         [String]$Id,
 
+        [String]$Hostname,
+
+        [String]$TargetGroupId,
+
+        [String]$TargetGroupName,
+
         [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
         
@@ -353,13 +372,38 @@ function Get-ICAgent {
     )
 
     PROCESS {
+        $Endpoint = "Agents"
+        
         if ($Id) {
             $CountOnly = $False
             $Endpoint = "Agents/$Id"
-        } else {
-            $Endpoint = "Agents"
         }
-        Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit -CountOnly:$CountOnly
+        elseif ($Hostname) {
+            $where += @{ hostname = $Hostname }
+        }
+        elseif ($TargetGroupId -OR $TargetGroupName) {
+            if ($TargetGroupId) {
+                $tg = Get-ICTargetGroup -id $TargetGroupId
+            } else {
+                $tg = Get-ICTargetGroup -Name $TargetGroupName
+            }
+            if ($tg) {
+                Write-Verbose "Getting all Agents from TargetGroup: $($tg.name) [$($tg.id)]"
+                $addresses = Get-ICAddress -TargetGroupId $($tg.id) -where @{ agentId = @{ neq = $null }} -NoLimit:$NoLimit -CountOnly:$CountOnly
+                if ($CountOnly) {
+                    return $addresses
+                } else {
+                    $Addresses | Where-Object { $_.targetId } | ForEach-Object {
+                        Get-ICAgent -id $_.targetId
+                    }
+                    return
+                }
+            } else {
+                Write-Error "TargetGroup $TargetGroupName [$TargetGroupId] does not exist."
+                return
+            }
+        }
+        Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit -CountOnly:$CountOnly -ea 0
     }
 }
 

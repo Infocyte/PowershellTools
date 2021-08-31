@@ -12,6 +12,8 @@ function Get-ICScan {
         [alias('targetId')]
         [String]$TargetGroupId,
 
+        [String]$TargetGroupName,
+
         [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter ")]
         [HashTable]$where=@{},
         
@@ -27,15 +29,19 @@ function Get-ICScan {
             $CountOnly = $false
             $Endpoint += "/$Id"
         }
-        elseif ($TargetGroupId) {
-            $tg = Get-ICTargetGroup -Id $TargetGroupId
-            if ($tg) {
-                Write-Verbose "Getting Scans against Target Group $TargetGroup [$TargetGroupId]"
-                $where += @{ targetId = TargetGroupId }
+        elseif ($TargetGroupId -OR $TargetGroupName) {
+            if ($TargetGroupId) {
+                $tg = Get-ICTargetGroup -id $TargetGroupId
             } else {
-                Write-Error "TargetGroup with Id $TargetGroupId does not exist."
-                return
+                $tg = Get-ICTargetGroup -Name $TargetGroupName
             }
+            if ($tg) {
+				Write-Verbose "Getting Scans against Target Group $($tg.name) [$($tg.id)]"
+				$where += @{ targetId = $tg.id }
+            } else {
+                Write-Error "TargetGroup $TargetGroupName [$TargetGroupId] does not exist."
+                return
+			}
         }
 
         Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit -CountOnly:$CountOnly
