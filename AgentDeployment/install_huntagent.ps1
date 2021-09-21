@@ -41,6 +41,9 @@ New-Module -name install_InfocyteAgent -scriptblock {
 			[Parameter(HelpMessage='Authenticated: "user:password@192.168.1.1:8080" or Unauthenticated: "192.168.1.1:8080"')]
 			[String]$Proxy, # "user:password@192.168.1.1:8080" or "192.168.1.1:8080"
 
+			[Parameter(HelpMessage="The temporary location where agent setup will be downloaded to and ran from.")]
+			[String]$DownloadPath = "$($env:TEMP)\agent.windows.exe",
+
 			[Parameter(HelpMessage="Silent install is default. Use this switch to display output.")]
 			[Switch]$Interactive,
 
@@ -48,7 +51,6 @@ New-Module -name install_InfocyteAgent -scriptblock {
 			[Switch]$Force
 		)
 
-		$agentDestination = "$($env:TEMP)\agent.windows.exe"
 		$LogPath = "$env:SystemDrive\windows\Temp\infocyteagentinstaller.log"
 		if ([System.IntPtr]::Size -eq 4) {
 			$agentURL = "https://s3.us-east-2.amazonaws.com/infocyte-support/executables/agent.windows32.exe"
@@ -115,7 +117,7 @@ New-Module -name install_InfocyteAgent -scriptblock {
 		
 		# $wc.CachePolicy = New-Object System.Net.Cache.HttpRequestCachePolicy([System.Net.Cache.HttpRequestCacheLevel]::NoCacheNoStore) # For Testing:
 		try {
-			$wc.DownloadFile($agentURL, $agentDestination)
+			$wc.DownloadFile($agentURL, $DownloadPath)
 		} catch {
 			if ($Interactive) { Write-Warning "Could not download Infocyte agent from $agentURL" }
 			"$(Get-Date) [Error] Installation Error: Install started but could not download agent from $agentURL." >> $LogPath
@@ -124,7 +126,7 @@ New-Module -name install_InfocyteAgent -scriptblock {
 		# Verify Sha1 of file
 		try {
 			$SHA1CryptoProvider = new-object -TypeName system.security.cryptography.SHA1CryptoServiceProvider
-			$inputBytes = [System.IO.File]::ReadAllBytes($agentDestination);
+			$inputBytes = [System.IO.File]::ReadAllBytes($DownloadPath);
 			$Hash = [System.BitConverter]::ToString($SHA1CryptoProvider.ComputeHash($inputBytes))
 			$sha1 = $Hash.Replace('-','').ToUpper()
 		} catch {
@@ -141,11 +143,11 @@ New-Module -name install_InfocyteAgent -scriptblock {
 			$arguments = @("--uninstall")
 			if (-NOT $interactive) { $arguments += "--quiet" }
 			try {
-				Start-Process -NoNewWindow -FilePath $agentDestination -ArgumentList $arguments -Wait -ErrorAction Stop
-				#& $agentDestination $arguments
+				Start-Process -NoNewWindow -FilePath $DownloadPath -ArgumentList $arguments -Wait -ErrorAction Stop
+				#& $DownloadPath $arguments
 			} catch {
-				if ($Interactive) { Write-Error "$(Get-Date) [Error] Uninstall Error: Could not start $agentDestination. [$_]" }
-				"$(Get-Date) [Error] Uninstall Error: Could not start $agentDestination. [$_]" >> $LogPath
+				if ($Interactive) { Write-Error "$(Get-Date) [Error] Uninstall Error: Could not start $DownloadPath. [$_]" }
+				"$(Get-Date) [Error] Uninstall Error: Could not start $DownloadPath. [$_]" >> $LogPath
 				return
 			}
 		}
@@ -157,22 +159,22 @@ New-Module -name install_InfocyteAgent -scriptblock {
 		if ($Proxy) { $arguments += "--proxy $Proxy" }
 		if (-NOT $Interactive) { $arguments += "--quiet" }
 
-		$version = & "$agentDestination" --version
+		$version = & "$DownloadPath" --version
 		if ($version -notmatch "RTS Agent") {
-			if ($Interactive) { Write-Warning "$(Get-Date) [Error] $agentDestination (version: $version, sha1: $sha1) is not valid or appears to be corrupt." }
-			"$(Get-Date) [Error] $agentDestination (version: $version, sha1: $sha1) is not valid or appears to be corrupt." >> $LogPath
+			if ($Interactive) { Write-Warning "$(Get-Date) [Error] $DownloadPath (version: $version, sha1: $sha1) is not valid or appears to be corrupt." }
+			"$(Get-Date) [Error] $DownloadPath (version: $version, sha1: $sha1) is not valid or appears to be corrupt." >> $LogPath
 		}
 
 		if ($Interactive) { Write-Host "$(Get-Date) [Information] Downloaded agent.windows.exe (version: $version, sha1: $sha1) from $agentURL" }
-		if ($Interactive) { Write-Host "$(Get-Date) [Information] Installing Agent: $($agentDestination.Substring($agentDestination.LastIndexOf('\')+1)) $arguments" }
-		"$(Get-Date) [Information] Installing Agent: Downloaded agent.windows.exe from $agentURL [sha1: $sha1] and executing with commandline: $($agentDestination.Substring($agentDestination.LastIndexOf('\')+1)) $arguments" >> $LogPath
+		if ($Interactive) { Write-Host "$(Get-Date) [Information] Installing Agent: $($DownloadPath.Substring($DownloadPath.LastIndexOf('\')+1)) $arguments" }
+		"$(Get-Date) [Information] Installing Agent: Downloaded agent.windows.exe from $agentURL [sha1: $sha1] and executing with commandline: $($DownloadPath.Substring($DownloadPath.LastIndexOf('\')+1)) $arguments" >> $LogPath
 		# Execute!
 		try {
-			Start-Process -NoNewWindow -FilePath $agentDestination -ArgumentList $arguments -Wait -ErrorAction Stop
+			Start-Process -NoNewWindow -FilePath $DownloadPath -ArgumentList $arguments -Wait -ErrorAction Stop
 			if ($Interactive) { Write-Host "$(Get-Date) [Success] Installation Succeeded! Agent associated to $InstanceName." }
 			"$(Get-Date) [Success] Installation Succeeded! Agent associated to $InstanceName." >> $LogPath
 
-			#& $agentDestination $arguments
+			#& $DownloadPath $arguments
 		} catch {
 			if ($Interactive) { Write-Error "$(Get-Date) [Error] Installation Error: Could not start agent.windows.exe. [$_]" }
 			"$(Get-Date) [Error] Installation Error: Could not start agent.windows.exe. [$_]" >> $LogPath
@@ -200,7 +202,6 @@ New-Module -name install_InfocyteAgent -scriptblock {
 			[Switch]$Silent
 		)
 		$LogPath = "$env:SystemDrive\windows\Temp\infocyteagentinstaller.log"
-		$AgentPath = 'C:\Program Files\Infocyte\Agent\agent.windows.exe'
 
 		If (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
 			Write-Warning "[Error] You do not have Administrator rights to run this script!`nPlease re-run as an Administrator!"
@@ -211,8 +212,15 @@ New-Module -name install_InfocyteAgent -scriptblock {
 		# Make script silent unless run interactive
 		if ($Silent) { $ErrorActionPreference = "silentlycontinue" }
 
-		If (Get-Service -name HUNTAgent -ErrorAction SilentlyContinue) {
-			$Installed = $True
+		$service = Get-WmiObject -class win32_service -Filter "name='HUNTAgent'" -ea SilentlyContinue | Select-Object PathName -ExpandProperty PathName
+
+		If ($Service) {
+			if ($service -match '\"(.*)" --service') {
+				$AgentPath = $matches[1]
+			} else {
+				$AgentPath = 'C:\Program Files\Infocyte\Agent\agent.exe'
+			}
+			
 			if (-NOT $Silent) { Write-Host "Uninstalling Infocyte Agent." }
 			"$(Get-Date) [Information] Uninstalling Infocyte Agent." >> $LogPath
 
@@ -222,9 +230,9 @@ New-Module -name install_InfocyteAgent -scriptblock {
 
 			try {
 				Start-Process -NoNewWindow -FilePath $AgentPath -ArgumentList $arguments -Wait -ErrorAction Stop
-				#& $agentDestination $arguments
+				#& $DownloadPath $arguments
 			} catch {
-				if (-NOT $Silent) { Write-Error "$(Get-Date) [Error] Uninstall Error: Could not execute agent.windows.exe --uninstall. [$_]" }
+				if (-NOT $Silent) { Write-Error "$(Get-Date) [Error] Uninstall Error: Could not execute agent.exe --uninstall. [$_]" }
 				"$(Get-Date) [Error] Uninstall Error: Could not execute agent.windows.exe --uninstall. [$_]" >> $LogPath
 			}
 
