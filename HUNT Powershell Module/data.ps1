@@ -108,6 +108,7 @@ function Get-ICEvent {
         [string]$ScanId,
 
         [Switch]$CountOnly,
+
         [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter")]
         [HashTable]$where=@{},
 
@@ -160,6 +161,13 @@ function Get-ICEvent {
         "Host" {
             $Endpoint = "ScanHosts"
         }
+        "Extension" {
+            $Endpoint = "ScanExtensionDetail"
+            if (-NOT $fields) {
+                $fields = @("id", "extensionId", "extensionVersionId", "hostname", "ip", "sha256",
+                "hostScanId", "success", "threatStatus", "name", "hostId", "scanId", "scannedOn", "startedOn", "endedOn", "outputString")
+            }           
+        }
         "File" {
             $cnt = 0
             $Files | ForEach-Object {
@@ -187,14 +195,13 @@ function Get-ICEvent {
         $Endpoint += "/$id"
     }
     if ($CountOnly) { 
-        Get-ICAPI -Endpoint $Endpoint -where $where -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly
+        Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit -CountOnly:$CountOnly
     } else {
         Get-ICAPI -Endpoint $Endpoint -where $where -fields $fields -NoLimit:$NoLimit     
     }
 }
 
-
-function Get-ICObject_old {
+4function Get-ICObject_old {
     [cmdletbinding(DefaultParameterSetName="Box")]
     param(
         [parameter(ValueFromPipeline)]
@@ -456,48 +463,25 @@ function Get-ICHostScanResult {
 function Get-ICResponseResult {
     [cmdletbinding()]
     param(
-        [parameter(
-            Mandatory)]
-        [ValidateScript( { if ($_ -match $GUID_REGEX) { $true } else { throw "Incorrect input: $_.  Should be a guid." } })]
-        [alias('id')]
-        [String]$scanId,
+        [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter")]
+        [HashTable]$where=@{},
 
-        [parameter()]
-        [String]$hostname
+        [parameter(HelpMessage="The field or fields to return.")]
+        [String[]]$fields,
+
+        [Switch]$NoLimit,
+
+        [Switch]$CountOnly
     )
 
-    $Scan = Get-ICScan -id $scanId
-    if (-NOT $Scan) {
-        throw "ScanId does not exist"
+    if ($Id) {
+        $CountOnly = $false
+        $Endpoint += "/$id"
     }
-    if ($hostname) {
-        $where = @{ hostname = @{ ilike = $hostname }} 
-    }
-    $HostResult = Get-ICObject -Type Host -scanId $scanId -where $where | Select-Object -Last 1
-    if (-NOT $HostResult) {
-        throw "No data found for $hostname"
-    }
-    if (-NOT $HostResult.failed) {
-        $ExtensionResult = Get-ICObject -Type Extension -scanId $scanId -where $where -allinstances | Select-Object -Last 1
-        $success = $ExtensionResult.success
+    if ($CountOnly) { 
+        Get-ICAPI -Endpoint $Endpoint -where $where -NoLimit:$NoLimit -CountOnly:$CountOnly
     } else {
-        $success = $false
-    }
-    
-    return [PSCustomObject]@{
-        scanId             = $scanId
-        hostId             = $HostResult.hostId
-        extensionId        = $ExtensionResult.ExtensionId
-        os                 = $HostResult.osVersion
-        success            = $success
-        threatStatus       = $ExtensionResult.threatStatus
-        compromised        = $HostResult.compromised
-        completedOn        = $HostResult.completedOn
-        runTime            = $ExtensionResult.runTime
-        extensionName      = $ExtensionResult.name
-        messages           = $ExtensionResult.output
-        hostname           = $HostResult.hostname
-        ip                 = $HostResult.ip
+        Get-ICAPI -Endpoint $Endpoint -where $where -fields $fields -NoLimit:$NoLimit     
     }
 }
 
