@@ -201,183 +201,6 @@ function Get-ICEvent {
     }
 }
 
-4function Get-ICObject_old {
-    [cmdletbinding(DefaultParameterSetName="Box")]
-    param(
-        [parameter(ValueFromPipeline)]
-        [ValidateScript( { if ($_ -match $GUID_REGEX -OR $_ -match "\b[0-9a-f]{40}\b") { $true } else { throw "Incorrect input: $_.  Should be a guid." } })]
-        [String]$Id,
-
-        [parameter(
-            Mandatory=$true,
-            HelpMessage="Data is currently seperated into object-type tables. 'File' will perform a recursive call of all files.")]
-        [ValidateSet(
-          "Process",
-          "Module",
-          "Driver",
-          "MemScan",
-          "Artifact",
-          "Autostart",
-          "Host",
-          "Connection",
-          "Application",
-          "Account",
-          "Script",
-          "File",
-          "Extension"
-        )]
-        [String]$Type,
-
-        [parameter(
-            ParameterSetName="Box",
-            HelpMessage={"Boxes are the 7, 30, and 90 day views of target group or global data. Use Set-ICBox to set your default. CurrentDefault: $Global:ICCurrentBox"})]
-        [ValidateScript( { if ($_ -match $GUID_REGEX -OR $_ -match "\b[0-9a-f]{40}\b") { $true } else { throw "Incorrect input: $_.  Should be a guid." } })]
-        [String]$BoxId=$Global:ICCurrentBox,
-
-        [parameter(
-            ParameterSetName = "Scan")]
-        [ValidateScript( { if ($_ -match $GUID_REGEX -OR $_ -match "\b[0-9a-f]{40}\b") { $true } else { throw "Incorrect input: $_.  Should be a guid." } })]
-        [string]$ScanId,
-
-        [parameter(HelpMessage="Defaults to hash+path aggregation (normalized). Use this switch to get all raw instances of the object found.")]
-        [Switch]$AllInstances,
-
-        [Switch]$CountOnly,
-        [parameter(HelpMessage="This will convert a hashtable into a JSON-encoded Loopback Where-filter: https://loopback.io/doc/en/lb2/Where-filter")]
-        [HashTable]$where=@{},
-
-        [parameter(HelpMessage="The field or fields to return.")]
-        [String[]]$fields,
-
-        [Switch]$NoLimit
-    )
-
-    $Files = @(
-        "Process",
-        "Module",
-        "Driver",
-        "MemScan",
-        "Artifact",
-        "Autostart",
-        "Script"
-    )
-
-    Write-Verbose "Got $where"
-    if ($ScanId) {
-        if ($where -AND $where['and']) {
-            if (-NOT $where.scanId -AND -NOT $where['and'].scanId) {
-                $where['and'] += @{ 'scanId' = $scanId }
-            }
-        }
-        if ($where -AND $where['or']) {
-            # handle this wierd loopback thing where 'or' filters screw things up
-            # wrap everything in an explicit 'and'
-            Write-Warning "There is a known issue with Loopback where filters that cause problems with first level 'or' filters."
-            Write-Warning "You should wrap everything in an And filter to make sure this works. Doing this now."
-            $where = @{
-                and = @(
-                    @{ or = $where['or'] },
-                    @{ scanId = $scanId }
-                )
-            }
-            #$where += @{ scanId = $scanId }
-            Write-Warning "where-filter:$($where|ConvertTo-Json -depth 10)"
-        }
-        elseif ($where) {
-            $where['scanId'] = $scanId
-        }
-        else {
-            $where += @{ scanId = $scanId }
-        }
-        $Box = "Scan"
-    }
-    else {
-        #BoxId
-        if ($where -AND $where['and']) {
-            if (-NOT $where['boxId'] -AND -NOT $where['and'].boxId) {
-                $where['and'] += @{ 'boxId' = $BoxId }
-            }
-        }
-        if ($where -AND $where['or']) {
-            # handle this wierd loopback thing where 'or' filters screw things up
-            # wrap everything in an explicit 'and'
-            Write-Warning "There is a known issue with Loopback where filters that cause problems with first level 'or' filters."
-            Write-Warning "You should wrap everything in an And filter to make sure this works. Doing this now."
-            $where = @{
-                and = @(
-                    @{ or = $where['or'] },
-                    @{ boxId = $BoxId }
-                )
-            }
-            #$where += @{ boxId = $BoxId }
-            Write-Warning "where-filter:$($where|ConvertTo-Json -depth 10)"
-        }
-        elseif ($where) {
-            $where['boxId'] = $BoxId
-        }
-        else {
-            $where += @{ boxId = $BoxId }
-        }
-        $Box = "Box"
-        $B = Get-ICBox -id $BoxId
-        $BoxName = "$($B.targetGroup) - $($B.name)"
-    }
-    
-    switch ( $Type ) {
-        "Process" {
-                $Endpoint = "ScanProcessInstances"
-        }
-        "Script" {
-                $Endpoint = "ScanScriptInstances"
-        }
-        "Account" {
-            $Endpoint = "ScanAccountInstancesByHost"
-        }
-        "Extension" {
-            $Endpoint = "ScanExtensionInstances"
-            $fields = @("id", "extensionId", "extensionVersionId", "hostname", "ip", "sha256",
-                "hostScanId", "success", "threatStatus", "name", "hostId", "scanId", "scannedOn", "startedOn", "endedOn", "output")
-        }
-        "File" {
-            $cnt = 0
-            $Files | ForEach-Object {
-                if ($CountOnly) {
-                    if ($ScanId) {
-                        $c = Get-ICObject -Type $_ -ScanId $ScanId -where $where  -CountOnly
-                    } else {
-                        $c = Get-ICObject -Type $_ -BoxId $BoxId -where $where  -CountOnly
-                    }
-                    Write-Verbose "Found $c $_ Objects"
-                    $cnt += $c
-                } else {
-                    Write-Verbose "Querying $_"
-                    if ($ScanId) {
-                        Get-ICObject -Type $_ -ScanId $ScanId -where $where -fields $fields -NoLimit:$NoLimit 
-                    } else {
-                        Get-ICObject -Type $_ -BoxId $BoxId -where $where -fields $fields -NoLimit:$NoLimit 
-                    }
-                }    
-            }
-            if ($CountOnly) {
-                return $cnt
-            }
-        }
-        Default {
-            $Endpoint = "Scan$($Type)Instances"
-        }
-    }
-    if ($Type -ne 'File') {
-        if ($Id) {
-            $CountOnly = $false
-            $Endpoint += "/$id"
-        }
-        if ($CountOnly) { 
-            Get-ICAPI -Endpoint $Endpoint -where $where -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly
-        } else {
-            $Results = Get-ICAPI -Endpoint $Endpoint -where $where -fields $fields -NoLimit:$NoLimit
-        }
-    }
-}
 function Get-ICComplianceResults {
     [cmdletbinding()]
     param(
@@ -634,6 +457,18 @@ function Get-ICAlert {
         [String]$Id,
 
         [parameter(
+            Mandatory=$true,
+            HelpMessage="Alert sources can be from reputation, rules, compliance, or extension")]
+        [ValidateSet(
+          "rule",
+          "reputation",
+          "compliance",
+          "extension",
+          "all"
+        )]
+        [String]$sourceType = "all",
+
+        [parameter(
             ParameterSetName="Trailing",
             HelpMessage={"Trailing Days"})]
         [Int]$Trailing,
@@ -680,6 +515,13 @@ function Get-ICAlert {
             }
         }
         
+        if ($sourceType -ne "all") {
+            if ($where.Keys -contains 'and') {
+                $where['and'] += @{ sourceType = $sourceType }
+            } else {
+                $where['sourceType'] = $sourceType
+            }
+        }
         $Endpoint = "Alerts"
         if ($Id) {
             $CountOnly = $false
@@ -690,7 +532,11 @@ function Get-ICAlert {
                 Get-ICAPI -Endpoint "$($Endpoint)archive" -where $where -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly
             }
             elseif (-NOT ($IncludeArchived -OR $Where['archived'] -OR $where['and'].Keys -contains 'archived')) {
-                $Where['archived'] = $FALSE
+                if ($where.Keys -contains 'and') {
+                    $where['and'] += @{ archived = $FALSE }
+                } else {
+                    $Where['archived'] = $FALSE
+                }
             }
         }
         Get-ICAPI -Endpoint $Endpoint -where $where -fields $fields -NoLimit:$NoLimit -CountOnly:$CountOnly
