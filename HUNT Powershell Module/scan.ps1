@@ -486,85 +486,43 @@ function Import-ICSurvey {
 		[Alias('PSPath')]
 		[string[]]$LiteralPath,
 
-		[String]$ScanId,
 		[String]$TargetGroupId,
+
 		[alias('TargetGroupName')]
-      	[String]$DefaultTargetGroupName = "OfflineScans"
+		[String]$TargetGroupName = "OfflineScans"
     )
 
     BEGIN {
-  	# INITIALIZE
-  	$survey = "HostSurvey.json.gz"
-  	$surveyext = "*.json.gz"
+		# INITIALIZE
+		$surveyext = "*.tar"
 
-  	function Send-ICSurveys ([String]$FilePath, [String]$ScanId){
-  		Write-Verbose "Uploading Surveys"
-			$headers = @{
-		    Authorization = $Global:ICToken
-				scanid = $ScanId
-		    }
-  		try {
-  			Invoke-RestMethod $HuntServerAddress/api/survey -Headers $headers -Method POST -InFile $FilePath -ContentType "application/octet-stream"
-  		} catch {
-  			throw "$($_.Exception.Message)"
-  		}
-  	}
-
-	if ($ScanId) {
-		# Check for existing ScanId and use it
-		$scan = Get-ICScan -Id $ScanId
-		if ($scan) {
-			$ScanName = $scan.name
-			$TargetGroupName = $Scan.targetList
-		} else {
-			Write-Warning "No scan exists with ScanId $ScanId. Generating one."
+		if ($TargetGroupId) {
+			$TargetGroup = Get-ICTargetGroup -id $TargetGroupId
+		}	
+		elseif ($targetGroupName) {
+			$TargetGroup = Get-ICTargetGroup -Name $targetGroupName
+		} 
+		else {
+			throw "No Target Group Name or Id provided"
 		}
-	}
 
-	if ($TargetGroupId) {
 		# Check TargetGroupId and create new ScanId for that group
-		Write-Verbose "Checking for existance of target group with TargetGroupId: '$TargetGroupId' and generating new ScanId"
-		$TargetGroup = Get-ICTargetGroup -id $TargetGroupId
-		if ($TargetGroup) {
-			$TargetGroupName = ($TargetGroups | Where-Object { $_.id -eq $TargetGroupId }).name
-		} else {
-			Throw "No Target Group exists with TargetGroupId $TargetGroupId. Specify an existing TargetGroupId to add this survey to or use other parameters to generate one."
+		Write-Verbose "Checking for existance of target group with TargetGroupId: '$TargetGroupId'"
+		if (-NOT $TargetGroup) {
+			Write-Warning "$TargetGroupName does not exist. Creating new Target Group '$TargetGroupName'"
+			$g = Get-ICControllerGroup
+			if ($g.id.count -eq 1) {
+				$ControllerGroupId = $g.id
+			} else {
+				$ControllerGroupId = $g[0].id
+			}
+			$TargetGroup = New-ICTargetGroup -Name $TargetGroupName -ControllerGroupId $ControllerGroupId
 		}
-	}
-	else {
-		Write-Verbose "No ScanId or TargetGroupId specified. Checking for existance of target group: '$TargetGroupName'"
-  	    $TargetGroups = Get-ICTargetGroup
-  	    if ($TargetGroups.name -contains $TargetGroupName) {
-  		    Write-Verbose "$TargetGroupName Exists."
-			$TargetGroupId = ($targetGroups | Where-Object { $_.name -eq $TargetGroupName}).id
-  	    } else {
-            Write-Warning "$TargetGroupName does not exist. Creating new Target Group '$TargetGroupName'"
-            $g = Get-ICControllerGroup
-            if ($g.id.count -eq 1) {
-                $ControllerGroupId = $g.id
-            } else {
-                $ControllerGroupId = $g[0].id
-            }
-            $TargetGroupId = (New-ICTargetGroup -Name $TargetGroupName -ControllerGroupId $ControllerGroupId).id
-  	    }
-	}
 
-	# Creating ScanId
-	if (-NOT $ScanName) {
-		$ScanName = "Offline-" + (get-date).toString("yyyyMMdd-HHmm")
-		Write-Verbose "Creating scan named $ScanName [$TargetGroupName-$ScanName]..."
-		$StartTime = _Get-ICTimeStampUTC
-		$body = @{
-			name = $scanName;
-			targetId = $TargetGroupId;
-			startedOn = $StartTime
-		}
-		$newscan = Invoke-ICAPI -Endpoint $Endpoint -body $body -Method 'POST'
-		$ScanId = $newscan.id
+		$TargetGroupName = $TargetGroup.name
+		$TargetGroupId  = $TargetGroup.id
+		Write-Host "Importing Survey Results into $TargetGroupName [TargetGroupId: $TargetGroupId]"
 	}
-
-	Write-Verbose "Importing Survey Results into $TargetGroupName-$ScanName [ScanId: $ScanId] [TargetGroupId: $TargetGroupId]"
-    }
 
     PROCESS {
 		# Resolve path(s)
@@ -575,19 +533,38 @@ function Import-ICSurvey {
         }
 		# Process each item in resolved paths
 		foreach ($file in $resolvedPaths) {
- 			Write-Verbose "Uploading survey [$file]..."
- 			if ((Test-Path $file -type Leaf) -AND ($file -like $surveyext)) {
- 				Send-ICSurveys -FilePath $file -ScanId $ScanId
-   		    } else {
-   			    Write-Warning "$file does not exist or is not a $surveyext file"
-   		    }
-	   	}
+			Write-Host "Uploading survey [$file]..."
+			if ((Test-Path $file -type Leaf) -AND ($file -like $surveyext)) {
+				$file = Get-Item $file
+
+				$body = @{
+					filename = $file.name
+					type = "application/x-tar"
+				}
+
+				Write-Verbose "Getting Upload URL"
+				$URLs = Invoke-ICAPI -Endpoint "targets/uploadUrl" -body $body -Method Get
+
+				try {
+					Invoke-RestMethod $urls.urls[0] -Method PUT -InFile $file.FullName -ContentType "application/x-tar"
+				} catch {
+					Write-Error "$($_.Exception.Message)"
+				}
+
+				Write-Verbose "Completing Upload Job"
+				$Body = @{
+					targetGroupId = $targetGroupId
+					filename = $urls.filename
+				}
+				Invoke-ICAPI -Endpoint "targets/uploadCompleted" -Method POST -body $Body
+			} else {
+				Write-Warning "$file does not exist or is not a $surveyext file"
+			}
+		}
 	}
 
     END {
-	    # TODO: detect when scan is no longer processing submissions, then mark as completed
-        #Write-Verbose "Closing scan..."
-        #Invoke-RestMethod -Headers @{ Authorization = $token } -Uri "$HuntServerAddress/api/scans/$scanId/complete" -Method Post
+        Write-Host "All uploads are complete"
     }
 
 }
