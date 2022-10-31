@@ -12,3 +12,5 @@ The following command is all you need.  Run it on any windows system and it will
 ### Example 2 (For use in batch or from cmd.exe):
 If running from outside Powershell (like in cmd.exe or a batch script):
 > `powershell.exe -ExecutionPolicy bypass -noprofile -nologo -command { [System.Net.ServicePointManager]::SecurityProtocol = [Enum]::ToObject([System.Net.SecurityProtocolType], 3072); Invoke-Expression (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AttackSim/attackscript.ps1") }`
+
+### WARNING: This script will leave your system in a messy state. The cleanup script is not finished yet. Shouldn't cause a problem but expect random calculators and command prompts (our selected malware) to persist and return randomly.
