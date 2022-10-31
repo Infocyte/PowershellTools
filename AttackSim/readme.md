@@ -3,6 +3,9 @@
 **Powershell Version:** 3.0+\
 **.NET Version:** 4.5+
 
+This script will execute several MITRE ATT&CK adversarial behaviors and add several footholds/Autoruns which are pointed at non-malware (calculator and cmd.exe).  The only malicous software run is mimikatz (steals passwords from memory) which will not persist.
+
+
 The following command is all you need.  Run it on any windows system and it will download this script and execute it.  
 
 
