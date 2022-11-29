@@ -11,6 +11,9 @@ The following command is all you need.  Run it on any windows system and it will
 
 > `[System.Net.ServicePointManager]::SecurityProtocol = [Enum]::ToObject([System.Net.SecurityProtocolType], 3072); Invoke-Expression (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AttackSim/attackscript.ps1")`
 
+OR If running from outside Powershell (like in cmd.exe or a batch script):
+> `powershell.exe -ExecutionPolicy bypass -noprofile -nologo -command { [System.Net.ServicePointManager]::SecurityProtocol = [Enum]::ToObject([System.Net.SecurityProtocolType], 3072); Invoke-Expression (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AttackSim/attackscript.ps1") }`
+
 
 While the script will attempt to disable MS Defender in the evasion step, you may need to proactively disable your endpoint protection prior to running this initial command to let it through:
 
@@ -24,8 +27,13 @@ Restore Defender:
 > `powershell.exe -command 'Set-MpPreference -DisableRealtimeMonitoring $false'`
 
 
-### Example 2 (For use in batch or from cmd.exe):
-If running from outside Powershell (like in cmd.exe or a batch script):
-> `powershell.exe -ExecutionPolicy bypass -noprofile -nologo -command { [System.Net.ServicePointManager]::SecurityProtocol = [Enum]::ToObject([System.Net.SecurityProtocolType], 3072); Invoke-Expression (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AttackSim/attackscript.ps1") }`
+### WARNING: This script will leave your system in a messy state with some persist footholds set to launch calculators at varying times in the future. Run the cleanup script to remove these. 
 
-### WARNING: This script will leave your system in a messy state. The cleanup script is not finished yet. Shouldn't cause a problem but expect random calculators and command prompts (our selected malware) to persist and return randomly.
+
+### Cleanup Script:
+Some persist footholds are left on systems in order to test non-realtime foothold scanning. Run this to remove them:
+> `[System.Net.ServicePointManager]::SecurityProtocol = [Enum]::ToObject([System.Net.SecurityProtocolType], 3072); Invoke-Expression (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AttackSim/attackscript_fullrestore.ps1")`
+
+
+OR if running from outside Powershell (like in cmd.exe or a batch script):
+> `powershell.exe -ExecutionPolicy bypass -noprofile -nologo -command { [System.Net.ServicePointManager]::SecurityProtocol = [Enum]::ToObject([System.Net.SecurityProtocolType], 3072); Invoke-Expression (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AttackSim/attackscript_fullrestore.ps1") }`
