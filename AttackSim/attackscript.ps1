@@ -289,7 +289,7 @@ Function Set-WallPaper {
         [ValidateSet('Fill', 'Fit', 'Stretch', 'Tile', 'Center', 'Span')]
         [string]$Style
     )
-     
+
     $WallpaperStyle = Switch ($Style) {
         "Fill" {"10"}
         "Fit" {"6"}
@@ -306,28 +306,26 @@ Function Set-WallPaper {
         New-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name WallpaperStyle -PropertyType String -Value $WallpaperStyle -Force
         New-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name TileWallpaper -PropertyType String -Value 0 -Force
     }
-     
+
     Add-Type -TypeDefinition @" 
     using System; 
     using System.Runtime.InteropServices;
-      
+        
     public class Params
     { 
         [DllImport("User32.dll",CharSet=CharSet.Unicode)] 
         public static extern int SystemParametersInfo (Int32 uAction, 
-                                                       Int32 uParam, 
-                                                       String lpvParam, 
-                                                       Int32 fuWinIni);
+                                                        Int32 uParam, 
+                                                        String lpvParam, 
+                                                        Int32 fuWinIni);
     }
-    "@ 
-      
-        $SPI_SETDESKWALLPAPER = 0x0014
-        $UpdateIniFile = 0x01
-        $SendChangeEvent = 0x02
-      
-        $fWinIni = $UpdateIniFile -bor $SendChangeEvent
-      
-        $ret = [Params]::SystemParametersInfo($SPI_SETDESKWALLPAPER, 0, $Image, $fWinIni)
-    }
-     
-Set-WallPaper -Image "C:\Wallpaper\Background.jpg" -Style Fit
+"@ 
+    $SPI_SETDESKWALLPAPER = 0x0014
+    $UpdateIniFile = 0x01
+    $SendChangeEvent = 0x02
+    
+    $fWinIni = $UpdateIniFile -bor $SendChangeEvent
+    
+    $ret = [Params]::SystemParametersInfo($SPI_SETDESKWALLPAPER, 0, $Image, $fWinIni)
+}
+#Set-WallPaper -Image "C:\Wallpaper\Background.jpg" -Style Fit
