@@ -67,19 +67,35 @@ Write-Host -ForegroundColor Cyan "`n`nStarting discovery step"
 Write-Host "Initiating Discovery - T1082 - System Information Discovery"
 Write-Host "When an adversary first gains access to a system, they often gather detailed information about the compromised system and network including users, operating system, hardware, patches, and architecture. Adversaries may use the information to shape follow-on behaviors, including whether or not to fully infect the target and/or attempt specific actions like a ransom.`n"
 $cmd = @"
-Hostname > $attackDir\recon.txt
-whoami >> $attackDir\recon.txt 
-REG QUERY HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Cryptography /v MachineGuid >> $attackDir\recon.txt
-Systeminfo >> $attackDir\recon.txt
-gpresult /z >> $attackDir\recon.txt
-"NTFS: $((Get-Volume -DriveLetter $env:HOMEDRIVE[0]).FileSystem -contains 'NTFS')" >> $attackDir\recon.txt
-reg query "HKEY_CURRENT_USER\Software\Microsoft\Terminal Server Client\Default" 2>&1 >> $attackDir\recon.txt
-net localgroup administrators 2>&1 >> $attackDir\recon.txt 
-net group "domain admins" /domain 2>&1 >> $attackDir\recon.txt 
-net group "Exchange Trusted Subsystem" /domain 2>&1 >> $attackDir\recon.txt  
-Start-Sleep -m $n
+    '==== Hostname ====' > $attackDir\recon.txt
+    Hostname >> $attackDir\recon.txt
+    '' >> $attackDir\recon.txt
+    '==== Whoami ====' >> $attackDir\recon.txt
+    whoami >> $attackDir\recon.txt
+    '' >> $attackDir\recon.txt
+    '==== MachineGuid (best unique id to use) ====' >> $attackDir\recon.txt
+    REG QUERY HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Cryptography /v MachineGuid >> $attackDir\recon.txt
+    '' >> $attackDir\recon.txt
+    '==== System Info ====' >> $attackDir\recon.txt
+    Systeminfo >> $attackDir\recon.txt
+    '' >> $attackDir\recon.txt
+    '==== Antivirus Product ====' >> $attackDir\recon.txt
+    WMIC /Node:localhost /Namespace:\\root\SecurityCenter2 Path AntiVirusProduct Get displayName,pathToSignedProductExe,pathToSignedReportingExe,productState 2>&1 >> $attackDir\recon.txt
+    '' >> $attackDir\recon.txt
+    '==== Terminal Services Remote Host List (who has this system remoted into?) ====' >> $attackDir\recon.txt
+    reg query 'HKEY_CURRENT_USER\Software\Microsoft\Terminal Server Client\Default' 2>&1 >> $attackDir\recon.txt
+    '' >> $attackDir\recon.txt
+    '==== Local Administrators ====' >> $attackDir\recon.txt
+    net localgroup administrators 2>&1 >> $attackDir\recon.txt 
+    '' >> $attackDir\recon.txt
+    '==== Domain Administrators ====' >> $attackDir\recon.txt
+    net group 'domain admins' /domain 2>&1 >> $attackDir\recon.txt 
+    '' >> $attackDir\recon.txt
+    '==== Exchange Administrators ====' >> $attackDir\recon.txt
+    net group 'Exchange Trusted Subsystem' /domain 2>&1 >> $attackDir\recon.txt  
+    Start-Sleep -m $n
 "@
-Powershell.exe -Win N -exec bypass -nop -command $cmd
+Powershell.exe -nop -command $cmd
 Start-Sleep 3
 Remove-item $attackDir\recon.txt -ErrorAction Ignore -force
 
