@@ -156,8 +156,8 @@ Write-Host "Adding T1547.009 - Malicious Shortcut Link Persistence with detectab
 Write-Host "Downloading IECAR file..."
 Invoke-WebRequest -Uri "https://www.eicar.org/download/eicar.com.txt" -OutFile "$attackDir\EICAR.exe"
 $cmd = @'
-$Target = "$attackDir\EICAR.exe"
-#$Target = "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\StartUp\EICAR.exe"
+#$Target = "$attackDir\EICAR.exe"
+$Target = "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\StartUp\EICAR.exe"
 $ShortcutLocation = "$home\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\evil_calc.lnk"
 $WScriptShell = New-Object -ComObject WScript.Shell
 $Create = $WScriptShell.CreateShortcut($ShortcutLocation)
