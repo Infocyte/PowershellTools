@@ -6,7 +6,7 @@ If (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdent
     Start-Sleep 10
     return
 }
-$agent = Get-Service -Name HUNTAgent2
+$agent = Get-Service -Name HUNTAgent
 if (-NOT $agent) {
     Write-Warning "[Error] Datto EDR Agent is not installed!`nExiting..."
     return
