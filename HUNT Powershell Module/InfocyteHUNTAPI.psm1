@@ -29,13 +29,11 @@ function Get-ICHelp {
     Write-Host -ForegroundColor Cyan "`tNew-ICExtension, Get-ICExtension, Update-ICExtension, Remove-ICExtension,"
     Write-Host -ForegroundColor Cyan "`tTest-ICExtension (Runs the extension locally for testing"
     Write-Host -ForegroundColor Cyan "`tImport-ICExtension -> Loads an extension into your instance "
-    Write-Host -ForegroundColor Cyan "`tImport-ICOfficialExtensions -> Imports all official extensions from Infocyte`n" 
 
     Write-Host "## Rule Development Functions ##"
     Write-Host -ForegroundColor Cyan "`tNew-ICRule, Get-ICRule, Update-ICRule, Remove-ICRule,"
-    Write-Host -ForegroundColor Cyan "`tTest-ICRule (Runs the extension locally for testing"
+    Write-Host -ForegroundColor Cyan "`tTest-ICRule (Runs the extension locally for testing)"
     Write-Host -ForegroundColor Cyan "`tImport-ICRule -> Loads an extension into your instance "
-    Write-Host -ForegroundColor Cyan "`tImport-ICOfficialRules -> Imports all official extensions from Infocyte`n" 
 
     Write-Host "## Admin/Misc Functions ##"
     Write-Host -ForegroundColor Cyan "`tGet-ICUser, Get-ICUserAuditLog,"
@@ -43,8 +41,6 @@ function Get-ICHelp {
 
     Write-Host "## Target Group Management Functions ##"
     Write-Host -ForegroundColor Cyan "`tNew-ICTargetGroup, Get-ICTargetGroup, Remove-ICTargetGroup,"
-    Write-Host -ForegroundColor Cyan "`tNew-ICCredential, Get-ICCredential, Remove-ICCredential,"
-    Write-Host -ForegroundColor Cyan "`tNew-ICQuery, Get-ICQuery, Remove-ICQuery,"
     Write-Host -ForegroundColor Cyan "`tGet-ICAddress, Remove-ICAddress,"
     Write-Host -ForegroundColor Cyan "`tGet-ICAgent, Remove-ICAgent`n"
     
@@ -53,7 +49,8 @@ function Get-ICHelp {
 
     Write-Host "## Scanning Functions ##"
     Write-Host -ForegroundColor Cyan "`tNew-ICScanOptions"
-    Write-Host -ForegroundColor Cyan "`tInvoke-ICFindHosts, Invoke-ICScan"
+    Write-Host -ForegroundColor Cyan "`tInvoke-ICScan"
+    Write-Host -ForegroundColor Cyan "`tGet-ICScan`n"
 
     Write-Host "## Offline Scan Import Functions ##"
     Write-Host -ForegroundColor Cyan "`tImport-ICSurvey`n"
@@ -64,14 +61,10 @@ function Get-ICHelp {
     Write-Host -ForegroundColor Cyan "`tGet-ICHostScanResult, Get-ICResponseResult`n"
 
     Write-Host "## Analysis Data Retrieval Functions ##"
-    Write-Host -ForegroundColor Cyan "`tGet-ICScan`n"
-    Write-Host -ForegroundColor Cyan "`tGet-ICBox, Set-ICBox -> Boxes are 7 (default), 30, or 90 day aggregations"
-    Write-Host -ForegroundColor Cyan "`tGet-ICObject (alias: Get-ICData) -> The primary data retrieval function"
-    Write-Host -ForegroundColor Cyan "`tGet-ICVulnerability, Get-ICNote"
-    Write-Host -ForegroundColor Cyan "`tGet-ICAlert, Get-ICFileDetail, Get-ICActivityTrace`n"
-
-    Write-Host "## Cloud App Compliance Functions ##"
-    Write-Host -ForegroundColor Cyan "`tGet-ICComplianceResults"
+    Write-Host -ForegroundColor Cyan "`tGet-ICAlert"
+    Write-Host -ForegroundColor Cyan "`tGet-ICEvent (alias: Get-ICObject) -> The primary data retrieval function"
+    Write-Host -ForegroundColor Cyan "`tGet-ICVulnerability`n"
+    Write-Host -ForegroundColor Cyan "`tGet-ICFileDetail, , Get-ICNote`n"
 
     Write-Host "`n"
     Write-Host "FAQ:"
@@ -83,7 +76,7 @@ function Get-ICHelp {
     Write-Host "- GET Results are capped at $resultlimit results unless you use -NoLimit`n----------------`n"
     Write-Host "Examples:"
     Write-Host -ForegroundColor Cyan 'PS> Set-ICInstance -Instance "clouddemo" -Token ASDFASDASFASDASF -Save'
-    Write-Host -ForegroundColor Cyan 'PS> Get-ICObject -Type Process -BoxId $Box.Id -NoLimit'
+    Write-Host -ForegroundColor Cyan 'PS> Get-ICObject -Type Process -Trailing 3 -NoLimit'
 
 
     Write-Host 'Using custom loopback filters: [HashTable]$where = @{ term1 = "asdf1"; term2 = "asdf2" }'
