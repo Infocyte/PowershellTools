@@ -1,16 +1,14 @@
 ## Infocyte Agent Scripted Installer (One Line Powershell)
 **Platform:** Microsoft Windows 7+ or Server 2008+\
 **Powershell Version:** 2.0+\
-**.NET Version:** 4.8+
+**.NET Version:** 4.0+
 
 The following command is all you need.  Run it on any windows system and it will download this script and execute it.  This is useful for scripted software distribution, sccm, or GPO deployments in leu of an MSI.  The script will manage an automated installation process for the HUNT agent.  *IMPORTANT: You DO NOT need to download this script. Leave it here unless you want to host it yourself.*
-
-NOTE: Due to TLS1.2 depreciation, .NET 4.8+ is required so that TLS 1.3 will work.
 
 To execute this script on a windows host, run this command replacing `<instancename>` and `[regkey]` with your hunt instance \<mandatory\> and registration key [optional]. Do not include the brackets.
 
 
-> `[System.Net.ServicePointManager]::SecurityProtocol = [Enum]::ToObject([System.Net.SecurityProtocolType], 12288); (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; installagent <instancename> [regkey]`
+> `[System.Net.ServicePointManager]::SecurityProtocol = [Enum]::ToObject([System.Net.SecurityProtocolType], 3072); (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; installagent <instancename> [regkey]`
 
 
 #### The positional arguments after the command *installagent* are:  
@@ -24,13 +22,13 @@ Registration Key (*regkey*) is created in the Agent Admin panel. This will autom
 Note: *InstanceName* (1) and *RegKey* (2) are positional arguments so they don't require argument headers if in position 1 and 2 after `installagent`.
 
 ### Example 1 (instancename only - Installing to demo1.infocyte.com):  
-> `[System.Net.ServicePointManager]::SecurityProtocol = [Enum]::ToObject([System.Net.SecurityProtocolType], 12288);
+> `[System.Net.ServicePointManager]::SecurityProtocol = [Enum]::ToObject([System.Net.SecurityProtocolType], 3072);
 (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex;
 installagent demo1`
 
 ### Example 2 (For use in batch or GPO - Installing to alpo1.infocyte.com):
 If running from outside Powershell (like in a batch or GPO install script):
-> `powershell.exe -ExecutionPolicy bypass -noprofile -nologo -command { [System.Net.ServicePointManager]::SecurityProtocol = [Enum]::ToObject([System.Net.SecurityProtocolType], 12288); (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; installagent alpo1 }`
+> `powershell.exe -ExecutionPolicy bypass -noprofile -nologo -command { [System.Net.ServicePointManager]::SecurityProtocol = [Enum]::ToObject([System.Net.SecurityProtocolType], 3072); (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; installagent alpo1 }`
 
 ---
 
@@ -59,7 +57,7 @@ Use *-FriendlyName* to add a descriptive name for the system (otherwise it uses 
 
 
 ### Example 3 (using named arguments):  
-> `[System.Net.ServicePointManager]::SecurityProtocol = [Enum]::ToObject([System.Net.SecurityProtocolType], 12288);
+> `[System.Net.ServicePointManager]::SecurityProtocol = [Enum]::ToObject([System.Net.SecurityProtocolType], 3072);
 (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex;
 installagent -InstanceName "demo1" -RegKey "asdfasdf" -FriendlyName "DBServer1" -Proxy "user:password@192.168.1.1:8080" -Interactive`
 
@@ -67,4 +65,4 @@ installagent -InstanceName "demo1" -RegKey "asdfasdf" -FriendlyName "DBServer1" 
 ## Uninstall One-Liner
 This script also includes an uninstallagent command:
 
-> `[System.Net.ServicePointManager]::SecurityProtocol = [Enum]::ToObject([System.Net.SecurityProtocolType], 12288); (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; uninstallagent`
+> `[System.Net.ServicePointManager]::SecurityProtocol = [Enum]::ToObject([System.Net.SecurityProtocolType], 3072); (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; uninstallagent`
