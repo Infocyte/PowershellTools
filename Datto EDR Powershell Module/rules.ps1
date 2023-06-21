@@ -32,14 +32,14 @@ function Import-ICRule {
             #$reader = New-Object -TypeName System.IO.StreamReader -ArgumentList $Path
             $rules = ConvertFrom-Yaml $Body | convertto-json | convertfrom-json | ForEach-Object {
                 if ($null -eq $_.rule) {
-                    Write-Error "Incorrect filetype. Not an Infocyte Rule"
+                    Write-Error "Incorrect filetype. Not a Datto EDR Rule"
                     continue
                 }
                 $_
             }
         } else {
             if ($null -eq $rule.rule) {
-                Write-Error "Incorrect filetype. Not an Infocyte Rule"
+                Write-Error "Incorrect filetype. Not a Datto EDR Rule"
                 continue
             }
             $rules = $rule
@@ -158,7 +158,7 @@ function Get-ICRule {
                 $rule = $_
                 Write-Verbose "Getting Rule $($rule.name) [$($rule.id)]"
                 try { $pc = [math]::Floor(($n / $c) * 100) } catch { $pc = -1 }
-                Write-Progress -Id 1 -Activity "Getting Rule Body from Infocyte API" -Status "Requesting Body from Rule $n of $c" -PercentComplete $pc
+                Write-Progress -Id 1 -Activity "Getting Rule Body from Datto EDR API" -Status "Requesting Body from Rule $n of $c" -PercentComplete $pc
                 $ruleBody = Get-ICAPI -endpoint "rules/$($rule.id)/LatestVersion" -fields body, sha256
                 $rule | Add-Member -MemberType NoteProperty -Name rule -Value $ruleBody.body 
                 $rule | Add-Member -MemberType NoteProperty -Name sha256 -Value $ruleBody.sha256
@@ -167,7 +167,7 @@ function Get-ICRule {
                 $rule.updatedBy = (Get-ICAPI -endpoint users -where @{ id = $rule.updatedBy } -fields email -ea 0).email
                 $n += 1
             }  
-            Write-Progress -Id 1 -Activity "Getting Rules from Infocyte API" -Status "Complete" -Completed
+            Write-Progress -Id 1 -Activity "Getting Rules from Datto EDR API" -Status "Complete" -Completed
         }
         
         if ($Export) {
@@ -266,7 +266,7 @@ function Update-ICRule {
 
         $rule = ConvertFrom-Yaml $Body | convertto-json | convertfrom-json
         if ($null -eq $_.rule) {
-            Write-Error "Incorrect filetype. Not an Infocyte Rule"
+            Write-Error "Incorrect filetype. Not a Datto EDR Rule"
             return
         }
 

@@ -1,7 +1,7 @@
 #Variables
 $GUID_REGEX = "^[A-Z0-9]{8}-([A-Z0-9]{4}-){3}[A-Z0-9]{12}$"
 
-Write-Verbose "Importing Infocyte HUNT API Powershell Module"
+Write-Verbose "Importing Datto EDR HUNT API Powershell Module"
 $PS = $PSVersionTable.PSVersion.tostring()
 if ($PSVersionTable.PSVersion.Major -lt 5) {
   Write-Warning "Powershell Version not supported. Install version 5.x or higher"
@@ -11,9 +11,9 @@ if ($PSVersionTable.PSVersion.Major -lt 5) {
 }
 
 function Get-ICHelp {
-  $Version = (Get-Module -Name InfocyteHUNTAPI).Version.ToString()
-    Write-Host "Infocyte Powershell Module version $Version"
-    Write-Host "Pass your Infocyte API Token into Set-ICToken to connect to an instance of Infocyte."
+  $Version = (Get-Module -Name DattoEDRAPI).Version.ToString()
+    Write-Host "Datto EDR Powershell Module version $Version"
+    Write-Host "Pass your Datto EDR API Token into Set-ICToken to connect to an instance of Datto EDR."
     Write-Host "`tThis will store your login token and server into a global variable for use by the other commands"
     Write-Host "`n"
     Write-Host "## Help ##"
@@ -68,7 +68,7 @@ function Get-ICHelp {
 
     Write-Host "`n"
     Write-Host "FAQ:"
-    Write-Host "- Most data within HUNT are tagged and filterable by Scan (" -NoNewLine
+    Write-Host "- Most data within Datto EDR are tagged and filterable by Scan (" -NoNewLine
     Write-Host -ForegroundColor Cyan "scanId" -NoNewLine
     Write-Host ") and Target Groups (" -NoNewLine
     Write-Host -ForegroundColor Cyan "targetGroupId" -NoNewLine

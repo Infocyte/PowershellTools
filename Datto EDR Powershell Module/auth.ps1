@@ -25,14 +25,14 @@ function _DisableSSLVerification {
 # You can save tokens and proxy info to disk as well with the -Save switch.
 function Set-ICToken {
 	[cmdletbinding()]
-	[alias("Set-ICInstance")]
+	[alias("Set-ICInstance","Connect-ICInstance")]
 	param(
-		[parameter(Mandatory=$true, HelpMessage="Infocyte Cloud Instance Name (e.g. 'clouddemo') or Full URL of Server/API (e.g. https://CloudDemo.infocyte.com)'")]
+		[parameter(Mandatory=$true, HelpMessage="Datto EDR Instance Name, cname (e.g. 'clouddemo') or Full URL of Server/API (e.g. https://CloudDemo.infocyte.com)'")]
 		[ValidateNotNullOrEmpty()]
-		[alias("HuntServer")]
-		[String]$Instance,
+		[alias("instance", "url")]
+		[String]$Name,
 
-		[parameter(HelpMessage="API Token from Infocyte App. Omit if using saved credentials.")]
+		[parameter(HelpMessage="API Token from Datto EDR App. Omit if using saved credentials.")]
 		[String]$Token,
 
 		[parameter(HelpMessage="Proxy Address and port: e.g. '192.168.1.5:8080'")]
@@ -42,7 +42,7 @@ function Set-ICToken {
 
 		[Switch]$DisableSSLVerification,
 
-		[parameter(HelpMessage="Will save provided token and proxy settings to disk for future use with this Infocyte Instance.")]
+		[parameter(HelpMessage="Will save provided token and proxy settings to disk for future use with this Datto EDR Instance.")]
 		[Switch]$Save
 	)
 
@@ -53,12 +53,12 @@ function Set-ICToken {
 	[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 	[System.Net.ServicePointManager]::MaxServicePointIdleTime = 60000
 
-	if ($Instance -match "https://*") {
-		$Global:HuntServerAddress = $Instance
-	} elseif ($Instance -match ".*infocyte.com") {
-		$Global:HuntServerAddress = "https://$Instance"
+	if ($Name -match "https://*") {
+		$Global:HuntServerAddress = $Name
+	} elseif ($Name -match ".*infocyte.com") {
+		$Global:HuntServerAddress = "https://$Name"
 	} else {
-		$Global:HuntServerAddress = "https://$Instance.infocyte.com"
+		$Global:HuntServerAddress = "https://$Name.infocyte.com"
 	}
 	Write-Verbose "Setting Global API URL to $Global:HuntServerAddress/api"
 
@@ -86,7 +86,7 @@ function Set-ICToken {
 				$Global:ICToken = $Token
 				Write-Verbose "Setting Auth Token for $Global:HuntServerAddress to $Token"
 		} else {
-			Throw "Invalide token. Must be a 64 character string generated within your profile or admin panel within Infocyte HUNT's web console"
+			Throw "Invalide token. Must be a 64 character string generated within your profile or admin panel within Datto EDR HUNT's web console"
 			return
 		}
 	} else {
@@ -100,10 +100,10 @@ function Set-ICToken {
 	}
 
 	if ($Proxy) {
-			Write-Verbose "Infocyte API functions will use Proxy: $Proxy"
+			Write-Verbose "Datto EDR API functions will use Proxy: $Proxy"
 			$Global:Proxy = $Proxy
 			if ($ProxyUser -AND $ProxyPass) {
-				Write-Verbose "Infocyte API functions will now use Proxy User: $ProxyUser"
+				Write-Verbose "Datto EDR API functions will now use Proxy User: $ProxyUser"
 				$pw = ConvertTo-SecureString $ProxyPass -AsPlainText -Force
 				$Global:ProxyCredential = New-Object System.Management.Automation.PSCredential ($ProxyUser, $pw)
 			}
@@ -111,7 +111,7 @@ function Set-ICToken {
 		# Load from file
 		$Global:Proxy = $Global:ICCredentials["Proxy"]
 		if ($Global:Proxy) {
-			Write-Verbose "Infocyte API functions will use Proxy config loaded from credential file: $($Global:Proxy)"
+			Write-Verbose "Datto EDR API functions will use Proxy config loaded from credential file: $($Global:Proxy)"
 		}
 		if ($Global:ICCredentials["ProxyUser"]) {
 			$pw = ConvertTo-SecureString $Global:ICCredentials["ProxyPass"] -AsPlainText -Force
@@ -121,20 +121,6 @@ function Set-ICToken {
 
 	#Test connection
 	$ver = Get-ICAPI -Endpoint "Version"
-
-	# Set initial default boxId (change with Set-ICBox) and test connection
-	$box = Get-ICBox -Last 7 -Global
-
-	if ($box) {
-		Write-Verbose "Successfully connected to $Global:HuntServerAddress"
-		$Global:ICCurrentBox = $box.id
-		Write-Verbose "`$Global:ICCurrentBox is set to $($box.targetGroup)-$($box.name) [$($box.id)]"
-		Write-Verbose "All analysis data & object retrieval will default to this box."
-		Write-Verbose "Use Set-ICBox to change the default in this session."
-	} else {
-		Throw "Your connection to $Global:HuntServerAddress failed using Infocyte API URI: $Global:HuntServerAddress`nToken: $Global:ICToken`nProxy: $Global:Proxy`nProxyUser: $($Global:ICCredentials['ProxyUser'])"
-	}
-
 
 	if ($Save) {
 		Write-Verbose "Saving Token and Proxy settings to credential file: $credentialfile"

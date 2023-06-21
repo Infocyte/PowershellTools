@@ -1,7 +1,7 @@
 
 # HElPER FUNCTIONS
 
-# Used with most Infocyte Get methods.
+# Used with most Datto EDR Get methods.
 # Takes a filter object (hashtable) and adds authentication and passes it as the body for URI encoded parameters.
 # NoLimit will iterate 1000 results at a time to the end of the data set.
 function Get-ICAPI {
@@ -27,10 +27,10 @@ function Get-ICAPI {
             access_token = $Global:ICToken
         }
     } else {
-        throw "API Token not set! Use Set-ICToken to connect to an Infocyte instance."
+        throw "API Token not set! Use Set-ICToken to connect to an Datto EDR instance."
     }
 
-    $resultlimit = 1000 # limits the number of results that come back. 1000 is max supported by Infocyte API. Use NoLimit flag on functions to iterate 1000 at a time for all results.
+    $resultlimit = 1000 # limits the number of results that come back. 1000 is max supported by Datto EDR API. Use NoLimit flag on functions to iterate 1000 at a time for all results.
     $Globallimit = 150000 # trying to control strains on the database. Add a filter to keep it reasonable.
     $skip = 0
     $lastId = $null
@@ -95,7 +95,7 @@ function Get-ICAPI {
         elseif ($total -ge $Globallimit) {
             Write-Warning "Your filter will return $total objects! You are limited to $GlobalLimit results per query.
                 Database performance can be severely degraded in large queries so dumping the database via the API is not advised. 
-                Try refining your query further with a 'where' filter or ask Infocyte for a data export by emailing support@infocyte.com. "
+                Try refining your query further with a 'where' filter or ask Datto EDR for a data export by emailing support@infocyte.com. "
             return
         }
         elseif ($total -gt $resultlimit -AND -NOT $NoLimit) {
@@ -119,7 +119,7 @@ function Get-ICAPI {
             $pc = -1
         }
         if (-NOT $NoCount -AND $total -ge 100 -AND $Endpoint -notmatch "count") {
-            Write-Progress -Id 2 -ParentId 1 -CurrentOperation "Paging" -Activity "Getting Data from Infocyte API" -Status "Requesting data from $url [$skip of $total] ($pc)" -PercentComplete $pc
+            Write-Progress -Id 2 -ParentId 1 -CurrentOperation "Paging" -Activity "Getting Data from Datto EDR API" -Status "Requesting data from $url [$skip of $total] ($pc)" -PercentComplete $pc
         }
         Write-Debug "Sending $url this Body as 'application/json':`n$($body|convertto-json)"
         $at = $timer.Elapsed
@@ -187,7 +187,7 @@ function Get-ICAPI {
     $AveTime = ($times | Measure-Object -Average).Average
     $MaxTime = ($times | Measure-Object -Maximum).Maximum
     if (-NOT $NoCount -AND $total -gt 100 -AND $Endpoint -notmatch "count") {
-        Write-Progress -Id 2 -ParentId 1 -CurrentOperation "Paging" -Activity "Getting Data from Infocyte API" -Completed
+        Write-Progress -Id 2 -ParentId 1 -CurrentOperation "Paging" -Activity "Getting Data from Datto EDR API" -Completed
     }
     if (-NOT $NoCount) {
         Write-Verbose "Received $count of $total objects from $url in $($TotalTime.TotalSeconds.ToString("#.####")) Seconds (Page Request times: Ave= $($AveTime.ToString("#"))ms, Max= $($MaxTime.ToString("#"))ms)"
@@ -222,7 +222,7 @@ function Invoke-ICAPI {
             Authorization = $Global:ICToken
         }
     } else {
-        Throw "API Token not set! Use Set-ICToken to set your token to an Infocyte instance."
+        Throw "API Token not set! Use Set-ICToken to set your token to an Datto EDR instance."
     }
 
     $url = "$($Global:HuntServerAddress)/api/$Endpoint"

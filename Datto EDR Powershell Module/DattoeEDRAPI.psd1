@@ -5,10 +5,10 @@
 @{
 
 # Script module or binary module file associated with this manifest.
-RootModule = 'InfocyteHUNTAPI.psm1'
+RootModule = 'DattoEDRAPI.psm1'
 
 # Version number of this module.
-ModuleVersion = '2.0.7'
+ModuleVersion = '3.0.0'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -20,13 +20,13 @@ GUID = 'd3d4e089-48ba-47f1-963c-36a6c5b6a5c7'
 Author = 'Chris Gerritz'
 
 # Company or vendor of this module
-CompanyName = 'Infocyte, Inc.'
+CompanyName = 'Datto, Inc.'
 
 # Copyright statement for this module
-Copyright = '(c) 2021 Infocyte, Inc. All rights reserved.'
+Copyright = '(c) 2023 Datto, Inc. All rights reserved.'
 
 # Description of the functionality provided by this module
-Description = 'Functions and Cmdlets to interface with the Infocyte HUNT API'
+Description = 'Functions and Cmdlets to interface with the Datto EDR API'
 
 # Minimum version of the Windows PowerShell engine required by this module
 PowerShellVersion = '5.1'
@@ -106,17 +106,15 @@ FunctionsToExport = @(
     "Get-ICTask",
     "Get-ICTaskItems",
     "Get-ICLastScanTask",
-    #"Get-ICBox",
-    #"Set-ICBox",
     "Get-ICFlagColors",
     "New-ICFlag",
     "Get-ICFlag",
     "Update-ICFlag",
     "Remove-ICFlag",
     "New-ICScanOptions",
-    "Add-ICScanSchedule",
-    "Get-ICScanSchedule",
-    "Remove-ICScanSchedule",
+    #"Add-ICScanSchedule",
+    #"Get-ICScanSchedule",
+    #"Remove-ICScanSchedule",
     "Get-ICReport",
     "Get-ICHelp",
     "New-ICExtension",
@@ -124,12 +122,10 @@ FunctionsToExport = @(
     "Update-ICExtension",
     "Remove-ICExtension",
     "Import-ICExtension",
-    #"Import-ICOfficialExtensions",
     "Test-ICExtension",
     "Get-ICAgent",
     "Remove-ICAgent",
     "Get-ICDwellTime",
-    #"Get-ICComplianceResults",
     "Get-ICRule",
     "New-ICRule",
     "Import-ICRule",
@@ -173,7 +169,7 @@ PrivateData = @{
         # IconUri = ''
 
         # ReleaseNotes of this module
-        ReleaseNotes = 'Add archived alerts endpoint to Get-ICAlert'
+        ReleaseNotes = 'Changed name from Infocyte to Datto EDR'
 
     } # End of PSData hashtable
 

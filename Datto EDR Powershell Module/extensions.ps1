@@ -374,73 +374,6 @@ function Remove-ICExtension {
     }
 }
 
-function Import-ICOfficialExtensions {
-    [cmdletbinding()]
-    Param(
-        [Switch]$IncludeContributed,
-        [Switch]$Update
-    )
-
-    $InstanceExtensions = Get-ICExtension -NoLimit
-    Write-Verbose "Pulling Official Extensions from Github: https://api.github.com/repos/Infocyte/extensions/contents/official/"
-    try {
-        $Extensions = Invoke-WebRequest -Uri "https://api.github.com/repos/Infocyte/extensions/contents/official/collection" | Select-Object -ExpandProperty content | ConvertFrom-Json
-    }
-    catch {
-        Write-Warning "Could not download extensions from https://api.github.com/repos/Infocyte/extensions/contents/official/collection"
-    }
-    try {
-        $Extensions += Invoke-WebRequest -Uri "https://api.github.com/repos/Infocyte/extensions/contents/official/response" | Select-Object -ExpandProperty content | ConvertFrom-Json
-    }
-    catch {
-        Write-Warning "Could not download extensions from https://api.github.com/repos/Infocyte/extensions/contents/official/response"
-    }
-    If ($IncludeContributed) {
-        Write-Verbose "Pulling Official Extensions from Github: https://api.github.com/repos/Infocyte/extensions/contents/contrib/"
-        try {
-            $Extensions += Invoke-WebRequest -Uri "https://api.github.com/repos/Infocyte/extensions/contents/contrib/collection" | Select-Object -ExpandProperty content | ConvertFrom-Json
-        }
-        catch {
-            Write-Warning "Could not download extensions from https://api.github.com/repos/Infocyte/extensions/contents/contrib/collection"
-        }
-        try {
-            $Extensions += Invoke-WebRequest -Uri "https://api.github.com/repos/Infocyte/extensions/contents/contrib/response" | Select-Object -ExpandProperty content | ConvertFrom-Json
-        }
-        catch {
-            Write-Warning "Could not download extensions from https://api.github.com/repos/Infocyte/extensions/contents/contrib/response"
-        }
-    }
-
-    $Extensions | ForEach-Object {
-        $filename = ($_.name -split "\.")[0]
-        try {
-            $ext = (new-object Net.WebClient).DownloadString($_.download_url)
-        } catch {
-            Write-Warning "Could not download extension. [$_]"
-            continue
-        }
-        try {
-            $header = Convert-ICExtensionHeader -Body $ext
-        } catch {
-            Write-Warning "Could not parse header on $($filename)"; 
-            continue
-        }       
-        $existingExt = $InstanceExtensions | Where-Object { $_.description -eq $header.guid }
-        if ($existingExt) {
-            if ($Update) {
-                Write-Verbose "Updating extension $($header.name) [$($existingExt.id)] with guid $($header.guid):`n$existingExt"
-                Update-ICExtension -Id $existingExt.id -Body $ext   
-            }
-            else {
-                Write-Warning "Extension $($header.name) [$($existingExt.id)] with guid $($header.guid) already exists. Try using -Update to update it."
-            }
-        } else {
-            Write-Verbose "Importing extension $($header.name) [$($header.Type)] with guid $($header.guid)"
-            Import-ICExtension -Body $ext -Active -Force:$Update
-        }
-    }
-}
-
 # For Extension Developers
 function Test-ICExtension {
 	[cmdletbinding()]
@@ -571,7 +504,7 @@ function Test-ICExtension {
     $a += "survey --no-compress --only-extensions"
 
     $completedsuccessfully = $false
-    $agentOutputRegex = '^\[(?<datestamp>\d{4}-\d{1,2}-\d{1,2}\s\d{1,2}:\d{1,2}:\d{1,2}\.\d+\sUTC)\]\[(?<level>.+?)\]\[(?<logtype>.+?)\]\s(?<msg>.+)'
+    $agentOutputRegex = '^\[(?<datestamp>\d{4}-\d{1,2}-\d{1,2}\s\d{1,2}:\d{1,2}:\d{1,2}\d+\sUTC)\]\[(?<guid>.*?)\]\[(?<hostname>.+?)\]\[(?<version>.+?)\]\[(?<level>.+?)\]\[(?<logtype>.+?)::\d{1,3}\]\s(?<msg>.+)'
     $color = 'green'
 
     Write-Host -ForegroundColor $LoggingColor "Executing $ext with $agentname (Version: $DevVer)"
@@ -601,7 +534,7 @@ function Test-ICExtension {
                 Write-Verbose "System inspections complete!"
                 break
             }
-            elseif ($AgentOutput.logtype -eq "agent::survey") {
+            elseif ($AgentOutput.logtype -match "agent::survey") {
                 Write-Verbose "$line"
             }
             elseif ($AgentOutput.msg -match "Logging initialized") {
@@ -611,17 +544,23 @@ function Test-ICExtension {
                 #Color code output
                 Switch ($AgentOutput.level) {
                     "ERROR" { $color = 'Red' }
+                    "ERR" { $color = 'Red' }
                     "WARN" { $color = 'DarkYellow' }
+                    "WRN" { $color = 'DarkYellow' }
                     "DEBUG" { $color = 'Yellow' }
+                    "DBG" { $color = 'Yellow' }
                     "VERBOSE" { $color = 'Yellow' }
+                    "VER" { $color = 'Yellow' }
                     "TRACE" { $color = 'Yellow' }
+                    "TRC" { $color = 'Yellow' }
                     "INFO" { $color = 'Blue' }
+                    "INF" { $color = 'Blue' }
                     default {
                         Write-Warning "[Unknown] $($AgentOutput.msg)"        
                     }
                 } 
 
-                if ($AgentOutput.logtype -eq "agent::extensions" -AND $AgentOutput.level -eq "ERROR") {
+                if ($AgentOutput.logtype -eq "agent::extensions" -AND $AgentOutput.level -MATCH "ERR") {
                     Write-Host -ForegroundColor $color "[$($AgentOutput.level)][$($AgentOutput.logtype)] $($AgentOutput.msg)"
                     $exitError = $true
                 }
