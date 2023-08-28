@@ -55,7 +55,7 @@ New-Module -name install_InfocyteAgent -scriptblock {
 		if ([System.IntPtr]::Size -eq 4) {
 			$agentURL = "https://s3.us-east-2.amazonaws.com/infocyte-support/executables/agent.windows32.exe"
 		} else {
-			$agentURL = "https://s3.us-east-2.amazonaws.com/infocyte-support/executables/agent.windows.exe"
+			$agentURL = "https://s3.us-east-2.amazonaws.com/infocyte-support/executables/agent.windows64.exe"
 		}
 		
 		$hunturl = "https://$InstanceName.infocyte.com"
