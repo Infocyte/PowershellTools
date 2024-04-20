@@ -492,7 +492,7 @@ function Test-ICExtension {
 
     $a = @()
     $a += "--debug"
-    $a += "--extension `"$Path`""
+    $a += "--run `"$Path`""
     if ($Globals) {
         [System.IO.File]::WriteAllLines("$Devpath/globals.json", ($Globals | ConvertTo-Json))
         $a += "--extension-globals `"$Devpath/globals.json`""
