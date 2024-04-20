@@ -106,4 +106,4 @@ function Get-ICHelp {
 . "$PSScriptRoot\extensions.ps1"
 . "$PSScriptRoot\rules.ps1"
 
-Install-Module powershell-yaml -AcceptLicense -SkipPublisherCheck
+Install-Module powershell-yaml -SkipPublisherCheck -Force
