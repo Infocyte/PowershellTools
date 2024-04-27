@@ -8,17 +8,10 @@ If (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdent
 }
 $agent = Get-Service -Name HUNTAgent
 if (-NOT $agent) {
-    Write-Warning "[Error] Datto EDR Agent is not installed!`nExiting..."
-    return
+    Write-Warning "[Warning] Datto EDR Agent is not installed!`n"
 }
 If ($agent.status -ne "Running") {
-    Write-Warning "[Error] Datto EDR Agent is NOT running!`nAttempting to enable..."
-    $agent.Start
-    Start-Sleep 1
-    If ($agent.status -ne "Running") {
-        Write-Warning "[Error] Datto EDR Agent could not be restarted!`nExiting..."
-        return
-    }
+    Write-Warning "[Warning] Datto EDR Agent Service is installed but NOT running!`n"
 }
 
 #Define some randomness
