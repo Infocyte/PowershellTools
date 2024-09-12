@@ -85,6 +85,8 @@ Function Get-LockingProcs {
                 }
             }
             Write-Host -ForegroundColor Cyan "Get-LockingProcs : Using [$exe]"
+			"Get-LockingProcs run on [$(Get-Date -AsUTC) UTC] Using [$exe]" | Out-file ./get-lockingprocs_$(Get-Date -AsUTC -Format "yyyyMMdd_HHmm")UTC.txt -Force
+
         } catch {
             if (!$PSitem.InvocationInfo.MyCommand) {
                 $PSCmdlet.ThrowTerminatingError(
@@ -111,7 +113,7 @@ Function Get-LockingProcs {
         try {
 
 			Write-Host -ForegroundColor Cyan "`nGet-LockingProcs : Searching for handles to [$path]"
-			
+
 			# execute handle.exe and get output, pass arguments to accept license and hide banner
 			$data = & $exe -u -accepteula -nobanner $path
 			if ($data.count -eq 1){ Write-Verbose $data } else { $data | % {  Write-Verbose $_ } }
@@ -168,7 +170,8 @@ Function Get-LockingProcs {
 				$lockingProcs = ($lockingProcs | Sort-Object pid -unique)
 				Write-Host -ForegroundColor Cyan "Get-LockingProcs : Found $($lockingProcs.count) unique processes with locks on [$path]"
 				
-				return [array]$lockingProcs
+				return [array]$lockingProcs | select *
+				$LockingProcs | fl * | Out-file ./get-lockingprocs_$(Get-Date -AsUTC -Format "yyyyMMdd_HHmm")UTC.txt -Append
 			}
         } catch {
             if (!$PSitem.InvocationInfo.MyCommand) {
