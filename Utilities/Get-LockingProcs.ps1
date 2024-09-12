@@ -86,7 +86,7 @@ Function Get-LockingProcs {
             }
             Write-Host -ForegroundColor Cyan "Get-LockingProcs : Using [$exe]"
 			$outputname = "get-lockingprocs_$(Get-Date -AsUTC -Format "yyyyMMdd_HHmm")UTC.txt"
-			"Get-LockingProcs run on [$(Get-Date -AsUTC) UTC] Using [$exe]" | Out-file ./$outputname -Force
+			"Get-LockingProcs run on [$(Get-Date -AsUTC) UTC] Using [$exe]" | Out-file .\$outputname -Force
 
         } catch {
             if (!$PSitem.InvocationInfo.MyCommand) {
@@ -170,7 +170,7 @@ Function Get-LockingProcs {
 				# remove duplicate entries
 				$lockingProcs = ($lockingProcs | Sort-Object pid -unique)
 				Write-Host -ForegroundColor Cyan "Get-LockingProcs : Found $($lockingProcs.count) unique processes with locks on [$path]"
-				$LockingProcs | fl * | Out-file ./$outputname -Append
+				[array]$LockingProcs | select * | Out-String | Out-file .\$outputname -Append
 
 				return [array]$lockingProcs | select *
 			}
