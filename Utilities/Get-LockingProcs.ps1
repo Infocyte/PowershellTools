@@ -85,7 +85,8 @@ Function Get-LockingProcs {
                 }
             }
             Write-Host -ForegroundColor Cyan "Get-LockingProcs : Using [$exe]"
-			"Get-LockingProcs run on [$(Get-Date -AsUTC) UTC] Using [$exe]" | Out-file ./get-lockingprocs_$(Get-Date -AsUTC -Format "yyyyMMdd_HHmm")UTC.txt -Force
+			$outputname = "get-lockingprocs_$(Get-Date -AsUTC -Format "yyyyMMdd_HHmm")UTC.txt"
+			"Get-LockingProcs run on [$(Get-Date -AsUTC) UTC] Using [$exe]" | Out-file ./$outputname -Force
 
         } catch {
             if (!$PSitem.InvocationInfo.MyCommand) {
@@ -171,7 +172,7 @@ Function Get-LockingProcs {
 				Write-Host -ForegroundColor Cyan "Get-LockingProcs : Found $($lockingProcs.count) unique processes with locks on [$path]"
 				
 				return [array]$lockingProcs | select *
-				$LockingProcs | fl * | Out-file ./get-lockingprocs_$(Get-Date -AsUTC -Format "yyyyMMdd_HHmm")UTC.txt -Append
+				$LockingProcs | fl * | Out-file ./$outputname -Append
 			}
         } catch {
             if (!$PSitem.InvocationInfo.MyCommand) {
@@ -188,4 +189,7 @@ Function Get-LockingProcs {
             } else { $PSCmdlet.ThrowTerminatingError($PSitem) }
         }
     }
+	END {
+		Write-Host "Output file written to: [./$outputname]"
+	}
 } # Get-LockingProcs
