@@ -165,10 +165,10 @@ Function Get-LockingProcs {
 			} else {
 				#Write-Host "Get-LockingProcs : Found $($lockingProcs.count) processes with locks on [$path]"
 				# remove duplicate entries
-				$lockingProcs = [Array]($lockingProcs | Sort-Object pid -unique)
+				$lockingProcs = ($lockingProcs | Sort-Object pid -unique)
 				Write-Host "Get-LockingProcs : Found $($lockingProcs.count) unique processes with locks on [$path]"
 				
-				return $lockingProcs
+				return [array]$lockingProcs
 			}
         } catch {
             if (!$PSitem.InvocationInfo.MyCommand) {
