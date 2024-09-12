@@ -168,7 +168,7 @@ Function Get-LockingProcs {
 				$lockingProcs = [Array]($lockingProcs | Sort-Object pid -unique)
 				Write-Host "Get-LockingProcs : Found $($lockingProcs.count) unique processes with locks on [$path]"
 				
-				$lockingProcs | ft -auto
+				return $lockingProcs
 			}
         } catch {
             if (!$PSitem.InvocationInfo.MyCommand) {
