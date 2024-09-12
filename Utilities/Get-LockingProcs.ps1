@@ -170,9 +170,9 @@ Function Get-LockingProcs {
 				# remove duplicate entries
 				$lockingProcs = ($lockingProcs | Sort-Object pid -unique)
 				Write-Host -ForegroundColor Cyan "Get-LockingProcs : Found $($lockingProcs.count) unique processes with locks on [$path]"
-				
-				return [array]$lockingProcs | select *
 				$LockingProcs | fl * | Out-file ./$outputname -Append
+
+				return [array]$lockingProcs | select *
 			}
         } catch {
             if (!$PSitem.InvocationInfo.MyCommand) {
