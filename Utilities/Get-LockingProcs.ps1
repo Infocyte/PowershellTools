@@ -77,14 +77,14 @@ Function Get-LockingProcs {
 			$sysinternalsFolder = "$env:temp\sysinternals"
             $exe = "$sysinternalsFolder\handle.exe"
             if (!(Test-Path $exe -ErrorAction Ignore)) {
-                Write-Host "Get-LockingProcs : [$exe] not found, attempting to download"
+                Write-Host -ForegroundColor Cyan "Get-LockingProcs : [$exe] not found, attempting to download"
 				if (!(Test-Path $sysinternalsFolder -ErrorAction Ignore)) { New-Item -ItemType Directory $sysinternalsFolder -ErrorAction Ignore | Out-Null }
                 Invoke-WebRequest -Uri "https://live.sysinternals.com/handle.exe" -OutFile $exe -Force
                 if (!(Test-Path $exe -ErrorAction Ignore)) {
                     throw "Can't find [$exe]"
                 }
             }
-            Write-Host "Get-LockingProcs : Using [$exe]"
+            Write-Host -ForegroundColor Cyan "Get-LockingProcs : Using [$exe]"
         } catch {
             if (!$PSitem.InvocationInfo.MyCommand) {
                 $PSCmdlet.ThrowTerminatingError(
@@ -110,7 +110,7 @@ Function Get-LockingProcs {
 		
         try {
 
-			Write-Host "`nGet-LockingProcs : Searching for handles to [$path]"
+			Write-Host -ForegroundColor Cyan "`nGet-LockingProcs : Searching for handles to [$path]"
 			
 			# execute handle.exe and get output, pass arguments to accept license and hide banner
 			$data = & $exe -u -accepteula -nobanner $path
@@ -161,12 +161,12 @@ Function Get-LockingProcs {
 			}
 			# if lockingProcs array size is zero, we didn't find anything
 			if ($lockingProcs.Count -eq 0) {
-				Write-Host "Get-LockingProcs : No matching handles found for [$path]"
+				Write-Host -ForegroundColor Cyan "Get-LockingProcs : No matching handles found for [$path]"
 			} else {
 				#Write-Host "Get-LockingProcs : Found $($lockingProcs.count) processes with locks on [$path]"
 				# remove duplicate entries
 				$lockingProcs = ($lockingProcs | Sort-Object pid -unique)
-				Write-Host "Get-LockingProcs : Found $($lockingProcs.count) unique processes with locks on [$path]"
+				Write-Host -ForegroundColor Cyan "Get-LockingProcs : Found $($lockingProcs.count) unique processes with locks on [$path]"
 				
 				return [array]$lockingProcs
 			}
