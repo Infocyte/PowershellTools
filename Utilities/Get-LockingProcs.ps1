@@ -79,14 +79,14 @@ Function Get-LockingProcs {
             if (!(Test-Path $exe -ErrorAction Ignore)) {
                 Write-Host -ForegroundColor Cyan "Get-LockingProcs : [$exe] not found, attempting to download"
 				if (!(Test-Path $sysinternalsFolder -ErrorAction Ignore)) { New-Item -ItemType Directory $sysinternalsFolder -ErrorAction Ignore | Out-Null }
-                Invoke-WebRequest -Uri "https://live.sysinternals.com/handle.exe" -OutFile $exe -Force
+                Invoke-WebRequest -Uri "https://live.sysinternals.com/handle.exe" -OutFile $exe
                 if (!(Test-Path $exe -ErrorAction Ignore)) {
                     throw "Can't find [$exe]"
                 }
             }
             Write-Host -ForegroundColor Cyan "Get-LockingProcs : Using [$exe]"
-			$outputname = "get-lockingprocs_$(Get-Date -AsUTC -Format "yyyyMMdd_HHmm")UTC.txt"
-			"Get-LockingProcs run on [$(Get-Date -AsUTC) UTC] Using [$exe]" | Out-file .\$outputname -Force
+			$outputname = "get-lockingprocs_$(Get-Date -Format "yyyyMMdd_HHmm_K")UTC.txt"
+			"Get-LockingProcs run on [$(Get-Date -Format "yyyy-MM-dd HH:mm K")] Using [$exe]" | Out-file .\$outputname -Force
 
         } catch {
             if (!$PSitem.InvocationInfo.MyCommand) {
