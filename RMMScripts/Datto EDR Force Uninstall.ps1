@@ -341,6 +341,12 @@ Function Get-EDRConfig {
 
 #region ---Code--------------------------------------------------------------------------------------------------------------------------
 
+$EDRServiceName = "HUNTAgent"
+$AVServiceName = "EndpointProtectionService"
+$AVServiceName2 = "EndpointProtectionService"
+$EDRProcessName = "agent"
+$AVProcessName = "endpointprotection"
+
 # Determine if Datto EDR is Installed:
 $EDRServiceKey = Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Services\HUNTAgent\" -ea 0
 $EDRService = Get-ServiceWithMessage "HUNTAgent"
@@ -493,8 +499,8 @@ if (get-process -Name RMM.AdvancedThreatDetection -ea 0) {
     }
 }
 
-# Stop Datto EDR
-$Procs = get-process -Name agent -EA 0 | Where { $_.description -eq "Datto EDR Agent" } 
+# Kill Datto EDR Agents
+$Procs = get-process -EA 0 | Where { $_.description -eq "Datto EDR Agent" } 
 if ($Procs) {
     try {
         $Procs | Stop-Process -Force
@@ -514,8 +520,10 @@ if ($Procs) {
 }
 
 # delete files
-gci "$env:ProgramData\CentraStage*\RMM.AdvancedThreatDetection" | Remove-item -Force
+gci "$env:ProgramData\CentraStage*\AEMAgent\RMM.AdvancedThreatDetection" | Remove-item -Recurse -Force
 Remove-item "C:\programData\kaseyaone\dattoedr.json" -Force
+
+
 Write-host `r
 Write-Host "!   SUCCESS: Datto EDR Uninstalled and/or killed."
 Write-Host "  RMM Policy will perform a reinstall on its' next policy enforcement check if it is still enabled in RMM."
