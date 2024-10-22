@@ -13,7 +13,7 @@
         Restart Service
         Stop Service
         Fix Known Issues
-        Uninstall
+        Force Uninstall
 
 
     Diagnostic:
@@ -56,7 +56,7 @@
     Stop Service:
         It is recommended you turn off realtime monitoring or other policies from the console. But if necessary, this utility will stop the service from the endpoint. A reboot or forced restart of the service will restore it.
     
-    Uninstall:
+    Force Uninstall:
         Used when other methods of removing Datto EDR are not working.  Primary recommended uninstallation method is to remove the
          Datto EDR Security policy from the system in RMM and then issue uninstall from the Datto EDR user interface. 
          WARNING: Uninstalling Datto AV deletes all quarantine files making them unrecoverable.
@@ -94,7 +94,6 @@ $BYPASS_SERVICE_CHECK = if ($env:varBypassInstallCheck) { $true } else { $false 
 
 Write-Host "varAction: $($env:varAction)"
 SWITCH ($env:varAction) {
-    "Diagnostic" { $Diagnostic = $true }
     "Fix Known Issues" { $FixKnownIssues = $true }
     "Restart Service" { $RestartService = $true }
     "Stop Service" { $StopService = $true }
@@ -106,6 +105,10 @@ SWITCH ($env:varAction) {
         } else {
             Write-Host "! Notice: No Uninstall Token (varUninstallToken) was specified. If Uninstall Protection is turned on, this action will be blocked without an Uninstall Token from your EDR console."
         }
+     }
+     "Diagnostic" { $Diagnostic = $true }
+     Default {
+        $Diagnostic = $true
      }
 }
 
@@ -200,8 +203,6 @@ Function Convertto-ShortenedEDRLogs ($logs) {
     return $parsed_logs
 }
 
-
-# Functions
 Function Get-ServiceInfo ([String]$Name, [Switch]$Quiet=$false) {
 
     # Get-Service but with Installation directory, ImageName, ImagePath info.
@@ -361,6 +362,7 @@ Function Get-ProcessInfo {
     }
 }
 
+# Functions
 Function Test-isDattoEDRInstalled {
 
     # Find Service
@@ -589,21 +591,17 @@ Function Restart-EDR {
     $Service = Get-ServiceInfo $EDR_SERVICE_NAME
     if (-NOT $Service) {
         Write-Host "$EDR_SERVICE_NAME Service not running. Exiting..."
-        exit 1
+        return $false
     }
     Write-Host "  Found $EDR_SERVICE_NAME service."
     Write-FormattedObject $Service
-    
-    if ($Service.TamperProtected) {
-        # This is not implimented yet but may be before the end of 2024.
-        write-host "! NOTICE: Datto EDR service cannot be stopped directly."
-        write-host "  This utility will need to be updated to support tamper protection."
-        Write-Host "Exiting..."
-        return $false
-    }
-
 
     if ($Service.State -eq "Running") {
+        if ($Service.TamperProtected) {
+            # This is not implimented yet but may be before the end of 2024.
+            write-host "! NOTICE: Datto EDR service cannot be stopped directly."
+            write-host "  This utility will need to be updated to support tamper protection."
+        }
         $ProcessIdOld = $Service.ProcessId
         Write-Host "  ... Stopping $EDR_SERVICE_NAME Service."
         Stop-Service -Name $EDR_SERVICE_NAME
@@ -664,8 +662,6 @@ Function Restart-EDR {
         Write-Host "  New Status: $($Service.State) ($($Service.Status))"
         return $false
     }
-
-    
 }
 
 Function Stop-EDR {
@@ -1019,6 +1015,7 @@ function Get-KaseyaOneConfig {
     return $Dattoedrjson
 }
 
+# Sensative Function:
 
 #region ---Code--------------------------------------------------------------------------------------------------------------------------
 
@@ -1037,7 +1034,7 @@ $EDR_isActive = $false
 $EDRService = Get-ServiceInfo $EDR_SERVICE_NAME
 if ($EDRService) {
     Write-Host "  Found EDR Service."
-    Write-FormattedObject $EDRService
+    Write-FormattedObject $EDRService 
     $EDR_isInstalled = $true
 
     # Set Installation Directory to Root of Service
