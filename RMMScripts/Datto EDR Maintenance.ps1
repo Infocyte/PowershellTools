@@ -1,11 +1,12 @@
 #Requires -Version 5
 <# Datto EDR Maintenance
-    Version 2 (Updated: 22 October 2024)
+    Version 2.2 (Updated: 23 October 2024)
     Written by: Chris Gerritz
 
     Variables: 
         varAction - Mandatory
-        varBypassInstallCheck - Optional to run diagnostic even if Datto EDR service is not installed
+        varBypassInstallCheck - Optional to run diagnostic even if Datto EDR service is not installed (By default it exits as a success)
+        varFullDiagnostic - Option to run diagnostic prior to any other action(s) selected
         varUninstallToken - Optional - Uninstall Key from the Datto EDR Settings console or Offline Uninstall Key from Support
 
     Actions:
@@ -39,7 +40,7 @@
         - Log Snippets
             -- Available Log Files
             -- Today's Errors 
-            -- Last Log Tail (30 lines)
+            -- Last Log Tail ($varLogLines lines)
         - Agent Known Problem Detection
           -- Service Not Running
           -- Service Not Connecting
@@ -89,33 +90,54 @@ $RB_PROCESS_NAME = 'rollbackservice'
 
 
 # Input Variables
-$varGetLogSnips = if ($env:varGetLogSnips) { $true } else { $false }
-$BYPASS_SERVICE_CHECK = if ($env:varBypassInstallCheck) { $true } else { $false }
+$DEFAULT_LOGLOGS = 30
+$varLogLines = = if ([Int]$env:varLogLines -ge 1 -AND [Int]$env:varLogLines -le 100) { $env:varLogLines } else { $DEFAULT_LOGLOGS }
+$varBypassInstallCheck = if ([Boolean]$env:varBypassInstallCheck) { $true } else { $false }
 
 Write-Host "varAction: $($env:varAction)"
 SWITCH ($env:varAction) {
-    "Fix Known Issues" { $FixKnownIssues = $true }
-    "Restart Service" { $RestartService = $true }
-    "Stop Service" { $StopService = $true }
+    "Fix Known Issues" { 
+        Write-Host "Attempting to fix known Datto EDR Agent issues."
+        $action_FixKnownIssues = $true 
+    }
+    "Restart Service" { 
+        Write-Host "Restarting Datto EDR."
+        $action_RestartService = $true 
+    }
+    "Stop Service" { 
+        Write-Host "Stopping Datto EDR."
+        $action_StopService = $true 
+    }
     "Force Uninstall" { 
-        $UninstallEDR = $true;
+        Write-Host "Forcing Uninstall of Datto EDR and associated modules."
+        $action_UninstallEDR = $true;
         if ($env:varUninstallToken) {
-            $UninstallToken = $env:varUninstallToken
-            Write-Host "varUninstallToken: $UninstallToken"
+            $varUninstallToken = $env:varUninstallToken
+            Write-Host "varUninstallToken: $varUninstallToken"
         } else {
             Write-Host "! Notice: No Uninstall Token (varUninstallToken) was specified. If Uninstall Protection is turned on, this action will be blocked without an Uninstall Token from your EDR console."
         }
-     }
-     "Diagnostic" { $Diagnostic = $true }
-     Default {
-        $Diagnostic = $true
-     }
+    }
+    "Diagnostic" { 
+        Write-Host "Running Diagnostic of Datto EDR and associated modules."
+        $varDiagnostic = $true 
+    }
+    Default {
+        Write-Host "Invalid Action Selected. Running Diagnostic of Datto EDR and associated modules instead."
+        $varDiagnostic = $true
+    }
 }
+
+if (-NOT $varDiagnostic -AND [Boolean]$env:varFullDiagnostic) {
+    Write-Host "Running Full Diagnostic prior to action selected."
+    $varDiagnostic = $varFullDiagnostic
+}
+Write-Host `n
 
 
 #region ---Functions--------------------------------------------------------------------------------------------------------------------------
 
-# Helper Functions
+# Helper Functions and Dependencies
 Function Write-FormattedObject ([Object]$Object) {
     # Helper Function to print an object with indendation in RMM Scripts. Helps readability.
     try {
@@ -132,7 +154,7 @@ Function Write-FormattedObject ([Object]$Object) {
         Write-Host ('-'*$width)
         $Object | Out-String -Stream -Width $width | foreach { if ($_) { Write-Host "|  $_" } } 
         Write-Host ('-'*$width)
-        Write-Host `r
+        Write-Host `n
     } catch {
         Write-BetterErrorTrace -Err $_
     }
@@ -172,7 +194,7 @@ Function Write-BetterErrorTrace {
         Write-Host -ForegroundColor Red $msg
         Write-Host -ForegroundColor Red $StackTrace
         Write-Host -ForegroundColor Red "$($LineNumber): $($Line.Trim(' '))"
-        Write-Host `r
+        Write-Host `n
     } catch {
         Write-Host -ForegroundColor Red "! ERROR: Error Handling Function ran into an error: $_"
     }   
@@ -187,7 +209,8 @@ Function Convertto-ShortenedEDRLogs ($logs) {
                 $ver = $($parsed.Groups['ver'].Value)
                 if ($version -ne $ver) {
                     $version = $ver
-                    "`rEDR AGENT VERSION: $version==>"
+                    Write-Host `n
+                    Write-Host "EDR AGENT VERSION: $version==>"
                 }       
                 "[$($parsed.Groups['timestamp'].Value)][$($parsed.Groups['where'].Value)][$($parsed.Groups['level'].Value)] $($parsed.Groups['msg'].Value)"
                 #[2024-10-18 18:54:46 UTC][ccd9778b-e8d8-45da-bf73-4b5266ac34a7][hyperion][3.12.0.2205][63568][INF][agent::jobs::98] Executing Real Time (8759f8e8-212e-41d8-89e6-3fce6b0bf25e)
@@ -208,7 +231,7 @@ Function Get-ServiceInfo ([String]$Name, [Switch]$Quiet=$false) {
     # Get-Service but with Installation directory, ImageName, ImagePath info.
     if (-NOT $Quiet) { Write-Host "- Retrieving Service Information for Service named '$Name'" }
     try {
-        $Service = Get-Service -Name $name -ea 1
+        #$Service = Get-Service -Name $name -ea 1
         $Service = Get-CimInstance -Query "select * from win32_service where name='$Name'" -ea 1
         #| Select-Object DisplayName, Name, Description, StartType, Status, ProcessId, 
         if (-NOT $Service) {
@@ -362,7 +385,8 @@ Function Get-ProcessInfo {
     }
 }
 
-# Functions
+
+# Functions (these only depend on helper functions)
 Function Test-isDattoEDRInstalled {
 
     # Find Service
@@ -382,7 +406,6 @@ Function Test-isDattoEDRInstalled {
                 return $false
             }
         }
-
     }
 
     return $true
@@ -708,11 +731,11 @@ Function Stop-EDR {
     Write-Host "  New Status: $($Service.State) ($($Service.Status))"
 }
 
-Function Uninstall-EDR ([String]$UninstallToken) {
+Function Uninstall-EDR ([String]$varUninstallToken) {
     if (-NOT $EDR_SERVICE_NAME) { $EDR_SERVICE_NAME = "HUNTAgent" }
 
-    if ($UninstallToken) {
-        Write-Host "- Uninstalling Datto EDR (Service = $EDR_SERVICE_NAME) with uninstall token: '$UninstallToken'"
+    if ($varUninstallToken) {
+        Write-Host "- Uninstalling Datto EDR (Service = $EDR_SERVICE_NAME) with uninstall token: '$varUninstallToken'"
     } else {
         Write-Host "- Uninstalling Datto EDR (Service = $EDR_SERVICE_NAME)"
     }
@@ -755,7 +778,7 @@ Function Uninstall-EDR ([String]$UninstallToken) {
     # Run Uninstall
     if (Test-Path $Service.ImagePath) {
         
-        $agentOutput = & ($Service.ImagePath) --no-gui --uninstall $UninstallToken 2>&1
+        $agentOutput = & ($Service.ImagePath) --no-gui --uninstall $varUninstallToken 2>&1
         Write-FormattedObject $agentOutput
 
         if ($agentOutput -match "Error: Unable to verify uninstallation with server" -OR $agentOutput -match "NotApproved") {
@@ -767,79 +790,56 @@ Function Uninstall-EDR ([String]$UninstallToken) {
     }
 }
 
-Function Clean-EDR {
+Function Remove-EDRArtifacts ([Switch]$Force) {
+    # TODO (WIP)
     Write-Host "- Cleaning up Datto EDR Artifacts from Broken Installations"
 
     if (-NOT $EDR_SERVICE_NAME) { $EDR_SERVICE_NAME = "HUNTAgent" }
-    $Service =  Get-Service -Name $EDR_SERVICE_NAME -ea 0
+    $Service =  Get-ServiceInfo -Name $EDR_SERVICE_NAME
     if (-NOT $Service) {
-        write-host "! Datto EDR service is not installed"
-        return
+        write-host "! Datto EDR service is not installed. Looking for files using previously known locations."
+        Write-Host "  NOTE: This may not find files if the target installation path was custom and the service has since been removed."
     }
 
-    if ($Service.CanStop -eq $false) {
+    if ($Service.TamperProtected) {
         # This is not implimented yet but may be before the end of 2024.
         write-host "! Datto EDR service cannot be stopped directly."
         write-host "  This utility will need to be updated to support tamper protection."
-        return $false
     }
 
     try {
         Stop-Service $EDR_SERVICE_NAME -ea 1
     } catch {
-        $err = $_.Exception.Message
-        switch -Regex ($err) {
+        $err = $_
+        switch -Regex ($err.Exception.Message) {
             "Cannot find any service" { 
-                write-host "! WARNING: Datto EDR Service is not installed. Cannot restart service."
-                write-host "  ERROR: $err"
-                return $false
+                write-host "! WARNING: Cannot Stop Service. Datto EDR Service is not installed."
             }
             "Cannot stop" {
                 write-host "! WARNING: Datto EDR Service could not be stopped. This error is not related to tamper protection."
-                write-host "  ERROR: $err"
-                return $false
+                Write-BetterErrorTrace $_
             }
             default { 
-                Write-Host "  ERROR: Could not stop service. $err" 
+                Write-Host "  ERROR: Could not stop service." 
+                Write-BetterErrorTrace $_
             }
         }
     }
     
-    try {
-        Start-Service $EDR_SERVICE_NAME -ea 1
-        #Write-Host "  Datto EDR Service Restarted!"
-    } catch {
-        $err = $_.Exception.Message
-        switch -Regex ($err) {
-            default { 
-                Write-Host "  ERROR: Could not start service: $err" 
-            }
-        }
-    }
+    #Remove Datto AV
 
-    # Check startup type is automatic
-    if ($Service.StartMode -ne 2) {
-        write-host "! WARNING: Datto EDR Service is not set to start automatically!  Attempting to fix"
-        write-host "  StartType of $($EDR_SERVICE_NAME): '$($Service.StartType)'"
+    
+    #Kill Processes
+    Write-Host "- Killing EDR Processes"
+    Get-Process | where { $_.Description -eq $EDR_PROCESS_FRIENDLY_NAME} | Stop-Process -Force
 
-        try {
-            Set-Service -Name $EDR_SERVICE_NAME -StartupType Automatic -ea Stop
-        } catch {
-            $err = $_.Exception.Message
-            switch -Regex ($err) {
-                "Access is denied" {
-                    write-host "! ERROR: Datto EDR Service could not be set to automatic StartupType due to tamper protection."
-                    Write-BetterErrorTrace $err
-                    Write-Host "  You may need to reinstall Datto EDR."
-                }
-                default { 
-                    Write-Host "  ERROR: Datto EDR Service could not be set to automatic StartupType: $err" 
-                    Write-Host "  You may need to reinstall Datto EDR."
-                }
-            }
-        }
-    }
-    return $true
+    #Delete Files
+    Write-Host "- Deleting EDR-related Files and Folders"
+    Get-ChildItem "$env:ProgramData\CentraStage*\AEMAgent\RMM.AdvancedThreatDetection\" -ea 0 | Get-ChildItem | Remove-Item -Recurse -Force
+    Get-ChildItem "$env:ProgramData\Datto\Datto Rollback Driver\" | Remove-Item -Recurse -Force
+    Get-ChildItem "$env:ProgramData\Datto\RWDWrapper*" | Remove-Item -Recurse -Force
+    Get-ChildItem "$env:ProgramData\kaseyaone\dattoEdr.json" | Remove-Item -Force
+
 }
 
 Function Get-EDRRegistry {
@@ -1015,156 +1015,160 @@ function Get-KaseyaOneConfig {
     return $Dattoedrjson
 }
 
+
+# Aggregate Functions
+
+
 # Sensative Function:
 
 #region ---Code--------------------------------------------------------------------------------------------------------------------------
 
-#region ---Pre-Checks
-
-Write-Host "`n"
-Write-Host "`n=============================================`n"
-Write-Host "- Datto EDR Installed Service Info"
-Write-Host "`n=============================================`n"
-
-# Checks if Datto EDR is Installed and Running
-$EDR_isInstalled = $false
-$EDR_isActive = $false
-
-# Get Datto EDR Service
-$EDRService = Get-ServiceInfo $EDR_SERVICE_NAME
-if ($EDRService) {
-    Write-Host "  Found EDR Service."
-    Write-FormattedObject $EDRService 
-    $EDR_isInstalled = $true
-
-    # Set Installation Directory to Root of Service
-    $DattoEDRInstallDirectory = $EDRService.ImageDirectory
-    Write-Host "  Datto EDR Installed to $DattoEDRInstallDirectory"
-    Write-Host `r
-
-    if ($EDRService.State -eq "Running") {
-
-        # Get Datto EDR Agent Processes from Service
-        if ($EDRService.ProcessId) {
-            Write-Host "-  Getting process information for the $EDR_SERVICE_NAME service's primary process (processId = $($EDRService.ProcessId))"
-            
-            $EDRServiceProcess = Get-ProcessInfo -Id $EDRService.ProcessId
-            if ($EDRServiceProcess) {
-                Write-Host "  Found EDR Process:"
-                Write-FormattedObject $EDRServiceProcess
-
-                $EDR_isActive = $true
-                
-            } else {
-                Write-Host "! ERROR: Primary process for $EDR_SERVICE_NAME is not running."
-                
-            }
-            
-            # Get EDR Version
-            if ($EDRServiceProcess.ProductVersion) {
-                [version]$EDRAgent_CurrVer = $($EDRServiceProcess.ProductVersion)
-                Write-Host "EDR Version (from Process's ProductVersion): $EDRAgent_CurrVer"
-            } else {
-                Write-Host "! NOTE: ProductVersion not available in Process Info. Might be a Windows version thing."
-            }
-            
-        } else {
-            Write-Host "  ProcessId was not present in the service info, service may not be running."
-        }
-    } else {
-        Write-Host "! NOTICE: EDR service present but not running."
-    }
+# ---Pre-Checks----------------------------------------------------------------------------------------------------------------------------
+if ($true) {
+    Write-Host "`n"
+    Write-Host "`n=============================================`n"
+    Write-Host "- Datto EDR Installed Service Info"
+    Write-Host "`n=============================================`n"
     
-} else {
-    Write-Host "! NOTICE: Could not find service '$EDR_SERVICE_NAME'. Datto EDR is NOT installed."
-    if ($BYPASS_SERVICE_CHECK) {
-        # Check for remnants or broken installs
-        Write-Host "  Bypass Service Check was enabled so continuing with diagnostic and other selected aactions.  Checking for remnants or broken installs."
-    } else {
-        Write-Host "!  Diagnostic not applicable. Exiting.  If you believe there are remnents or simply problems with the service, set the varBYPASS_SERVICE_CHECK variable to True and rerun the diagnostic."
-        exit 0
-    }
-}
-Write-Host `r
-
-Write-Host "`n"
-Write-Host "`n=============================================`n"
-Write-Host "- Active Datto EDR Agents"
-Write-Host "`n=============================================`n"
-
-
-# Get any EDR Agent processes:
-Write-Host "- Getting EDR Agent Processes with description $EDR_PROCESS_FRIENDLY_NAME"
-$procs = Get-Process | Where { $_.description -eq $EDR_PROCESS_FRIENDLY_NAME }
-Write-Host "  Found $($procs.count) active processes."
-if ($procs) {
-    $EDRProcesses = $procs | Get-ProcessInfo
-    $EDRProcesses | foreach { 
-        Write-FormattedObject $_; 
-    }
-}
-Write-Host `r
-
-
-Write-Host "`n"
-Write-Host "`n=============================================`n"
-Write-Host "- Datto EDR Module Config (kaseyaone\dattoedr.json)"
-Write-Host "  This file is written by EDR and tells other Kaseya modules what features are available and configured in Datto EDR."
-Write-Host "  While EDR is active, this file will be updated every two minutes."
-Write-Host "`n=============================================`n"
-
-# Get KaseyaOne dattoedr.json.  This file is written by EDR and tells other Kaseya modules what features are available and configured in Datto EDR.
-$Dattoedrjson =  Get-KaseyaOneConfig
-if ($Dattoedrjson) {
-    Write-FormattedObject $Dattoedrjson
-    $ts = [DateTime]$Dattoedrjson.timestamp
-
-    if ($EDRProcesses -AND [DateTime]$Dattoedrjson.timestamp -lt (Get-Date).AddMinutes(-10)) {
-        $EDR_isActive = $true
-
-    } elseif ($EDRProcesses -AND [DateTime]$Dattoedrjson.timestamp -gt (Get-Date).AddMinutes(-60)) {
-        # Active EDR Processes but EDR has not updated dattoedr.json
-        Write-Host "! POTENTIAL PROBLEM: Datto EDR Processes are running but dattoedr.json has not been updated in over an hours."
-        $EDR_isActive = $false
-
-    } elseif ([DateTime]$Dattoedrjson.timestamp -lt (Get-Date).AddDays(-1)) {
-        # Datto EDR datto.json not updated in over a day.
-        Write-Host "! POTENTIAL PROBLEM: dattoedr.json has not been updated in over 24 hours."
-        $EDR_isActive = $false
-    }
-    
-} else {
-    Write-Host "! ERROR: File Not Found. Service may not be active."
+    # Checks if Datto EDR is Installed and Running
+    $EDR_isInstalled = $false
     $EDR_isActive = $false
+    
+    # Get Datto EDR Service
+    $EDRService = Get-ServiceInfo $EDR_SERVICE_NAME
+    if ($EDRService) {
+        Write-Host "  Found EDR Service."
+        Write-FormattedObject $EDRService 
+        $EDR_isInstalled = $true
+    
+        # Set Installation Directory to Root of Service
+        $DattoEDRInstallDirectory = $EDRService.ImageDirectory
+        Write-Host "  Datto EDR Installed to $DattoEDRInstallDirectory"
+        Write-Host `n
+    
+        if ($EDRService.State -eq "Running") {
+    
+            # Get Datto EDR Agent Processes from Service
+            if ($EDRService.ProcessId) {
+                Write-Host "-  Getting process information for the $EDR_SERVICE_NAME service's primary process (processId = $($EDRService.ProcessId))"
+                
+                $EDRServiceProcess = Get-ProcessInfo -Id $EDRService.ProcessId
+                if ($EDRServiceProcess) {
+                    Write-Host "  Found EDR Process:"
+                    Write-FormattedObject $EDRServiceProcess
+    
+                    $EDR_isActive = $true
+                    
+                } else {
+                    Write-Host "! ERROR: Primary process for $EDR_SERVICE_NAME is not running."
+                    
+                }
+                
+                # Get EDR Version
+                if ($EDRServiceProcess.ProductVersion) {
+                    [version]$EDRAgent_CurrVer = $($EDRServiceProcess.ProductVersion)
+                    Write-Host "EDR Version (from Process's ProductVersion): $EDRAgent_CurrVer"
+                } else {
+                    Write-Host "! NOTE: ProductVersion not available in Process Info. Might be a Windows version thing."
+                }
+                
+            } else {
+                Write-Host "  ProcessId was not present in the service info, service may not be running."
+            }
+        } else {
+            Write-Host "! NOTICE: EDR service present but not running."
+        }
+        
+    } else {
+        Write-Host "! NOTICE: Could not find service '$EDR_SERVICE_NAME'. Datto EDR is NOT installed."
+        if ($varBypassInstallCheck) {
+            # Check for remnants or broken installs
+            Write-Host "  Bypass Service Check was enabled so continuing with diagnostic and other selected actions.  (Only useful if there are artifacts remaining without the service)."
+        } else {
+            Write-Host "!  Diagnostic not applicable. Exiting.  If you believe there are remnents or simply problems with the service, set the varBYPASS_SERVICE_CHECK variable to True and rerun the diagnostic."
+            exit 0
+        }
+    }
+    Write-Host `n
+    
+    Write-Host "`n"
+    Write-Host "`n=============================================`n"
+    Write-Host "- Active Datto EDR Agents"
+    Write-Host "`n=============================================`n"
+    
+    # Get any EDR Agent processes:
+    Write-Host "- Getting EDR Agent Processes with description $EDR_PROCESS_FRIENDLY_NAME"
+    $procs = Get-Process | Where { $_.description -eq $EDR_PROCESS_FRIENDLY_NAME }
+    Write-Host "  Found $($procs.count) active processes."
+    if ($procs) {
+        $EDRProcesses = $procs | Get-ProcessInfo
+        $EDRProcesses | foreach { 
+            Write-FormattedObject $_; 
+        }
+    }
+    Write-Host `n
+    
+    
+    Write-Host "`n"
+    Write-Host "`n=============================================`n"
+    Write-Host "- Datto EDR Module Config (kaseyaone\dattoedr.json)"
+    Write-Host "  This file is written by EDR and tells other Kaseya modules what features are available and configured in Datto EDR."
+    Write-Host "  While EDR is active, this file will be updated every two minutes."
+    Write-Host "`n=============================================`n"
+    
+    # Get KaseyaOne dattoedr.json.  This file is written by EDR and tells other Kaseya modules what features are available and configured in Datto EDR.
+    $Dattoedrjson =  Get-KaseyaOneConfig
+    if ($Dattoedrjson) {
+        Write-FormattedObject $Dattoedrjson
+        $ts = [DateTime]$Dattoedrjson.timestamp
+    
+        if ($EDRProcesses -AND $ts -lt (Get-Date).AddMinutes(-10)) {
+            $EDR_isActive = $true
+    
+        } elseif ($EDRProcesses -AND $ts -gt (Get-Date).AddMinutes(-60)) {
+            # Active EDR Processes but EDR has not updated dattoedr.json
+            Write-Host "! POTENTIAL PROBLEM: Datto EDR Processes are running but dattoedr.json has not been updated in over an hours."
+            $EDR_isActive = $false
+    
+        } elseif ($ts -lt (Get-Date).AddDays(-1)) {
+            # Datto EDR datto.json not updated in over a day.
+            Write-Host "! POTENTIAL PROBLEM: dattoedr.json has not been updated in over 24 hours."
+            $EDR_isActive = $false
+        }
+        
+    } else {
+        Write-Host "! ERROR: File Not Found. Service may not be active."
+        $EDR_isActive = $false
+    }
+    Write-Host `n
+    
+    Write-Host "`n"
+    Write-Host "`n=============================================`n"
+    Write-Host "- Datto EDR Version and Build Info"
+    write-Host "  Provide the raw output to Datto Support if you need an Offline Uninstall Key generated."
+    Write-Host "`n=============================================`n"
+    
+    # Get EDR Agent Version
+    if (-NOT $EDRAgent_CurrVer) {
+        [version]$EDRAgent_CurrVer = Get-EDRVersion
+    }
+    Write-host "  Current Datto EDR version: $EDRAgent_CurrVer"
+    Write-Host `n
+    
+    $EDRAgent_CurrVer_raw = Get-EDRVersion -raw
+    if ($EDRAgent_CurrVer_raw) {
+        Write-Host "EDR Raw Version and Build Output:"
+        Write-FormattedObject $EDRAgent_CurrVer_raw
+    }
+    Write-Host `n
 }
-Write-Host `r
-
-Write-Host "`n"
-Write-Host "`n=============================================`n"
-Write-Host "- Datto EDR Version and Build Info"
-write-Host "  Provide this output to Datto Support if you need an Offline Uninstall Key generated."
-Write-Host "`n=============================================`n"
-
-# Get EDR Agent Version
-if (-NOT $EDRAgent_CurrVer) {
-    [version]$EDRAgent_CurrVer = Get-EDRVersion
-}
-Write-host "  Current Datto EDR version: $EDRAgent_CurrVer"
-Write-host `r
-
-$EDRAgent_CurrVer_raw = Get-EDRVersion -raw
-if ($EDRAgent_CurrVer_raw) {
-    Write-Host "EDR Version and Build Output:"
-    Write-FormattedObject $EDRAgent_CurrVer_raw
-}
-Write-host `r
 
 
-# -------------------------------------------------------------------------------------------------------------
-if ($Diagnostic) {
+# ---Diagnostic----------------------------------------------------------------------------------------------------------------------------
+if ($varDiagnostic) {
 
     Write-Host "- Running Full EDR Endpoint Diagnostic"
-    Write-Host `r
+    Write-Host `n
 
     # Get System Info
     Write-Host "`n=============================================`n"
@@ -1173,12 +1177,21 @@ if ($Diagnostic) {
 
     $SystemInfo = systeminfo
     Write-FormattedObject $SystemInfo
-    Write-Host `r
+
+    $osInfo = Get-CimInstance -ClassName Win32_OperatingSystem | select ProductType -ExpandProperty ProductType
+    $OSType = SWITCH ($osInfo) {
+        1 { "Workstation" }
+        2 { "Domain Controller" }
+        3 { "Server" }
+        DEFAULT { "Workstation" }
+    }
+    Write-Host "  System Type: $OSType"
+    Write-Host `n
 
     # Get Timezone
     $tz = Get-TimeZone -ea Continue | select DisplayName -ExpandProperty DisplayName
     Write-Host "  TIMEZONE: $tz"
-    Write-Host `r
+    Write-Host `n
 
 
     Write-Host "`n"
@@ -1191,20 +1204,23 @@ if ($Diagnostic) {
     Write-Host "-------------------------------------------------------------------"
     Write-Host (Get-ChildItem $DattoEDRInstallDirectory | Out-String)
     Write-Host "-------------------------------------------------------------------`n"
-    Write-Host `r
+    Write-Host `n
     
     # Get EDR Config from File
     $Config = Get-EDRConfigToml
     if ($Config) {
+        
         Write-FormattedObject ($config | Select-Object -ExcludeProperty TomlRaw)
-        Write-Host "`rRaw Unparsed config.toml:"
+        Write-Host `n
+        Write-Host "Raw Unparsed config.toml:"
         Write-FormattedObject ($Config.TomlRaw)
+        
         # Potential Issue: Ignore Versioning is On
         if ($Config.'ignore-versioning' -eq "true") {
             Write-Host "!  WARNING: ignore-versioning is turned on. Datto EDR Agent could not update with this setting in place. This setting is used for testing only."
         }
     }
-    Write-Host `r
+    Write-Host `n
     
     # Get EDR Config from Registry
     $EDRRegistry = Get-EDRRegistry
@@ -1214,7 +1230,7 @@ if ($Diagnostic) {
     
         Write-FormattedObject $EDRRegistry
     }
-    Write-Host `r
+    Write-Host `n
 
     
     Write-Host "`n"
@@ -1223,18 +1239,24 @@ if ($Diagnostic) {
     Write-Host "`n=============================================`n"
 
     # Active AV from Security Center
-    Write-Host "-  Getting Installed AVs Registered with Microsoft Windows Security Center:"
-    $ActiveAV = Get-CimInstance -Namespace root\SecurityCenter2 -ClassName AntivirusProduct
-    if ($ActiveAV) {
-        $ActiveAV | foreach {
-            Write-FormattedObject $_
+    if ($OSType -eq "Server" -OR $OSType -eq "Domain Controller") {
+        # SecurityCenter is not supported on Servers and Datto EDR/AV does not register to Win32_Product so this might not be useful
+        #$ActiveAV = Get-WMIObject -Class "Win32_Product" -NameSpace "root\cimv2" -ComputerName "." -filter "Name like '%antivirus%'"
+    } else {    
+        Write-Host "-  Getting Installed AVs Registered with Microsoft Windows Security Center:"
+        $ActiveAV = Get-CimInstance -Namespace root\SecurityCenter2 -ClassName AntivirusProduct
+        if ($ActiveAV) {
+            $ActiveAV | foreach {
+                Write-FormattedObject $_
+            }
         }
-        
-    }
-    Write-Host `r
+        Write-Host `n
+    }    
 
     if ($Dattoedrjson.dattoAv) {
-
+        $AV_isInstalled = $false
+        $AV_isActive = $false
+        
         Write-Host "  Datto EDR is configured to deploy and manage Datto AV"
 
         # Get Datto AV Service
@@ -1251,7 +1273,13 @@ if ($Diagnostic) {
         } else {
             Write-Host "! ERROR: Could not find $AV_SERVICE_NAME2"
         }
-        Write-Host `r 
+        if ($AVService -OR $AVService2) { 
+            $AV_isInstalled = $true
+        }
+        if ($AVService.State -eq "Running" -OR $AVService2.State -eq "Running") {
+            $AV_isActive = $true
+        }
+        Write-Host `n 
 
 
         # Get Datto AV process:
@@ -1266,7 +1294,7 @@ if ($Diagnostic) {
         } else {
             Write-Host "! NOTICE: Did not find any processes with name $($AV_PROCESS_NAME)"
         }
-        Write-host `r
+        Write-Host `n
 
 
         # Get Datto AV AppSettings
@@ -1287,7 +1315,7 @@ if ($Diagnostic) {
         } else {
             Write-Host "! WARNING: Datto AV AppSettings file does not exist at $AppSettingsPath"
         }
-        Write-Host `r
+        Write-Host `n
 
 
     } elseif ($Dattoedrjson.managedWinDefAntivirus) {
@@ -1304,7 +1332,7 @@ if ($Diagnostic) {
     } else {
         Write-Host "! WARNING: No Antivirus is configured to be managed by Datto EDR"
     }
-    Write-Host `r
+    Write-Host `n
 
     Write-Host "`n"
     Write-Host "`n=============================================`n"
@@ -1335,7 +1363,7 @@ if ($Diagnostic) {
     } else {
         Write-Host "  Ransomware Detection is not enabled in EDR."
     }
-    Write-Host `r
+    Write-Host `n
 
 
     Write-Host "`n"
@@ -1367,7 +1395,7 @@ if ($Diagnostic) {
         } else {
             Write-Host "! NOTICE: Could not find service '$RBService'. Ransomware Rollback is not installed."
         }
-        Write-Host `r 
+        Write-Host `n 
 
         
         # Get Rollback Processes:
@@ -1380,14 +1408,14 @@ if ($Diagnostic) {
         }
         if ($RBProcesses) {
             Write-Host "  Found $(([Object[]]$RBProcesses).count) processes"
-            $RBProcesses | foreach { Write-FormattedObject $_; Write-Host `r }
+            $RBProcesses | foreach { Write-FormattedObject $_; Write-Host `n }
         } else {
             Write-host "  NO RESULTS"
         }
     } else {
         Write-Host "  Ransomware Rollback Policy is not enabled in EDR."
     }
-    Write-Host `r
+    Write-Host `n
 
 
     Write-Host "`n"
@@ -1395,13 +1423,13 @@ if ($Diagnostic) {
     Write-Host "- Known Problem Detection Routines"
     Write-Host "`n=============================================`n"
 
-    if ($EDRService.State -eq "Running" -AND $Dattoedrjson.timestamp -lt (Get-Date).AddMinutes(-60)) {
+    if ($EDRService.State -eq "Running" -AND [DateTime]$Dattoedrjson.timestamp -lt (Get-Date).AddMinutes(-60)) {
         Write-Host "! POTENTIAL PROBLEM: Datto EDR is running but has not updated the DattoEDR.JSON file in over an hour (should be every two minutes)"
         Write-Host "  This file lets Datto RMM know what services and configurations should be on the system to aid in RMM service monitoring."
         Write-Host "  Service Monitoring in RMM will be impacted by this issue.  Please reach out to support to let them know about this issue."
     }
 
-    if ($EDRService.State -eq "Running" -AND $Dattoedrjson.timestamp -gt (Get-Date).AddMinutes(-60)) {
+    if ($EDRService.State -eq "Running" -AND [DateTime]$Dattoedrjson.timestamp -gt (Get-Date).AddMinutes(-60)) {
         # EDR is active and updating DattoEDR.JSON... so lets check some settings.
         Write-Host "- Checking for mismatches with the reported modules in DattoEDR.JSON."
 
@@ -1432,7 +1460,7 @@ if ($Diagnostic) {
         }
 
     }
-    Write-Host `r
+    Write-Host `n
 
     # Find problems with EDR Processes
     Write-Host "- Checking for Old EDR Agents or EDR Agent version mismatches."
@@ -1443,7 +1471,7 @@ if ($Diagnostic) {
                 Write-Host "! POTENTIAL PROBLEM: Process Id $($process.ProcessId) ($($process.name)) is running a mismatched version of the EDR Agent.  Service Agent is $EDRAgent_CurrVer while this process is $($process.ProductVersion)."
             }
         } else {
-            # ToDO: Call --version on the file.
+            # ToDO: Call --version on that file.
             if ($Process.Path) {
                 $Version =  Get-EDRVersion -Path $process.Path
                 if ($EDRAgent_CurrVer -ne $Version) {
@@ -1471,9 +1499,10 @@ if ($Diagnostic) {
     if ($RBProcesses.count -gt 1) {
         Write-Host "! POTENTIAL PROBLEM: Multiple RAnsomware Rollback Processes ($($RBProcess.Name)) running. There should only be one."
     }
-    Write-Host `r
+    Write-Host `n
 
-    # Un-updated RMM Installers       
+
+    # Out of Date RMM Installers       
     Write-Host "- Checking for Rogue RMM Datto EDR Installer Processes"
     $EDRInstallerProcesses = $EDRProcesses | where { $_.Name -match "rmm.AdvancedThreatDetection" }
     if ($EDRInstallerProcesses) {
@@ -1481,7 +1510,19 @@ if ($Diagnostic) {
         Write-Host "  RMM downloads and executes this process but it will end and be renamed agent.exe following successful Install."
         Write-FormattedObject $EDRInstallerProcesses
     }
-    Write-Host `r
+    # Find RMM Installers
+    $InstallerFiles = Get-ChildItem "$env:ProgramData\CentraStage*\AEMAgent\RMM.AdvancedThreatDetection\RMM.AdvancedThreatDetection.exe" -ea 0 
+    if ($InstallerFiles) {
+        Write-Host "Found RMM.AdvancedThreatDetection.exe files:"
+        Write-FormattedObject $InstallerFiles
+        $InstallerFiles | foreach {
+            $ver = Get-EDRVersion -Path $_.FullName -raw
+            Write-FormattedObject $ver
+        }
+    } else {
+        Write-Host "  Did not find any EDR installer files $env:ProgramData\CentraStage*\AEMAgent\RMM.AdvancedThreatDetection\RMM.AdvancedThreatDetection.exe"
+    }
+    Write-Host `n
 
     
     if ($EDRService) {
@@ -1508,21 +1549,21 @@ if ($Diagnostic) {
             Write-BetterErrorTrace -Err $err
         }
     }
-    Write-Host `r
+    Write-Host `n
 
     <#
         # Check all possible folders for files:
         Write-Host "- Getting a list of other possible files associated to Datto EDR:"
         try {
             $Files = Get-ChildItem "$((Get-ItemProperty "HKLM:\SOFTWARE\CentraStage" -Name "AgentFolderLocation" -ea stop).AgentFolderLocation)\AEMAgent\RMM.AdvancedThreatDetection" -Depth 5 -include *.exe, *.config
-            $Files += Get-ChildItem "$env:ProgramData\CentraStage*\AEMAgent\RMM.AdvancedThreatDetection" -Depth 5 -include *.exe, *.config | where { $Files.FullPath -notcontains $_.FullPath }
-            $Files += Get-ChildItem "$env:ProgramFiles\Infocyte\" -Depth 5 -include *.exe, *.config | where { $Files.FullPath -notcontains $_.FullPath }
-            $Files += Get-ChildItem "$env:ProgramFiles\Datto\Datto Rollback Driver\" -Depth 5 -include *.exe, *.config | where { $Files.FullPath -notcontains $_.FullPath }
-            $Files += $EDRService | foreach { Get-Item $_.ImagePath -ea 0 | where { $Files.FullPath -notcontains $_.FullPath }}
-            $Files += $EDRProcesses | foreach { Get-Item $_.ImagePath -ea 0 | where { $Files.FullPath -notcontains $_.FullPath }}
-            $Files += $AVProcesses | foreach { Get-Item $_.ImagePath -ea 0 | where { $Files.FullPath -notcontains $_.FullPath }}
-            $Files += $RWDProcesses | foreach { Get-Item $_.ImagePath -ea 0 | where { $Files.FullPath -notcontains $_.FullPath }}
-            $Files += $RBProcesses | foreach { Get-Item $_.ImagePath -ea 0 | where { $Files.FullPath -notcontains $_.FullPath }}
+            $Files += Get-ChildItem "$env:ProgramData\CentraStage*\AEMAgent\RMM.AdvancedThreatDetection" -Depth 5 -include *.exe, *.config | where { $Files.FullName -notcontains $_.FullName }
+            $Files += Get-ChildItem "$env:ProgramFiles\Infocyte\" -Depth 5 -include *.exe, *.config | where { $Files.FullName -notcontains $_.FullName }
+            $Files += Get-ChildItem "$env:ProgramFiles\Datto\Datto Rollback Driver\" -Depth 5 -include *.exe, *.config | where { $Files.FullName -notcontains $_.FullName }
+            $Files += $EDRService | foreach { Get-Item $_.ImagePath -ea 0 | where { $Files.FullName -notcontains $_.FullName }}
+            $Files += $EDRProcesses | foreach { Get-Item $_.ImagePath -ea 0 | where { $Files.FullName -notcontains $_.FullName }}
+            $Files += $AVProcesses | foreach { Get-Item $_.ImagePath -ea 0 | where { $Files.FullName -notcontains $_.FullName }}
+            $Files += $RWDProcesses | foreach { Get-Item $_.ImagePath -ea 0 | where { $Files.FullName -notcontains $_.FullName }}
+            $Files += $RBProcesses | foreach { Get-Item $_.ImagePath -ea 0 | where { $Files.FullName -notcontains $_.FullName }}
             Write-FormattedObject $Files
         } catch {
             Write-Host 
@@ -1530,7 +1571,8 @@ if ($Diagnostic) {
     #>
 }
 
-if ($varGetLogSnips) {
+# ---Log Snips-----------------------------------------------------------------------------------------------------------------------------
+if ($varDiagnostic) {
 
 
     Write-Host "`n"
@@ -1538,10 +1580,14 @@ if ($varGetLogSnips) {
     Write-Host "- Gather Snippet of Latest EDR Logs"
     Write-Host "`n=============================================`n"
 
-
+    if ($Config.'log-dir') {
+        $EDRLogDir = $($Config.'log-dir')
+    } else {
+        $EDRLogDir = "$DattoEDRInstallDirectory\logs"
+    }
     # Get Latest EDR Logs
     Write-Host "-  Getting List of Available EDR Log Files: "
-    $log_files = Get-ChildItem "$($Config.'log-dir')" -Include *.log -ea 0 | Sort-Object LastWriteTimeUtc | select LastWriteTimeUtc, FullName, Length
+    $log_files = Get-ChildItem $EDRLogDir -Include *.log -ea 0 | Sort-Object LastWriteTimeUtc | select LastWriteTimeUtc, FullName, Length
     if ($log_files) {
         # Print available log EDR Log files
         Write-FormattedObject ($log_files | sort-object LastWriteTimeUtc)
@@ -1551,13 +1597,13 @@ if ($varGetLogSnips) {
             Write-Host "!  NOTE: No EDR Log file was written to in the last 24 hours. May not have been active."
         }
     } else {
-        Write-Host "! WARNING: No logs were found in $($Config.'log-dir')\"
+        Write-Host "! WARNING: No logs were found in $EDRLogDir\"
     }
-    write-host `r
+    Write-Host `n
 
 
     # Last Agent Logs
-    $LastAgentLog = Get-ChildItem "$($Config.'log-dir')\agent*" -Include *.log -ea 0 | Sort-Object LastWriteTimeUtc | select -Last 1
+    $LastAgentLog = Get-ChildItem "$EDRLogDir\agent*" -Include *.log -ea 0 | Sort-Object LastWriteTimeUtc | select -Last 1
     if ($LastAgentLog) {
 
         Write-Host "-  Getting Errors from latest agent log:"
@@ -1566,37 +1612,37 @@ if ($varGetLogSnips) {
         $logs = Convertto-ShortenedEDRLogs $logs
         Write-FormattedObject $logs
 
-        WRite-Host "-  Getting Last 30 Lines from latest Agent Log:"
-        $logs = $LastAgentLog | get-content -Tail 30 
+        WRite-Host "-  Getting Last $varLogLines Lines from latest Agent Log:"
+        $logs = $LastAgentLog | get-content -Tail $varLogLines
         $logs = Convertto-ShortenedEDRLogs $logs0
         Write-FormattedObject $logs
         
     } else {
-        Write-Host "! NOTE: No agent logs were found in $($Config.'log-dir')\"
+        Write-Host "! NOTE: No agent logs were found in $EDRLogDir\"
     }
-    write-host `r
+    Write-Host `n
 
 
     # Last Update Logs
-    $LastAgentUpdateLog = Get-ChildItem "$($Config.'log-dir')\update*" -Include *.log -ea 0 | Sort-Object LastWriteTimeUtc | select -Last 1
+    $LastAgentUpdateLog = Get-ChildItem "$EDRLogDir\update*" -Include *.log -ea 0 | Sort-Object LastWriteTimeUtc | select -Last 1
     if ($LastAgentUpdateLog) {
 
         Write-Host "-  Getting Errors from latest agent update log:"
         Write-Host "  $LastAgentUpdateLog"
         $logs = $null
-        $logs = $Logs_EDRupdate | get-content | Select-String "(ERR|error|failed|could not)"
+        $logs = $LastAgentUpdateLog | get-content | Select-String "(ERR|error|failed|could not)"
         $logs = Convertto-ShortenedEDRLogs $logs
         Write-FormattedObject $logs
 
-        WRite-Host "-  Getting Last 30 Lines from latest agent update Log:"
-        $logs = $LastAgentUpdateLog | get-content -Tail 30
+        WRite-Host "-  Getting Last $varLogLines Lines from latest agent update Log:"
+        $logs = $LastAgentUpdateLog | get-content -Tail $varLogLines
         $logs = Convertto-ShortenedEDRLogs $logs
         Write-FormattedObject $logs
             
     } else {
-        Write-Host "! NOTE: No agent update logs were found in $($Config.'log-dir')\"
+        Write-Host "! NOTE: No agent update logs were found in $EDRLogDir\"
     }
-    write-host `r
+    Write-Host `n
 
 
     Write-Host "`n"
@@ -1617,13 +1663,13 @@ if ($varGetLogSnips) {
             Write-Host "!  NOTE: No EDR Log file was written to in the last 24 hours. May not have been active."
         }
     } else {
-        Write-Host "! WARNING: No logs were found in $($Config.'log-dir')\"
+        Write-Host "! WARNING: No logs were found in $EDRLogDir\"
     }
-    write-host `r
+    Write-Host `n
 
 
     # Last Datto EDR AV Interface Logs
-    $LastAgentLog = Get-ChildItem "$($Config.'log-dir')\datto-av-*" -ea 0 | Sort-Object LastWriteTimeUtc | select -Last 1
+    $LastAgentLog = Get-ChildItem "$EDRLogDir\datto-av-*" -ea 0 | Sort-Object LastWriteTimeUtc | select -Last 1
     if ($LastAgentLog) {
 
         Write-Host "-  Getting Errors from latest agent log:"
@@ -1633,29 +1679,29 @@ if ($varGetLogSnips) {
         $logs = Convertto-ShortenedEDRLogs $logs
         Write-FormattedObject $logs
 
-        WRite-Host "-  Getting Last 30 Lines from latest Agent Log:"
-        $logs = $LastAgentLog | get-content -Tail 30 
+        WRite-Host "-  Getting Last $varLogLines Lines from latest Agent Log:"
+        $logs = $LastAgentLog | get-content -Tail $varLogLines 
         $logs = Convertto-ShortenedEDRLogs $logs
         Write-FormattedObject $logs
         
     } else {
-        Write-Host "! NOTE: No agent logs were found in $($Config.'log-dir')\"
+        Write-Host "! NOTE: No agent logs were found in $EDRLogDir\"
     }
-    write-host `r
+    Write-Host `n
 
     # AV EndpointProtectionService Log Errors
     Write-Host "- Getting AV EndpointProtectionService Log Errors"
     $EndpointProtectionServiceLogs = Get-ChildItem "$AV_DATA_PATH\logs\EndpointProtectionService*" -ea 0
     if ($EndpointProtectionServiceLogs) {
         $EndpointProtectionServiceLogs | foreach {
-            Write-Host "- Getting Error Logs from $($_.FullPath)"
+            Write-Host "- Getting Error Logs from $($_.FullName)"
             $logs = Get-Content $_ | select-string "(\[(WARN|ERRO?R?)\])" 
             Write-FormattedObject $logs
         }
     } else {
         Write-Host "! NOTE: No endpointprotectionservice logs were found in $AV_DATA_PATH\logs\"
     }
-    Write-Host `r
+    Write-Host `n
 
 
     <# There are really not useful
@@ -1693,15 +1739,15 @@ if ($varGetLogSnips) {
     } else {
         Write-Host "! NOTE: Could not find Ransomware Rollback Log $RBDataPath\Logs\wrapper.log"
     }
-    Write-Host `r
+    Write-Host `n
 
 }
 
 
 #region Actions
 
-
-if ($FixKnownIssues) {
+# ---ACTION: Fix Known Issues--------------------------------------------------------------------------------------------------------------
+if ($action_FixKnownIssues) {
     Write-Host "`n"
     Write-Host "`n=============================================`n"
     Write-Host "- Fix Rogue EDR Installer Problem"
@@ -1798,8 +1844,8 @@ if ($FixKnownIssues) {
     Start-Service -Name $EDR_SERVICE_NAME -ea Continue
 }
 
-
-if ($RestartService) {
+# ---ACTION: Restart Service---------------------------------------------------------------------------------------------------------------
+if ($action_RestartService) {
 
     Write-Host "`n"
     Write-Host "`n=============================================`n"
@@ -1814,7 +1860,8 @@ if ($RestartService) {
     }
 }
 
-if ($StopService) {
+# ---ACTION: Stop Service------------------------------------------------------------------------------------------------------------------
+if ($action_StopService) {
 
     Write-Host "`n"
     Write-Host "`n=============================================`n"
@@ -1829,8 +1876,8 @@ if ($StopService) {
     }
 }
 
-
-if ($UninstallEDR) {
+# ---ACTION: Force Uninstall---------------------------------------------------------------------------------------------------------------
+if ($action_UninstallEDR) {
 
 
     Write-Host "`n"
@@ -1838,7 +1885,7 @@ if ($UninstallEDR) {
     Write-Host "- Uninstall Datto EDR"
     Write-Host "`n=============================================`n"
 
-    [Boolean]$result = Uninstall-EDR -UninstallToken $UninstallToken
+    [Boolean]$result = Uninstall-EDR -UninstallToken $varUninstallToken
     if ($result) {
         exit 0
     } else {
