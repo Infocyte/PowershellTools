@@ -29,18 +29,12 @@ New-Module -name install_dattoedr -scriptblock {
 
 		#>
 		param(
-			[Parameter(Mandatory=$true, Position = 0, HelpMessage="The cname from the URL: https://<instancename>.infocyte.com)")]
-			[String]$InstanceName,
+			[Parameter(Mandatory=$true, Position = 0, HelpMessage="The API URL or cname from the URL: https://<instancename>.infocyte.com or https://<instancename>.<region>.infocyte.com)")]
+			[Alias("InstanceName")]
+			[String]$URL,
 
 			[Parameter(Position = 1, HelpMessage="This will automatically approve the agent registration and add it to its' default Target Group.")]
 			[String]$RegKey,
-
-			[Parameter(HelpMessage="ap or eu")]
-			[ValidateSet("us", "ap", "eu")]
-			[String]$Region="us",
-
-			[Parameter(HelpMessage="Explicit URL to the Datto EDR API. Overrides InstanceName and Region parameters")]
-			[String]$URL,
 
 			[Parameter(HelpMessage="Will register a name for the system. Otherwise will use the hostname.")]
 			[String]$FriendlyName,
@@ -58,7 +52,7 @@ New-Module -name install_dattoedr -scriptblock {
 			[Switch]$Force
 		)
 
-		$LogPath = "$env:SystemDrive\windows\Temp\agentinstallscript.log"
+		$LogPath = "$env:Temp\agentinstallscript.log"
 		if ([System.IntPtr]::Size -eq 4) {
 			$agentURL = "https://s3.us-east-2.amazonaws.com/infocyte-support/executables/agent.windows32.exe"
 		} else {
@@ -66,9 +60,9 @@ New-Module -name install_dattoedr -scriptblock {
 		}
 		
 		
-		If (-NOT $InstanceName -AND -NOT $URL) {
-			Write-Warning "[Error] Please provide Datto EDR instance name (i.e. mycompany in mycompany.infocyte.com) or a URL parameter"
-			"$(Get-Date) [Error] Installation Error: No InstanceName or URL parameter provided in arguments!" >> $LogPath
+		If (-NOT $URL) {
+			Write-Warning "[Error] Please provide Datto EDR URL or instance name (i.e. mycompany in mycompany.infocyte.com) or a full URL to your EDR instance."
+			"$(Get-Date) [Error] Installation Error: No InstanceName or URL provided in arguments!" >> $LogPath
 			return
 		}
 
@@ -78,22 +72,25 @@ New-Module -name install_dattoedr -scriptblock {
 			return
 		}
 
-		if ($URL) {
-			if ($URL -match "https://.*\.infocyte\.com/?") {
+		if ($URL -match "https://.*?\.infocyte\.com/?") {
 				$hunturl = $URL.TrimEnd('/')
-			} else {
-
-			}
+		} elseif ($URL -match "\.infocyte\.com/?") {
+			$hunturl = "https://$($URL.TrimEnd('/'))"
+		} elseif ($URL -notmatch "([:\\/-]|.com)") {
+			$hunturl = "https://$URL.infocyte.com"
 		} else {
-			if ($Region -eq "us") {
-				$hunturl = "https://$InstanceName.infocyte.com"
-			} else {				
-				$hunturl = "https://$InstanceName.$region.infocyte.com"
-			}
+			if ($Interactive) { Write-Error "Could not parse instance name or url correctly: $hunturl" }
+			"$(Get-Date) [Error] Could not parse instance name or url correctly: $URL" >> $LogPath
 		}
-		if ($Interactive) { Write-Host "Installing with URL: $hunturl" }
-		"$(Get-Date) [Information] Installing with URL: $hunturl" >> $LogPath
 
+		if ([Uri]::IsWellFormedUriString($hunturl, [URIKind]::RelativeOrAbsolute)) {
+			if ($Interactive) { Write-Host "Installing with URL: $hunturl" }
+			"$(Get-Date) [Information] Installing with URL: $hunturl" >> $LogPath
+		} else {
+			if ($Interactive) { Write-error "URL is invalid: $hunturl" }
+			"$(Get-Date) [Error] URL is invalid: $hunturl" >> $LogPath
+		}
+		
 
 		If (Get-Service -name huntAgent -ErrorAction SilentlyContinue) {
 			if (-NOT $Force) {
@@ -149,7 +146,7 @@ New-Module -name install_dattoedr -scriptblock {
 		} catch {
 			if ($Interactive) { Write-Warning "Hash Error. $_" }
 			$sha1 = "Hashing Error"
-			#"$(Get-Date) [Warning] Installation Warning: Could not hash agent.survey.exe." >> $LogPath
+			"$(Get-Date) [Warning] Installation Warning: Could not hash agent.survey.exe." >> $LogPath
 		}
 
 		# Setup exe arguments
@@ -163,8 +160,12 @@ New-Module -name install_dattoedr -scriptblock {
 
 		$version = & "$DownloadPath" --version
 		if ($version -notmatch "RTS Agent") {
-			if ($Interactive) { Write-Warning "$(Get-Date) [Error] $DownloadPath (version: $version, sha1: $sha1) is not valid or appears to be corrupt." }
+			if ($Interactive) { 
+				Write-Warning "$(Get-Date) [Error] $DownloadPath (version: $version, sha1: $sha1) is not valid or appears to be corrupt." 
+				Write-Warning "Output: `n$version"
+			}
 			"$(Get-Date) [Error] $DownloadPath (version: $version, sha1: $sha1) is not valid or appears to be corrupt." >> $LogPath
+			"$(Get-Date) [Error] Output: `n$version" >> $LogPath
 		}
 
 		if ($Interactive) { Write-Host "$(Get-Date) [Information] Downloaded agent.windows.exe (version: $version, sha1: $sha1) from $agentURL" }
@@ -173,8 +174,8 @@ New-Module -name install_dattoedr -scriptblock {
 		# Execute!
 		try {
 			Start-Process -NoNewWindow -FilePath $DownloadPath -ArgumentList $arguments -Wait -ErrorAction Stop
-			if ($Interactive) { Write-Host "$(Get-Date) [Success] Installation Succeeded! Agent associated to $InstanceName." }
-			"$(Get-Date) [Success] Installation Succeeded! Agent associated to $InstanceName." >> $LogPath
+			if ($Interactive) { Write-Host "$(Get-Date) [Success] Installation Succeeded! Agent associated to $URL." }
+			"$(Get-Date) [Success] Installation Succeeded! Agent associated to $URL." >> $LogPath
 
 			#& $DownloadPath $arguments
 		} catch {

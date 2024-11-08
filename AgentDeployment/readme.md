@@ -1,34 +1,31 @@
-## Infocyte Agent Scripted Installer (One Line Powershell)
+## Datto EDR Agent Scripted Installer (One Line Powershell)
 **Platform:** Microsoft Windows 7+ or Server 2008+\
 **Powershell Version:** 2.0+\
 **.NET Version:** 4.8+
 
-The following command is all you need.  Run it on any windows system and it will download this script and execute it.  This is useful for scripted software distribution, sccm, or GPO deployments in leu of an MSI.  The script will manage an automated installation process for the HUNT agent.  *IMPORTANT: You DO NOT need to download this script. Leave it here unless you want to host it yourself.*
+The following command is all you need.  Run it on any windows system and it will download this script and execute it.  This is useful for scripted software distribution, sccm, or GPO deployments in leu of an MSI.  The script will manage an automated installation process for the Datto EDR agent.  *IMPORTANT: You DO NOT need to download this script. Leave it here unless you want to host it yourself.*
 
-To execute this script on a windows host, run this command replacing `<instancename>` and `[regkey]` with your hunt instance \<mandatory\> and registration key [optional]. Do not include the brackets.
-
-
-> `[System.Net.ServicePointManager]::SecurityProtocol = [Enum]::ToObject([System.Net.SecurityProtocolType], 3072); (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; installagent <instancename> [regkey]`
+To execute this script on a windows host, run this command replacing `<url>` with your EDR instance's url \<mandatory\> and any optional arguments like registration key `[regkey]`.  
+IMPORTANT: Do not include the brackets.
 
 
-#### The positional arguments after the command *installagent* are:  
-* **(1st Argument) \<Mandatory\>:** `-InstanceName instancename`
+> `[System.Net.ServicePointManager]::SecurityProtocol = [Enum]::ToObject([System.Net.SecurityProtocolType], 3072); (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; Install-EDR <url> [regkey]`
+
+
+#### The positional arguments after the command *Install-EDR* are:  
+* **(1st Argument) \<Mandatory\>:** `-url https://alpo1.infocyte.com` (urls formated like `alpo1.infocyte.com` or even just the cname `alpo1` also work here)
 * **(2nd Argument) [Optional]:** `-RegKey regkey`
 
-Instance Name (*instancename*) is your cname from the URL, not the FULL url https://instancename.infocyte.com).
+Registration Key (*regkey*) is created in the Agent Admin panel. This will automatically approve the agent registration and add it to its' associated org and location instead of the default one.
 
-Registration Key (*regkey*) is created in the Agent Admin panel. This will automatically approve the agent registration and add it to its' default Target Group. Without it, the agent will initially report as "pending" in the web console and cannot be used until approved.
+Note: *Url* (1) and *RegKey* (2) are positional arguments so they don't require argument headers if in position 1 and 2 after `Install-EDR`.
 
-Note: *InstanceName* (1) and *RegKey* (2) are positional arguments so they don't require argument headers if in position 1 and 2 after `installagent`.
+### Example 1 (instancename only - Installing to demo1.infocyte.com with no registration key):  
+> `(new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; Install-EDR https://demo1.infocyte.com`
 
-### Example 1 (instancename only - Installing to demo1.infocyte.com):  
-> `[System.Net.ServicePointManager]::SecurityProtocol = [Enum]::ToObject([System.Net.SecurityProtocolType], 3072);
-(new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex;
-installagent demo1`
-
-### Example 2 (For use in batch or GPO - Installing to alpo1.infocyte.com):
+### Example 2 (For use in batch or GPO - Installing to demo1.infocyte.com with registration key 'xregkey01'):
 If running from outside Powershell (like in a batch or GPO install script):
-> `powershell.exe -ExecutionPolicy bypass -noprofile -nologo -command { [System.Net.ServicePointManager]::SecurityProtocol = [Enum]::ToObject([System.Net.SecurityProtocolType], 3072); (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; installagent alpo1 }`
+> `powershell.exe -ExecutionPolicy bypass -noprofile -nologo -command { (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; Install-EDR https://demo1.infocyte.com xregkey01 }`
 
 ---
 
@@ -43,7 +40,7 @@ If running from outside Powershell (like in a batch or GPO install script):
 Silent run is default so if you want to troubleshoot or check out what is happening, check the log file or run the command in interactive mode:  Add *-Interactive* to the end of the command.
 
 In either mode, the output/log can be read here:
-> `Get-Content "C:\Windows\Temp\infocyteagentinstaller.log"`
+> `Get-Content "$env:Temp\agentinstallscript.log"`
 
 ##### Proxy Configuration:
 * Authenticated: *-Proxy "\<user\>:\<password\>@\<ProxyAddress\>:\<ProxyPort\>"*
@@ -57,12 +54,10 @@ Use *-FriendlyName* to add a descriptive name for the system (otherwise it uses 
 
 
 ### Example 3 (using named arguments):  
-> `[System.Net.ServicePointManager]::SecurityProtocol = [Enum]::ToObject([System.Net.SecurityProtocolType], 3072);
-(new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex;
-installagent -InstanceName "demo1" -RegKey "asdfasdf" -FriendlyName "DBServer1" -Proxy "user:password@192.168.1.1:8080" -Interactive`
+> `(new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; Install-EDR -url https://alpo1.infocyte.com -regkey "asdfasdf" -friendlyname "DBServer01" -Proxy "user:password@192.168.1.1:8080" -Interactive`
 
 
 ## Uninstall One-Liner
 This script also includes an uninstallagent command:
 
-> `[System.Net.ServicePointManager]::SecurityProtocol = [Enum]::ToObject([System.Net.SecurityProtocolType], 3072); (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; uninstallagent`
+> `(new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; Uninstall-EDR`
