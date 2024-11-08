@@ -3,13 +3,13 @@ New-Module -name install_dattoedr -scriptblock {
 	# www.datto.com
 
 	# WARNING: Single line scripted installers like this use similiar techniques to modern staged malware.
-	# As a result, this script will likely trigger behavioral detection products and may need to be whitelisted.
+	# As a result, this script will likely trigger behavioral detection products and may need to be whitelisted by your current security software.
 
 	# To execute this script as a one liner on a windows host with powershell 3.0+ (.NET 4.5+), run this command replacing instancename and key with your hunt instance <mandatory> and registration key [optional]. NOTE: Instancename is the cname from the URL, not the FULL url https://instancename.infocyte.com). This script will append the url for you during install.
-	# [System.Net.ServicePointManager]::SecurityProtocol = [Enum]::ToObject([System.Net.SecurityProtocolType], 3072); (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; installagent <instancename> [regkey]
+	# [System.Net.ServicePointManager]::SecurityProtocol = [Enum]::ToObject([System.Net.SecurityProtocolType], 3072); (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; Install-EDR -InstanceName <instancename> -RegKey [regkey] -Region [ap|eu]
 
 	# Example:
-	# [System.Net.ServicePointManager]::SecurityProtocol = [Enum]::ToObject([System.Net.SecurityProtocolType], 3072); (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; installagent alpo1 asdfhrendsa
+	# [System.Net.ServicePointManager]::SecurityProtocol = [Enum]::ToObject([System.Net.SecurityProtocolType], 3072); (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; Install-EDR -InstanceName allsafemsp -RegKey asdf1234 -Region ap
 
 	# Logs are stored here: "C:\Windows\Temp\agentinstallscript.log"
 
@@ -36,8 +36,8 @@ New-Module -name install_dattoedr -scriptblock {
 			[String]$RegKey,
 
 			[Parameter(HelpMessage="ap or eu")]
-			[ValidateSet("ap", "eu", $null)]
-			[String]$Region,
+			[ValidateSet("us", "ap", "eu")]
+			[String]$Region="us",
 
 			[Parameter(HelpMessage="Explicit URL to the Datto EDR API. Overrides InstanceName and Region parameters")]
 			[String]$URL,
@@ -85,21 +85,20 @@ New-Module -name install_dattoedr -scriptblock {
 
 			}
 		} else {
-			if ($Region) {
+			if ($Region -eq "us") {
+				$hunturl = "https://$InstanceName.infocyte.com"
+			} else {				
 				$hunturl = "https://$InstanceName.$region.infocyte.com"
-			} else {
-				$hunturlnv = "https://$InstanceName.infocyte.com"
 			}
 		}
+		if ($Interactive) { Write-Host "Installing with URL: $hunturl" }
+		"$(Get-Date) [Information] Installing with URL: $hunturl" >> $LogPath
 
-		
 
-		$InstallPath = 'C:\Program Files\Infocyte\Agent\agent.exe'
 		If (Get-Service -name huntAgent -ErrorAction SilentlyContinue) {
-			if ($Force) {
-			} else {
-				if ($Interactive) { Write-Error "Infocyte Agent (HUNTAgent) service already installed" }
-				"$(Get-Date) [Information] Install started but HUNTAgent service already running. Skipping." >> $LogPath
+			if (-NOT $Force) {
+				if ($Interactive) { Write-Error "Datto EDR already installed" }
+				"$(Get-Date) [Information] Datto EDR is already installed and HUNTAgent service running. Skipping." >> $LogPath
 				return
 			}
 		}
@@ -215,7 +214,7 @@ New-Module -name install_dattoedr -scriptblock {
 		$service = Get-WmiObject -class win32_service -Filter "name='HUNTAgent'" -ea SilentlyContinue | Select-Object PathName -ExpandProperty PathName
 
 		If ($Service) {
-			if ($service -match '\"(.*)" --service') {
+			if ($service -match '^"(.*?)" --service') {
 				$AgentPath = $matches[1]
 			} else {
 				$AgentPath = 'C:\Program Files\Infocyte\Agent\agent.exe'
