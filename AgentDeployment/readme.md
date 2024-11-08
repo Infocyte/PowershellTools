@@ -27,6 +27,9 @@ Note: *Url* (1) and *RegKey* (2) are positional arguments so they don't require 
 If running from outside Powershell (like in a batch or GPO install script):
 > `powershell.exe -ExecutionPolicy bypass -noprofile -nologo -command { (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; Install-EDR https://demo1.infocyte.com xregkey01 }`
 
+### Example 3 (using named arguments):  
+> `(new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; Install-EDR -url https://alpo1.infocyte.com -regkey "asdfasdf" -friendlyname "DBServer01" -proxy "user:password@192.168.1.1:8080" -interactive`
+
 ---
 
 ## Additional (Optional) Parameters:
@@ -53,11 +56,10 @@ Use *-Force* to force a reinstall (by default it bails)
 Use *-FriendlyName* to add a descriptive name for the system (otherwise it uses hostname). This can be added or changed in the web console as well after install.
 
 
-### Example 3 (using named arguments):  
-> `(new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; Install-EDR -url https://alpo1.infocyte.com -regkey "asdfasdf" -friendlyname "DBServer01" -Proxy "user:password@192.168.1.1:8080" -Interactive`
-
 
 ## Uninstall One-Liner
 This script also includes an uninstallagent command:
 
-> `(new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; Uninstall-EDR`
+```
+(new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; Uninstall-EDR
+```
