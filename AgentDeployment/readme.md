@@ -8,9 +8,9 @@ The following command is all you need.  Run it on any windows system and it will
 To execute this script on a windows host, run this command replacing `<url>` with your EDR instance's url \<mandatory\> and any optional arguments like registration key `[regkey]`.  
 IMPORTANT: Do not include the brackets.
 
-
-> `(new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; Install-EDR <url> [regkey]`
-
+```
+(new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; Install-EDR <url> [regkey]
+```
 
 #### The positional arguments after the command *Install-EDR* are:  
 * **(1st Argument) \<Mandatory\>:** `-url https://alpo1.infocyte.com` (urls formated like `alpo1.infocyte.com` or even just the cname `alpo1` also work here)
