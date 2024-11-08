@@ -1,19 +1,19 @@
-New-Module -name install_InfocyteAgent -scriptblock {
-	# Infocyte HUNT scripted installation option. If unfamiliar with this script, contact your IT or Security team.
-	# www.infocyte.com
+New-Module -name install_dattoedr -scriptblock {
+	# Datto EDR scripted installation option. If unfamiliar with this script, contact your IT or Security team.
+	# www.datto.com
 
 	# WARNING: Single line scripted installers like this use similiar techniques to modern staged malware.
-	# As a result, this script will likely trigger behavioral detection products and may need to be whitelisted.
+	# As a result, this script will likely trigger behavioral detection products and may need to be whitelisted by your current security software.
 
 	# To execute this script as a one liner on a windows host with powershell 3.0+ (.NET 4.5+), run this command replacing instancename and key with your hunt instance <mandatory> and registration key [optional]. NOTE: Instancename is the cname from the URL, not the FULL url https://instancename.infocyte.com). This script will append the url for you during install.
-	# [System.Net.ServicePointManager]::SecurityProtocol = [Enum]::ToObject([System.Net.SecurityProtocolType], 3072); (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; installagent <instancename> [regkey]
+	# [System.Net.ServicePointManager]::SecurityProtocol = [Enum]::ToObject([System.Net.SecurityProtocolType], 3072); (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; Install-EDR -InstanceName <instancename> -RegKey [regkey] -Region [ap|eu]
 
 	# Example:
-	# [System.Net.ServicePointManager]::SecurityProtocol = [Enum]::ToObject([System.Net.SecurityProtocolType], 3072); (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; installagent alpo1 asdfhrendsa
+	# [System.Net.ServicePointManager]::SecurityProtocol = [Enum]::ToObject([System.Net.SecurityProtocolType], 3072); (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; Install-EDR -InstanceName allsafemsp -RegKey asdf1234 -Region ap
 
-	# Logs are stored here: "C:\Windows\Temp\infocyteagentinstaller.log"
+	# Logs are stored here: "C:\Windows\Temp\agentinstallscript.log"
 
-	Function Install-InfocyteAgent() {
+	Function Install-EDR() {
 		<#
 		.SYNOPSIS
 		Installs the Infocyte agent
@@ -29,8 +29,9 @@ New-Module -name install_InfocyteAgent -scriptblock {
 
 		#>
 		param(
-			[Parameter(Mandatory=$true, Position = 0, HelpMessage="The cname from the URL: https://<instancename>.infocyte.com)")]
-			[String]$InstanceName,
+			[Parameter(Mandatory=$true, Position = 0, HelpMessage="The API URL or cname from the URL: https://<instancename>.infocyte.com or https://<instancename>.<region>.infocyte.com)")]
+			[Alias("InstanceName")]
+			[String]$URL,
 
 			[Parameter(Position = 1, HelpMessage="This will automatically approve the agent registration and add it to its' default Target Group.")]
 			[String]$RegKey,
@@ -51,18 +52,17 @@ New-Module -name install_InfocyteAgent -scriptblock {
 			[Switch]$Force
 		)
 
-		$LogPath = "$env:SystemDrive\windows\Temp\infocyteagentinstaller.log"
+		$LogPath = "$env:Temp\agentinstallscript.log"
 		if ([System.IntPtr]::Size -eq 4) {
 			$agentURL = "https://s3.us-east-2.amazonaws.com/infocyte-support/executables/agent.windows32.exe"
 		} else {
 			$agentURL = "https://s3.us-east-2.amazonaws.com/infocyte-support/executables/agent.windows64.exe"
 		}
 		
-		$hunturl = "https://$InstanceName.infocyte.com"
-
-		If (-NOT $InstanceName) {
-			Write-Warning "[Error] Please provide Infocyte HUNT instance name (i.e. mycompany in mycompany.infocyte.com)"
-			"$(Get-Date) [Error] Installation Error: No InstanceName provided in arguments!" >> $LogPath
+		
+		If (-NOT $URL) {
+			Write-Warning "[Error] Please provide Datto EDR URL or instance name (i.e. mycompany in mycompany.infocyte.com) or a full URL to your EDR instance."
+			"$(Get-Date) [Error] Installation Error: No InstanceName or URL provided in arguments!" >> $LogPath
 			return
 		}
 
@@ -72,16 +72,30 @@ New-Module -name install_InfocyteAgent -scriptblock {
 			return
 		}
 
-		# Make script silent unless run interactive
-		if (-NOT $Interactive) { $ErrorActionPreference = "silentlycontinue" }
+		if ($URL -match "https://.*?\.infocyte\.com/?") {
+				$hunturl = $URL.TrimEnd('/')
+		} elseif ($URL -match "\.infocyte\.com/?") {
+			$hunturl = "https://$($URL.TrimEnd('/'))"
+		} elseif ($URL -notmatch "([:\\/-]|.com)") {
+			$hunturl = "https://$URL.infocyte.com"
+		} else {
+			if ($Interactive) { Write-Error "Could not parse instance name or url correctly: $hunturl" }
+			"$(Get-Date) [Error] Could not parse instance name or url correctly: $URL" >> $LogPath
+		}
 
-		$InstallPath = 'C:\Program Files\Infocyte\Agent\agent.exe'
+		if ([Uri]::IsWellFormedUriString($hunturl, [URIKind]::RelativeOrAbsolute)) {
+			if ($Interactive) { Write-Host "Installing with URL: $hunturl" }
+			"$(Get-Date) [Information] Installing with URL: $hunturl" >> $LogPath
+		} else {
+			if ($Interactive) { Write-error "URL is invalid: $hunturl" }
+			"$(Get-Date) [Error] URL is invalid: $hunturl" >> $LogPath
+		}
+		
+
 		If (Get-Service -name huntAgent -ErrorAction SilentlyContinue) {
-			if ($Force) {
-				$Uninstall = $True
-			} else {
-				if ($Interactive) { Write-Error "Infocyte Agent (HUNTAgent) service already installed" }
-				"$(Get-Date) [Information] Install started but HUNTAgent service already running. Skipping." >> $LogPath
+			if (-NOT $Force) {
+				if ($Interactive) { Write-Error "Datto EDR already installed" }
+				"$(Get-Date) [Information] Datto EDR is already installed and HUNTAgent service running. Skipping." >> $LogPath
 				return
 			}
 		}
@@ -119,7 +133,7 @@ New-Module -name install_InfocyteAgent -scriptblock {
 		try {
 			$wc.DownloadFile($agentURL, $DownloadPath)
 		} catch {
-			if ($Interactive) { Write-Warning "Could not download Infocyte agent from $agentURL" }
+			if ($Interactive) { Write-Warning "Could not download Datto EDR agent from $agentURL" }
 			"$(Get-Date) [Error] Installation Error: Install started but could not download agent from $agentURL." >> $LogPath
 		}
 
@@ -132,28 +146,13 @@ New-Module -name install_InfocyteAgent -scriptblock {
 		} catch {
 			if ($Interactive) { Write-Warning "Hash Error. $_" }
 			$sha1 = "Hashing Error"
-			#"$(Get-Date) [Warning] Installation Warning: Could not hash agent.survey.exe." >> $LogPath
-		}
-
-		# Uninstall if already installed and forcing a reinstall
-		if ($Force -AND $Uninstall) {
-			if ($Interactive) { Write-Warning "Agent service already installed. Forcing a reinstall." }
-			"$(Get-Date) [Information] HUNTAgent service already running. Forcing a reinstall." >> $LogPath
-
-			$arguments = @("--uninstall")
-			if (-NOT $interactive) { $arguments += "--quiet" }
-			try {
-				Start-Process -NoNewWindow -FilePath $DownloadPath -ArgumentList $arguments -Wait -ErrorAction Stop
-				#& $DownloadPath $arguments
-			} catch {
-				if ($Interactive) { Write-Error "$(Get-Date) [Error] Uninstall Error: Could not start $DownloadPath. [$_]" }
-				"$(Get-Date) [Error] Uninstall Error: Could not start $DownloadPath. [$_]" >> $LogPath
-				return
-			}
+			"$(Get-Date) [Warning] Installation Warning: Could not hash agent.survey.exe." >> $LogPath
 		}
 
 		# Setup exe arguments
 		$arguments = @("--url $hunturl")
+		$arguments += "--no-gui"
+		$arguments += "--no-verify"
 		if ($RegKey) { $arguments += "--key $RegKey" }
 		if ($FriendlyName) { $arguments += "--friendly $FriendlyName" }
 		if ($Proxy) { $arguments += "--proxy $Proxy" }
@@ -161,8 +160,12 @@ New-Module -name install_InfocyteAgent -scriptblock {
 
 		$version = & "$DownloadPath" --version
 		if ($version -notmatch "RTS Agent") {
-			if ($Interactive) { Write-Warning "$(Get-Date) [Error] $DownloadPath (version: $version, sha1: $sha1) is not valid or appears to be corrupt." }
+			if ($Interactive) { 
+				Write-Warning "$(Get-Date) [Error] $DownloadPath (version: $version, sha1: $sha1) is not valid or appears to be corrupt." 
+				Write-Warning "Output: `n$version"
+			}
 			"$(Get-Date) [Error] $DownloadPath (version: $version, sha1: $sha1) is not valid or appears to be corrupt." >> $LogPath
+			"$(Get-Date) [Error] Output: `n$version" >> $LogPath
 		}
 
 		if ($Interactive) { Write-Host "$(Get-Date) [Information] Downloaded agent.windows.exe (version: $version, sha1: $sha1) from $agentURL" }
@@ -171,8 +174,8 @@ New-Module -name install_InfocyteAgent -scriptblock {
 		# Execute!
 		try {
 			Start-Process -NoNewWindow -FilePath $DownloadPath -ArgumentList $arguments -Wait -ErrorAction Stop
-			if ($Interactive) { Write-Host "$(Get-Date) [Success] Installation Succeeded! Agent associated to $InstanceName." }
-			"$(Get-Date) [Success] Installation Succeeded! Agent associated to $InstanceName." >> $LogPath
+			if ($Interactive) { Write-Host "$(Get-Date) [Success] Installation Succeeded! Agent associated to $URL." }
+			"$(Get-Date) [Success] Installation Succeeded! Agent associated to $URL." >> $LogPath
 
 			#& $DownloadPath $arguments
 		} catch {
@@ -182,13 +185,13 @@ New-Module -name install_InfocyteAgent -scriptblock {
 
 	}
 
-	Function Uninstall-InfocyteAgent() {
+	Function Uninstall-EDR() {
 		<#
 		.SYNOPSIS
-		Uninstalls the Infocyte agent
+		Uninstalls the Datto EDR agent
 
 		.DESCRIPTION
-		Uninstalls the Infocyte agent
+		Uninstalls the Datto EDR agent
 
 		.Aliases
 		uninstallagent
@@ -201,7 +204,7 @@ New-Module -name install_InfocyteAgent -scriptblock {
 			[Parameter(HelpMessage="Use this switch silence output.")]
 			[Switch]$Silent
 		)
-		$LogPath = "$env:SystemDrive\windows\Temp\infocyteagentinstaller.log"
+		$LogPath = "$env:SystemDrive\windows\Temp\agentinstallscript.log"
 
 		If (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
 			Write-Warning "[Error] You do not have Administrator rights to run this script!`nPlease re-run as an Administrator!"
@@ -209,13 +212,10 @@ New-Module -name install_InfocyteAgent -scriptblock {
 			return
 		}
 
-		# Make script silent unless run interactive
-		if ($Silent) { $ErrorActionPreference = "silentlycontinue" }
-
 		$service = Get-WmiObject -class win32_service -Filter "name='HUNTAgent'" -ea SilentlyContinue | Select-Object PathName -ExpandProperty PathName
 
 		If ($Service) {
-			if ($service -match '\"(.*)" --service') {
+			if ($service -match '^"(.*?)" --service') {
 				$AgentPath = $matches[1]
 			} else {
 				$AgentPath = 'C:\Program Files\Infocyte\Agent\agent.exe'
@@ -226,6 +226,7 @@ New-Module -name install_InfocyteAgent -scriptblock {
 
 			# Uninstall
 			$arguments = @("--uninstall")
+			$arguments += "--no-gui"
 			if ($Silent) { $arguments += "--quiet" }
 
 			try {
@@ -250,8 +251,8 @@ New-Module -name install_InfocyteAgent -scriptblock {
 		}
 	}
 
-	Export-ModuleMember -Alias 'installagent' -Function 'Install-InfocyteAgent'
-	Export-ModuleMember -Alias 'uninstallagent' -Function 'Uninstall-InfocyteAgent'
+	Export-ModuleMember -Alias 'installagent' -Function 'Install-EDR'
+	Export-ModuleMember -Alias 'uninstallagent' -Function 'Uninstall-EDR'
 } | Out-Null
-Set-Alias installagent -Value Install-InfocyteAgent
-Set-Alias uninstallagent -Value Uninstall-InfocyteAgent
+Set-Alias installagent -Value Install-EDR
+Set-Alias uninstallagent -Value Uninstall-EDR
