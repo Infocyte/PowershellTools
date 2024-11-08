@@ -9,7 +9,7 @@ To execute this script on a windows host, run this command replacing `<url>` wit
 IMPORTANT: Do not include the brackets.
 
 
-> `[System.Net.ServicePointManager]::SecurityProtocol = [Enum]::ToObject([System.Net.SecurityProtocolType], 3072); (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; Install-EDR <url> [regkey]`
+> `(new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/AgentDeployment/install_huntagent.ps1") | iex; Install-EDR <url> [regkey]`
 
 
 #### The positional arguments after the command *Install-EDR* are:  
