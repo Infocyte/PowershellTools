@@ -1,3 +1,5 @@
+#Run this like so:
+# (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Infocyte/PowershellTools/master/RMMScripts/rdptriage.ps1") | iex
 $temp = "~\Desktop\rdptriage"
 if (-NOT (Test-Path $temp)) {
 	mkdir $temp
