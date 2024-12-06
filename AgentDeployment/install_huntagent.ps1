@@ -221,8 +221,8 @@ New-Module -name install_dattoedr -scriptblock {
 				$AgentPath = 'C:\Program Files\Infocyte\Agent\agent.exe'
 			}
 			
-			if (-NOT $Silent) { Write-Host "Uninstalling Infocyte Agent." }
-			"$(Get-Date) [Information] Uninstalling Infocyte Agent." >> $LogPath
+			if (-NOT $Silent) { Write-Host "Uninstalling Datto EDR Agent." }
+			"$(Get-Date) [Information] Uninstalling Datto EDR Agent." >> $LogPath
 
 			# Uninstall
 			$arguments = @("--uninstall")
@@ -238,16 +238,8 @@ New-Module -name install_dattoedr -scriptblock {
 			}
 
 		} else {
-			$proc = Get-Process -name agent.windows
-			if ($proc) {
-				if (-NOT $Silent) { Write-Warning "Agent was not installed but it is running non-persistent mode. Killing process." }
-				"$(Get-Date) [Information] Agent was not installed but is running non-persistent mode. Killed process." >> $LogPath
-				Get-Process -name agent.windows | Stop-Process | Out-Null
-				Remove-Item $proc.Path -Force
-			} else {
-				if (-NOT $Silent) { Write-Warning "Agent was not installed." }
-				"$(Get-Date) [Information] Attempted to uninstall Agent but was not installed. Skipping." >> $LogPathvvv
-			}
+			if (-NOT $Silent) { Write-Warning "Agent was not installed." }
+			"$(Get-Date) [Information] Attempted to uninstall Agent but was not installed. Skipping." >> $LogPathvvv
 		}
 	}
 
